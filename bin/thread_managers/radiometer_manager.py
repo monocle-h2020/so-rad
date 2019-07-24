@@ -17,6 +17,7 @@ import datetime
 import logging
 import RPi.GPIO as GPIO
 import traceback
+from PyTrios import PyTrios as ps
 
 log = logging.getLogger()   # report to root logger
 
@@ -27,9 +28,9 @@ class TriosManager(object):
     """
     def __init__(self, rad):
         # import pytrios only if used
-        sys.path.append(rad['pytrios_path'])
-        global ps
-        from pytrios import PyTrios as ps
+        #sys.path.append(rad['pytrios_path'])
+        #global ps
+        #from pytrios import PyTrios as ps
         self.config = rad  # dictionary with radiometry settings
         self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
         self.coms = ps.TMonitor(self.ports, baudrate=9600)
