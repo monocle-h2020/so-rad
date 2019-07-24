@@ -29,7 +29,6 @@ import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun
 from thread_managers.gps_manager import GPSManager
-from thread_managers.motor_manager import MotorManager
 from thread_managers import radiometer_manager as RadManager
 from thread_managers.gps_checker import GPSChecker
 
