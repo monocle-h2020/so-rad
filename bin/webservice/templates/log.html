@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="jumbo">
+    <h2>SO-RAD Log Page</h2>
+  </div>
+  <br>
+  {% for m in message %}
+    <div class=body>{{ m }}</div>
+  {% endfor %}
+  <br>
+
+
+{% endblock %}

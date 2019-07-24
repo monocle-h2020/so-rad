@@ -1,0 +1,7 @@
+{
+    "SLAVE_ID": "1",
+    "FUNCTION_CODE": "16",
+    "SPEED": "2000",
+    "ACCELERATION": "1500",
+    "DECELERATION": "1500"
+}

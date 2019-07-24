@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="jumbo">
+    <h2>SO-RAD Status Page</h2>
+  </div>
+  <br>
+  <a href="/log">Recent log</a>
+  <a href="/logfull">Full log</a>
+  <br>
+  
+  <br>
+  {% for m in message %}
+    <div class=flash>{{ m }}</div>
+  {% endfor %}
+  <br>
+
+
+{% endblock %}

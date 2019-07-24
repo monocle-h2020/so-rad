@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <head>
+    <title>So-Rad Web API</title>
+    <strong><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></strong>    
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <h1 class="logo">SO-RAD Web API</h1>
+      </div>
+    </header> 
+     
+    <div class="container">
+      {% block content %}
+      {% endblock %}
+    </div>
+     
+  </body>
+</html>
