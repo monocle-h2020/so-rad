@@ -11,12 +11,10 @@ Plymouth Marine Laboratory
 License: under development
 
 """
-import sys
 import time
 import datetime
 import logging
 import RPi.GPIO as GPIO
-import traceback
 
 log = logging.getLogger()   # report to root logger
 

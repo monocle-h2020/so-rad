@@ -17,6 +17,8 @@ import sqlite3
 import RPi.GPIO as GPIO
 import logging
 from functions import gps_functions as gps_func
+from thread_managers import radiometer_manager
+from thread_managers import battery_manager
 
 log = logging.getLogger()   # report to root logger
 
@@ -92,6 +94,33 @@ def motor_init(motor_config, ports):
     return motor
 
 
+def battery_init(battery_config, ports):
+    """
+    Read battery monitoring configuration settings and initialise connection to battery.
+    
+    : battery_config is the [BATTERY] section in the config file
+    : battery is a dictionary containing the configuration 
+    """
+    battery = {}
+    # Get all the motor variables from the config file
+    battery['used'] = battery_config.getboolean('use_battery')
+    battery['interface'] = battery_config.get('battery_protocol')
+    battery['baud'] = battery_config.getint('baud')
+    battery['battery_low_th_V'] = float(battery_config.get('battery_low_th_V'))
+    battery['battery_crit_th_V'] = float(battery_config.getint('battery_crit_th_V'))
+    battery['port_autodetect'] = battery_config.getboolean('port_autodetect')
+    battery['port_autodetect_string'] = battery_config.get('port_autodetect_string')
+    battery['port_default'] = battery_config.get('port_default').lower()
+
+    assert battery['interface'] in ['victron',]
+
+    # Return the battery configuration dict and relevant manager class
+    if battery['interface'] == 'victron':
+        Bat_manager = battery_manager.VictronManager(battery, ports)
+
+    return battery, Bat_manager
+
+
 def gps_init(gps_config, ports):
     """read gps configuration. Any other initialisation should also be called here"""
     gps = {}
@@ -111,9 +140,10 @@ def gps_init(gps_config, ports):
     gps['id2'] = gps_config.get('id2').lower()
     gps['heading_speed_limit'] = gps_config.getint('heading_speed_limit')
     gps['gpio2'] = gps_config.getint('gpio2')
+    gps['gpio_control'] = gps_config.getboolean('use_gpio_control')
 
     # If port autodetect is wanted, look for what port has the identifying string also provided
-    if gps_config.getboolean('port_autodetect') and gps_config.getboolean('use_gpio_control') and gps['n_gps'] == 2:
+    if gps_config.getboolean('port_autodetect') and gps['gpio_control'] and gps['n_gps'] == 2:
         # this is the recommended situation, one gps will be detected, the second after powering the relay switch
         port_autodetect_string = gps_config.get('port_autodetect_string')
         gps_counter = 0
@@ -152,7 +182,7 @@ def gps_init(gps_config, ports):
         gps['port1'] = gps_config.get('port1_default')
         if gps['n_gps'] == 2:
             gps['port2'] = gps_config.get('port2_default')
-        if gps_config.getboolean('use_gpio_control'):
+        if gps['gpio_control']:
             # switch gpio pin on for second GPS sensor
             GPIO.setmode(GPIO.BOARD)
             pin = gps['gpio2']
@@ -228,8 +258,11 @@ def rad_init(rad_config, ports):
         GPIO.output(pins, GPIO.HIGH)
         time.sleep(1) # Wait to allow sensors to boot
 
-    # Return the radiometry dict
-    return rad
+    # Return the radiometry dict and relevant manager class
+    if rad['rad_interface'] == 'pytrios':
+        Rad_manager = radiometer_manager.TriosManager(rad)
+
+    return rad, Rad_manager
 
 
 def init_gpio(conf, state=0):
