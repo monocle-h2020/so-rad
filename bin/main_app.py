@@ -51,7 +51,7 @@ def parse_args():
 
 def read_config(config_file):
     """Opens and reads the config file
-    
+
     :param config_file: the config.ini file
     :type config_file: file
     :return: dictionary of the config file's contents
@@ -64,7 +64,7 @@ def read_config(config_file):
 
 def init_logger(conf_log_dict):
     """Initialises the root logger for the program
-    
+
     :param conf_log_dict: dictionary containing the logger config information
     :type conf_log_dict: dictionary
     :return: log
@@ -164,6 +164,10 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
+    # Stop the GPS checker manager
+    log.info("Stopping dual-gps monitor thread")
+    del(gps_checker_manager)
+
     # If a db is used, close the connection
     if db['used']:
         db['cur'].close()
@@ -176,10 +180,6 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager):
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
     del(radiometry_manager)
-
-    # Stop the GPS checker manager
-    log.info("Stopping dual-gps monitor thread")
-    del(gps_checker_manager)
 
     # Stop the GPS managers
     for gps_manager in gps_managers:

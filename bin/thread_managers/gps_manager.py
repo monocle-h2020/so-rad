@@ -492,7 +492,7 @@ class GPSManager(object):
     def flushbuffer(self):
         self.serial_ports[0].reset_input_buffer()
 
-    def reset_comports():
+    def reset_comports(self):
         """Reset the comports so that the data is fresh and the GPS sensors are in sync"""
         self.gps_lock.acquire(True)
         self.serial_ports[0].close()
