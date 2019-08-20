@@ -53,6 +53,8 @@ class GPSCheckerThread(threading.Thread):
         self.median_bearing = 0
         self.prev_gps1_time = datetime.datetime(1970,1,1)
         self.prev_gps2_time = datetime.datetime(1970,1,1)
+        self.last_reset = datetime.datetime.now()
+
         log.info("Starting GPS Checker thread")
 
     def run(self):
@@ -94,6 +96,12 @@ class GPSCheckerThread(threading.Thread):
                     #self.gps_managers[1].flushbuffer()
                     log.warning("GPS managers out of sync at {0} [1: {1} | 2: {2}]".\
                                 format(datetime.datetime.now(), gps1_time.timestamp(), gps2_time.timestamp()))
+                    #time_elapsed = datetime.datetime.now() - self.last_reset
+                    #if time_elapsed.total_seconds() > 300:
+                    #    self.last_reset = datetime.datetime.now()
+                    #    log.info("Resetting GPS com ports")
+                    #    self.gps_managers[0].reset_comports()
+                    #    self.gps_managers[1].reset_comports()
                     time.sleep(1.12)
                     continue
 
