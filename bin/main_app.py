@@ -95,14 +95,11 @@ def init_logger(conf_log_dict):
 
 def init_all(conf):
     """Initialise all components"""
+    
+    log = logging.getLogger()
+
     db = initialisation.db_init(conf['DATABASE'])
     initialisation.init_gpio(conf, state=0)  # set all used pins to LOW
-
-    # start logging here
-    log = init_logger(conf['LOGGING'])
-    #log = logging.getLogger()
-    log.info('\n===Started logging===\n')
-
 
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
@@ -110,7 +107,7 @@ def init_all(conf):
     gps = initialisation.gps_init(conf['GPS'], ports)
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
-    battery, bat_manager = initialisation.battery_init(conf['BATTERY'])
+    battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
 
     # start the battery manager
     if battery['used']:
@@ -164,11 +161,12 @@ def init_all(conf):
     time.sleep(0.1)
 
     # Start the radiometry manager
+    log.info("Starting radiometry manager")
     radiometry_manager = Rad_manager(rad)
     time.sleep(0.1)
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gps_checker_manager, log, gpios
+    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gps_checker_manager, gpios
 
 
 def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios):
@@ -225,10 +223,15 @@ def run():
     args = parse_args()
     conf = read_config(args.config_file)
 
+    # start logging here
+    log = init_logger(conf['LOGGING'])
+    #log = logging.getLogger()
+    log.info('\n===Started logging===\n')
+
     try:
         # Initialise everything
         db_dict, rad, sample, gps_managers, radiometry_manager,\
-            motor, battery, bat_manager, gps_checker_manager, log, gpios = init_all(conf)
+            motor, battery, bat_manager, gps_checker_manager, gpios = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
         stop_all(db_dict, radiometry_manager, gps_managers,
