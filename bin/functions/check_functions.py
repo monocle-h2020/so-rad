@@ -42,7 +42,7 @@ def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""
     return solar_elevation >= sample_dict['solar_elevation_limit']
 
-def check_battery(battery, bat_manager):
+def check_battery(bat_manager, battery):
     """Check whether battery voltage is OK
     returns:
         -1: Unknown

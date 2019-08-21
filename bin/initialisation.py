@@ -65,7 +65,6 @@ def motor_init(motor_config, ports):
     motor['home_pos'] = motor_config.getint('home_pos')
     motor['step_thresh_time'] = motor_config.getint('step_thresh_time')
     motor['baud'] = motor_config.getint('baud')
-    motor['check_angle_every_sec'] = float(motor_config.get('check_angle_every_sec'))
     motor['steps_per_degree'] = float(motor_config.getint('steps_per_degree'))
 
     # If port autodetect is wanted, look for what port has the identifying string also provided
@@ -106,8 +105,8 @@ def battery_init(battery_config, ports):
     battery['used'] = battery_config.getboolean('use_battery')
     battery['interface'] = battery_config.get('battery_protocol')
     battery['baud'] = battery_config.getint('baud')
-    battery['battery_low_th_V'] = battery_config.getint('battery_low_th_V')
-    battery['battery_crit_th_V'] = battery_config.getint('battery_crit_th_V')
+    battery['battery_low_th_V'] = float(battery_config.get('battery_low_th_V'))
+    battery['battery_crit_th_V'] = float(battery_config.get('battery_crit_th_V'))
     battery['port_autodetect'] = battery_config.getboolean('port_autodetect')
     battery['port_autodetect_string'] = battery_config.get('port_autodetect_string')
     battery['port_default'] = battery_config.get('port_default').lower()

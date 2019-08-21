@@ -333,7 +333,6 @@ def run():
                             moving = True
                         log.info("..moving motor.. {0} --> {1}".format(motor_pos, target_pos))
                         time.sleep(2)
-                motor_ready = True
 
             else:
                 message += "ShBe: None, SuAz: None, SuEl: None. "
@@ -344,7 +343,7 @@ def run():
             # min battery power (see config file)
 
             # If all checks are good, take radiometry measurements
-            if all([gps_ready, motor_ready, rad_ready, sun_suitable]):
+            if all([gps_ready, rad_ready, sun_suitable]):
                 # Get the current time of the computer and data from the GPS sensor managers
                 trigger_id = datetime.datetime.now()
                 gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
