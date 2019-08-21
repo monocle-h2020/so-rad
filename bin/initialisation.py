@@ -112,6 +112,9 @@ def battery_init(battery_config, ports):
     battery['port_autodetect_string'] = battery_config.get('port_autodetect_string')
     battery['port_default'] = battery_config.get('port_default').lower()
 
+    if not battery['used']:
+        return battery, None
+
     assert battery['interface'] in ['victron',]
 
     # Return the battery configuration dict and relevant manager class
