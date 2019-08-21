@@ -97,17 +97,17 @@ def motor_init(motor_config, ports):
 def battery_init(battery_config, ports):
     """
     Read battery monitoring configuration settings and initialise connection to battery.
-    
+
     : battery_config is the [BATTERY] section in the config file
-    : battery is a dictionary containing the configuration 
+    : battery is a dictionary containing the configuration
     """
     battery = {}
     # Get all the motor variables from the config file
     battery['used'] = battery_config.getboolean('use_battery')
     battery['interface'] = battery_config.get('battery_protocol')
     battery['baud'] = battery_config.getint('baud')
-    battery['battery_low_th_V'] = float(battery_config.get('battery_low_th_V'))
-    battery['battery_crit_th_V'] = float(battery_config.getint('battery_crit_th_V'))
+    battery['battery_low_th_mV'] = battery_config.getint('battery_low_th_mV')
+    battery['battery_crit_th_mV'] = battery_config.getint('battery_crit_th_mV')
     battery['port_autodetect'] = battery_config.getboolean('port_autodetect')
     battery['port_autodetect_string'] = battery_config.get('port_autodetect_string')
     battery['port_default'] = battery_config.get('port_default').lower()
@@ -116,9 +116,9 @@ def battery_init(battery_config, ports):
 
     # Return the battery configuration dict and relevant manager class
     if battery['interface'] == 'victron':
-        Bat_manager = battery_manager.VictronManager(battery, ports)
+        bat_manager = battery_manager.VictronManager(battery, ports)
 
-    return battery, Bat_manager
+    return battery, bat_manager
 
 
 def gps_init(gps_config, ports):
