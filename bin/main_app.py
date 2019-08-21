@@ -95,7 +95,7 @@ def init_logger(conf_log_dict):
 
 def init_all(conf):
     """Initialise all components"""
-    
+
     log = logging.getLogger()
 
     db = initialisation.db_init(conf['DATABASE'])
@@ -181,10 +181,6 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
     if db['used']:
         db['cur'].close()
 
-    # Turn all GPIO pins off
-    GPIO.output(gpios, GPIO.LOW)
-    GPIO.cleanup()
-
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
     del(radiometry_manager)
@@ -192,14 +188,16 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
     # Stop the GPS managers
     for gps_manager in gps_managers:
         log.info("Stopping GPS manager thread")
-        gps_manager.stop()
+        del(gps_manager)
 
     # Stop the battery manager
     if battery['used']:
         log.info("Stopping battery manager thread")
         del(bat_manager)
 
-    time.sleep(0.1)
+    # Turn all GPIO pins off
+    GPIO.output(gpios, GPIO.LOW)
+    GPIO.cleanup()
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
@@ -293,7 +291,8 @@ def run():
                 motor_pos = motor_func.get_motor_pos(motor['serial'])
                 if motor_pos is None:
                     message += "Motor position not read. NotReady: {0}".format(datetime.datetime.now())
-                    time.sleep(conf['DEFAULT'].getint['main_check_cycle_sec'])
+                    log.info(message)
+                    time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
                     continue
 
                 # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
@@ -349,8 +348,6 @@ def run():
                 gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
                 gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
 
-                #log.info('GPSChecker lock: {0}'.format(gps_checker_manager.checker_thread.locked()))
-
                 # Collect radiometry data and splice together
                 trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
                 spec_data = []
@@ -384,7 +381,7 @@ def run():
                     message += "NotReady | GPS Recorded: {0} [{1}]".format(last_commit_time, db_id)
 
             log.info(message)
-            time.sleep(conf['DEFAULT'].getint['main_check_cycle_sec'])
+            time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
