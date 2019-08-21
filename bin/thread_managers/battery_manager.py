@@ -14,6 +14,7 @@ import datetime
 import logging
 import serial
 import threading
+import codecs
 
 log = logging.getLogger()   # report to root logger
 
@@ -29,11 +30,82 @@ class VictronManager(object):
         : ports is a list of available COM ports
         """
         self.config = battery
-        # import any dependencies to connect to this interface
-        # configure connection
         self.serial = self.connect(ports)
         self.voltage = None
-        
+        self.stop_monitor = False
+        self.started = False        
+        self.lock = threading.Lock()
+        self.threads = []
+        self.connect()
+        self.lastlineread = ''
+        self.last_update = datetime.datetime.now()
+        self.sleep_interval = 0.1
+
+    def start(self):
+        """
+        Starts serial reading threads.
+        """
+        if not self.started:
+            self.started = True
+            for port in self.serial:
+                new_thread = threading.Thread(target=self.run, args=(port,))
+                self.threads.append(new_thread)
+            for thread in self.threads:
+                thread.start()
+            log.info("Started Battery manager")
+        else:
+            log.warn("Could not start Battery manager")
+
+    def stop(self):
+        """
+        Tells the serial threads to stop.
+        """
+        log.info("Stopping Battery manager")
+        self.stop_monitor = True
+        time.sleep(2*self.sleep_interval)
+        log.info(self.threads)
+        for thread in self.threads:
+            thread.join(1)
+            log.info("Battery manager running = {0}".format(thread.is_alive()))
+        self.threads = []
+        self.started = False
+
+    def parse_line(self, line):
+        """
+        Updates the fields held by this class, a lock is used to prevent corruption.
+        :line: a line read on the serial port
+        """
+        self.lock.acquire(True)
+        self.lastlineread = line
+        self.last_update = datetime.datetime.now()
+        self.gps_lock.release()
+
+    def run(self, port):
+        """
+        Main loop of the thread.
+        This will run and read from a serial port and pass it back
+        """
+        log.info("Starting battery monitor thread on port {0}".format(port))
+        while not self.stop_monitor:
+            if port.inWaiting() > 1000:
+                # if too much data in buffer, throw it away
+                log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(port))
+                port.reset_input_buffer()
+                time.sleep(0.001)
+                continue
+            if port.inWaiting() > 0:
+                # if there is data, read it, parse it and continue immediately
+                serial_string = port.readline()
+                try:
+                    self.last_result_dict = self.parse_line(codecs.decode(serial_string, 'utf-8'))
+                except UnicodeDecodeError:
+                    log.warning("UnicodeDecodeError on Battery string: {0}".format(serial_string))
+                    time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
+            else:
+                time.sleep(self.sleep_interval)
+                # sleep for a standard period
+                continue
+
     def connect(self, ports):
         # If port autodetect is selected, look for what port has the identifying string also provided
         if self.config['port_autodetect']:
@@ -55,225 +127,3 @@ class VictronManager(object):
         
     def __del__(self):
         self.serial.close()
-
-
-
-
-class SerialReader(threading.Thread):
-    """
-    Thread to read from a serial port
-    """
-    def __init__(self, serial_port, parent):
-        threading.Thread.__init__(self)
-        self.serial_port = serial_port
-        self.parent = parent
-
-        self.observers = []
-
-        self.current_gps_dict = None
-        log.info("Starting GPS reader thread")
-
-    def run(self):
-        """
-        Main loop of the thread.
-
-        This will run and read from a GPS string and when it is valid and decoded it'll be passed via the
-        observer design pattern.
-        """
-        while not self.parent.stop_gps:
-            old_gps_time = self.parent.datetime
-
-            if self.serial_port.inWaiting() > 1000:
-                # if too much data in buffer, throw it away
-                log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(self.serial_port.port))
-                self.serial_port.reset_input_buffer()
-                time.sleep(0.001)
-                continue
-
-            if self.serial_port.inWaiting() > 0:
-                # if there is data, read it
-                gps_string = self.serial_port.readline()
-            else:
-                time.sleep(0.01)
-                # sleep a bit longer than usual
-                continue
-
-            log.debug("NMEA: {0}".format(gps_string.strip()))
-
-            try:
-                self.current_gps_dict = GPSParser.parse(codecs.decode(gps_string, 'utf-8'))
-                self.notify_observers()
-            except UnicodeDecodeError:
-                log.warning("UnicodeDecodeError on GPS string: {0}".format(gps_string))
-
-            #if datetime.datetime.now().timestamp() - self.parent.last_update.timestamp() > 1.0:
-            #    if old_gps_time.timestamp() == self.current_gps_dict['date']:
-            #        self.parent.reset_comports()
-
-            time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
-
-    def register_observer(self, observer):
-        """
-        Register an observer of the GPS thread.
-
-        Observers must implement a method called "update"
-        :param observer: An observer object.
-        :type observer: object
-        """
-        if not observer in self.observers:
-            self.observers.append(observer)
-
-    def notify_observers(self):
-        """
-        This pushes the GPS dict to all observers.
-        """
-        if self.current_gps_dict is not None:
-            for observer in self.observers:
-                observer.update(self.current_gps_dict)
-
-
-class GPSManager(object):
-    """
-    Main GPS class which oversees the management and reading of GPS ports.
-    """
-    def __init__(self):
-        self.serial_ports = []
-        self.stop_gps = False
-        self.watchdog = None
-        self.started = False
-        self.threads = []
-        self.heading = None
-        self.lat = None
-        self.lon = None
-        self.alt = None
-        self.speed = None
-        self.fix = 0
-        self.datetime = None
-        self.old = False
-        self.proper_compass = False
-        self.satellite_number = 0
-        self.update_rate = 0
-        self.gps_lock = threading.Lock()
-        self.gps_observers = []
-        self.watchdog_callbacks = []
-        self.last_update = datetime.datetime.now()
-
-    def __del__(self):
-        #self.disable_watchdog()
-        self.stop()
-
-    def add_serial_port(self, serial_port):
-        """
-        Add a serial port to the list of ports to read from.
-
-        The serial port must be an instance of serial.Serial, and the open() method must have been called.
-
-        :param serial_port: Serial object
-        :type serial_port: serial.Serial
-        """
-        if not serial_port in self.serial_ports:
-            self.serial_ports.append(serial_port)
-
-    def remove_serial_port(self, serial_port):
-        """
-        Remove serial port from the list of ports to remove.
-
-        This wont kill any threads reading serial ports. Run stop then remove then start again.
-        :param serial_port: Serial object
-        :type serial_port: serial.Serial
-        """
-        if serial_port in self.serial_ports:
-            self.serial_ports.remove(serial_port)
-
-    def start(self):
-        """
-        Starts serial reading threads.
-        """
-        if not self.started:
-            self.started = True
-            for port in self.serial_ports:
-                new_thread = GPSSerialReader(port, self)
-                new_thread.register_observer(self)
-                self.threads.append(new_thread)
-
-            for thread in self.threads:
-                thread.start()
-
-            log.info("Started GPS managers")
-        else:
-            log.warn("GPS manager already started")
-
-    def stop(self):
-        """
-        Tells the serial threads to stop.
-        """
-        log.info("Stopping GPS manager")
-        self.stop_gps = True
-        time.sleep(2)
-        log.info(self.threads)
-        for thread in self.threads:
-            thread.join(1)
-            log.info("gps alive? = {0}".format(thread.is_alive()))
-        self.threads = []
-        self.started = False
-
-    def update(self, gps_dict):
-        """
-        Updates the gps info held by this class, a lock is used to prevent corruption.
-
-        :param gps_dict: GPS Dictionary passed.
-        :type gps_dict: dict
-        """
-        self.gps_lock.acquire(True)
-        if gps_dict is not None:
-            self.old = False
-            if self.watchdog is not None:
-                self.watchdog.reset()
-            if gps_dict['type'] == 'hchdg':
-                self.proper_compass = True
-                self.heading = gps_dict['heading']
-            elif gps_dict['type'] == 'gpvtg':
-                # Use track made good? for heading if no proper compass
-                self.speed = gps_dict['speed']
-
-                if not self.proper_compass:
-                    self.heading = gps_dict['heading']
-            elif gps_dict['type'] == 'gpgga':
-                self.lat = gps_dict['lat']
-                self.lon = gps_dict['lon']
-                self.alt = gps_dict['alt']
-                #self.fix = gps_dict['fix']
-                self.satellite_number = gps_dict['satellite_number']
-                #if self.datetime is not None: # Doesnt get day only time so update if we have proper day (GPRMC should set that eventually)
-                #    self.datetime.replace(hour=gps_dict['hour'], minute=gps_dict['min'], second=gps_dict['seconds'])
-                #else:
-                #    self.datetime = gps_dict['date']
-            elif gps_dict['type'] == 'gprmc':
-                self.lat = gps_dict['lat']
-                self.lon = gps_dict['lon']
-                self.datetime = gps_dict['date']
-                self.speed = gps_dict['speed']
-                # Use track made good? for heading if no proper compass
-                if not self.proper_compass:
-                    self.heading = gps_dict['heading']
-            elif gps_dict['type'] == 'pmtk500':
-                self.update_rate = gps_dict['update_rate']
-            elif gps_dict['type'] == 'gpgsa':
-                self.fix = gps_dict['fix']
-            #self.notify_observers()
-            self.last_update = datetime.datetime.now()
-        self.gps_lock.release()
-
-    def flushbuffer(self):
-        self.serial_ports[0].reset_input_buffer()
-
-    def reset_comports(self):
-        """Reset the comports so that the data is fresh and the GPS sensors are in sync"""
-        self.gps_lock.acquire(True)
-        self.serial_ports[0].close()
-        time.sleep(0.05)
-        self.serial_ports[0].open()
-        log.info("Reset GPS ports: {0}".format(datetime.datetime.now()))
-        self.gps_lock.release()
-
-
