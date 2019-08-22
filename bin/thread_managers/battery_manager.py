@@ -129,8 +129,13 @@ class VictronManager(object):
                 try:
                     self.parse_line(codecs.decode(serial_string.strip(), 'utf-8'))
                 except UnicodeDecodeError:
-                    log.warning("UnicodeDecodeError on Battery string: {0}".format(serial_string))
+                    pass
+                    #log.warning("UnicodeDecodeError on Battery string: {0}".format(serial_string))
                     time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
+                except Exception:
+                    log.warning("Error parsing Battery string: {0}".format(serial_string))
+                    time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
+
             else:
                 time.sleep(self.sleep_interval)
                 # sleep for a standard period
