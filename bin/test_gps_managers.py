@@ -26,8 +26,18 @@ def run_test():
     args = main_app.parse_args()
     conf = main_app.read_config(args.config_file)
     ports = list_ports.comports()
+    print("connecting to gps ports")
     gps = initialisation.gps_init(conf['GPS'], ports)
 
+    print(gps['serial1'], gps['serial2'])
+
+    print("showing a few blocks of gps data, if available")
+    for gserial in [gps['serial1'], gps['serial2']]:
+        for i in range(10):
+            print(i, gserial.port, gserial.inWaiting())
+            print(i, gserial.port, gserial.read(100))
+
+    print("starting gps managers")
     gps_ports = [port for key, port in gps.items() if 'serial' in key]
     # Instantiate GPS monitoring threads
     if len(gps_ports) > 0:
@@ -45,6 +55,7 @@ def run_test():
     # gps_checker_manager = GPSChecker(gps_managers)
     # gps_checker_manager.start()
 
+    print("showing gps manager data, CTRL-C to stop")
     while True:
         try:
             for gpsman in gps_managers:

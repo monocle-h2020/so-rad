@@ -21,7 +21,7 @@ from thread_managers import radiometer_manager
 from thread_managers import battery_manager
 
 log = logging.getLogger()   # report to root logger
-
+GPIO.setwarnings(False)
 
 def db_init(db_config):
     """set up and test sqlite database connection. Return dictionary with database items"""
@@ -157,8 +157,23 @@ def gps_init(gps_config, ports):
                 log.info("GPS1 using port: {0}".format(port))
                 gps_counter += 1
         if gps_counter != 1:
-            err = "Error: {0} gps interfaces detected, expected 1 of {1} to be connected".format(gps_counter, gps['n_gps'])
-            raise AssertionError(err)
+            if gps['gpio_control']:
+                log.info("More than 1 GPS detected, attempting to power down GPS2")
+                GPIO.setmode(GPIO.BOARD)
+                pin = gps['gpio2']
+                GPIO.setup(pin, GPIO.OUT)
+                GPIO.output(pin, GPIO.LOW)
+                time.sleep(2)
+                gps_counter = 0
+                ports = list_ports.comports()
+                for port, desc, hwid in sorted(ports):
+                    if (desc == port_autodetect_string):
+                        gps['port1'] = port
+                        log.info("GPS1 using port: {0}".format(port))
+                        gps_counter += 1
+            if gps_counter !=1:
+                err = "Error: {0} gps interfaces detected, expected 1 of {1} to be connected".format(gps_counter, gps['n_gps'])
+                raise AssertionError(err)
 
         # switch gpio pin on for the second GPS
         GPIO.setmode(GPIO.BOARD)
@@ -176,11 +191,10 @@ def gps_init(gps_config, ports):
             if (desc == port_autodetect_string) and port != gps['port1']:
                 gps['port2'] = port
                 log.info("GPS2 using port: {0}".format(port))
-            # else: 
-            #     err = "Error: Second GPS not found"
-            #     raise AssertionError(err)
+
     else:
         # Get the known GPS ports from the config file
+        log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
         if gps['n_gps'] == 2:
             gps['port2'] = gps_config.get('port2_default')
@@ -194,8 +208,8 @@ def gps_init(gps_config, ports):
 
     time.sleep(1)
     # Create serial objects for both the GPS sensor ports using variables from the config file
-    gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=None, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-    gps['serial2'] = serial.Serial(port=gps['port2'], baudrate=gps['baud2'], timeout=None, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
+    gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
+    gps['serial2'] = serial.Serial(port=gps['port2'], baudrate=gps['baud2'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
 
     time.sleep(1)
     # If the polling rate is to be changed, send update commands to the GPS sensors
