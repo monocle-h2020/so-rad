@@ -14,7 +14,7 @@ log = logging.getLogger() #import root logger
 
 def connect_db(db_dict):
     """Connect to the sqlite3 database file
-    
+
     :param db_dict: database information dictionary
     :type db_dict: dictionary
     :raises Exception: Exception

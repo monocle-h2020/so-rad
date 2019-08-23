@@ -19,7 +19,7 @@ config_file_location = sys.argv[1]
 conf = read_config(config_file_location)
 
 log_file_location = conf['LOGGING'].get('log_file_location')
-db_file_location = conf['DATABASE'].get('database_file')
+db_path = conf['DATABASE'].get('database_path')
 
 status_page = Blueprint('status_page', __name__,
                         template_folder='templates')
@@ -31,7 +31,6 @@ log_full_page = Blueprint('log_full_page', __name__,
 @status_page.route('/')
 def show_status():
     try:
-        db_path = "../sorad_database.db"  # FIXME: get from config
         rows = get_one_row_from_db(db_path)
 
         return render_template('welcome.html', message=rows)
@@ -82,4 +81,4 @@ app.register_blueprint(log_full_page)
 
 
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=8081, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)

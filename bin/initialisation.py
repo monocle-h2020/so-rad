@@ -39,7 +39,7 @@ def db_init(db_config):
             raise AssertionError(msg)
 
         # Create tables (only if necessary)
-        db['file'] = db_config.get('database_file')
+        db['file'] = db_config.get('database_path')
         try:
             db_functions.create_tables(db)  # won't harm existing tables
         except Exception as err:
