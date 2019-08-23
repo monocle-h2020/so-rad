@@ -29,5 +29,5 @@ if __name__ == '__main__':
             time.sleep(0.01)
     except (KeyboardInterrupt, SystemExit):
         batman.stop()
-        batman.thread.join()
+        #batman.thread.join()
         sys.exit()
