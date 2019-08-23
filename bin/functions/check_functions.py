@@ -41,3 +41,21 @@ def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
 def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""
     return solar_elevation >= sample_dict['solar_elevation_limit']
+
+def check_battery(bat_manager, battery):
+    """Check whether battery voltage is OK
+    returns:
+        -1: Unknown
+        0: OK
+        1: LOW
+        2: CRITICAL
+    """
+    bat_voltage = bat_manager.batt_voltage
+    if bat_voltage is None:
+        return -1
+    elif bat_voltage >= battery['battery_low_th_V']:
+        return 0
+    elif bat_voltage >= battery['battery_crit_th_V']:
+        return 1
+    else:
+        return 2

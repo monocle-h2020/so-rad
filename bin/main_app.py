@@ -21,15 +21,12 @@ import argparse
 import initialisation
 import logging
 import logging.handlers
-import traceback
-from numpy import mean
 import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery
 from thread_managers.gps_manager import GPSManager
-from thread_managers import radiometer_manager as RadManager
 from thread_managers.gps_checker import GPSChecker
 
 
@@ -98,24 +95,37 @@ def init_logger(conf_log_dict):
 
 def init_all(conf):
     """Initialise all components"""
+
+    log = logging.getLogger()
+
     db = initialisation.db_init(conf['DATABASE'])
     initialisation.init_gpio(conf, state=0)  # set all used pins to LOW
-
-    # start logging here
-    log = init_logger(conf['LOGGING'])
-    #log = logging.getLogger()
-    log.info('\n===Started logging===\n')
 
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
     motor = initialisation.motor_init(conf['MOTOR'], ports)
     gps = initialisation.gps_init(conf['GPS'], ports)
-    rad = initialisation.rad_init(conf['RADIOMETERS'], ports)
+    rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
+    battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
+
+    # start the battery manager
+    if battery['used']:
+        bat_manager.start()
+        time.sleep(0.1)
+
+    # collect info on which GPIO pins are being used
+    gpios = []
+    if gps['gpio_control']:
+        gpios.append(gps['gpio2'])
+    if rad['use_gpio_control']:
+        gpios.append(rad['gpio1'])
+        gpios.append(rad['gpio2'])
+        gpios.append(rad['gpio3'])
+
 
     # Get the GPS serial objects from the GPS dict
     gps_ports = [port for key, port in gps.items() if 'serial' in key]
-
     # Instantiate GPS monitoring threads
     if len(gps_ports) > 0:
         gps_managers = []
@@ -126,7 +136,6 @@ def init_all(conf):
             gps_managers.append(gps_manager)
     else:
         log.info("Check GPS sensors and Motor connection settings")
-
     time.sleep(0.1)
 
     # Start the GPS checker thread
@@ -149,18 +158,18 @@ def init_all(conf):
         log.info("..done")
     else:
         log.info("Motor in home position")
-
     time.sleep(0.1)
 
     # Start the radiometry manager
-    radiometry_manager = RadManager.TriosManager(rad)
+    log.info("Starting radiometry manager")
+    radiometry_manager = Rad_manager(rad)
     time.sleep(0.1)
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps_managers, radiometry_manager, motor, gps_checker_manager, log
+    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gps_checker_manager, gpios
 
 
-def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager):
+def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
@@ -172,11 +181,6 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager):
     if db['used']:
         db['cur'].close()
 
-    # Turn all GPIO pins off
-    pins = [11,12,13,15]  # FIXME: get from configs
-    GPIO.output(pins, GPIO.LOW)
-    GPIO.cleanup()
-
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
     del(radiometry_manager)
@@ -184,9 +188,16 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager):
     # Stop the GPS managers
     for gps_manager in gps_managers:
         log.info("Stopping GPS manager thread")
-        gps_manager.stop()
+        del(gps_manager)
 
-    time.sleep(0.1)
+    # Stop the battery manager
+    if battery['used']:
+        log.info("Stopping battery manager thread")
+        del(bat_manager)
+
+    # Turn all GPIO pins off
+    GPIO.output(gpios, GPIO.LOW)
+    GPIO.cleanup()
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
@@ -210,24 +221,28 @@ def run():
     args = parse_args()
     conf = read_config(args.config_file)
 
+    # start logging here
+    log = init_logger(conf['LOGGING'])
+    #log = logging.getLogger()
+    log.info('\n===Started logging===\n')
+
     try:
         # Initialise everything
-        db_dict, rad, sample, gps_managers, radiometry_manager, motor, gps_checker_manager, log = init_all(conf)
-    except Exception as emsg:
+        db_dict, rad, sample, gps_managers, radiometry_manager,\
+            motor, battery, bat_manager, gps_checker_manager, gpios = init_all(conf)
+    except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager)
+        stop_all(db_dict, radiometry_manager, gps_managers,
+                 gps_checker_manager, battery, bat_manager, gpios)
         raise
     log.info("===Initialisation complete===")
 
     last_commit_time = datetime.datetime.now()
-    prev_sample_time = None
     trigger_id = None
     spec_data = ""
-    ship_bearing = None
-    ship_bearing_buffer = []
     ship_bearing_mean = None
-    solar_azi = None
-    solar_elev = None
+    solar_az = None
+    solar_el = None
 
     # Check if the program is using a fixed bearing or calculated one
     if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
@@ -243,13 +258,28 @@ def run():
         counter += 1
         message = "[{0}] ".format(counter)
         try:
+            # Check battery charge
+            if battery['used']:
+                if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
+                    message += "Battery low, idling. Battery info: {0}".format(bat_manager)
+                    log.info(message)
+                    time.sleep(conf['DEFAULT'].getint['main_check_cycle_sec'])
+                    continue
+                elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
+                    message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
+                    log.info(message)
+                    stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios)
+                else:
+                    message += "Bat {0}, ".format(bat_manager.batt_voltage)
+
+
             # Check if the GPS sensors have met conditions
             gps_ready = check_gps(gps_managers)
-            message += "GPS: {0}, ".format(checks[gps_ready])
+            message += "GPS {0}, ".format(checks[gps_ready])
 
             # Check if the radiometers have met conditions
             rad_ready = check_sensors(rad, trigger_id, radiometry_manager)
-            message += "Rad: {0}, ".format(checks[rad_ready])
+            message += "Rad {0}, ".format(checks[rad_ready])
 
             if gps_ready:
                 # read latest gps info and calculate angles for motor
@@ -261,7 +291,8 @@ def run():
                 motor_pos = motor_func.get_motor_pos(motor['serial'])
                 if motor_pos is None:
                     message += "Motor position not read. NotReady: {0}".format(datetime.datetime.now())
-                    time.sleep(5)
+                    log.info(message)
+                    time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
                     continue
 
                 # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
@@ -272,7 +303,7 @@ def run():
                 lon0 = gps_managers[0].lon
                 alt0 = gps_managers[0].alt
                 dt = gps_managers[0].datetime
-                dt1 = gps_managers[1].datetime
+                #dt1 = gps_managers[1].datetime
 
                 # Fetch sun variables
                 solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
@@ -301,34 +332,21 @@ def run():
                             moving = True
                         log.info("..moving motor.. {0} --> {1}".format(motor_pos, target_pos))
                         time.sleep(2)
-                motor_ready = True
 
             else:
                 message += "ShBe: None, SuAz: None, SuEl: None. "
                 sun_suitable = False
-
-            # log.info("[{2}] Mean latlon bearing: {0:1.1f} | Median latlon bearing {1:1.1f}"\
-            #         .format(gps_checker_manager.mean_bearing, gps_checker_manager.median_bearing, counter))
-            # try:
-            #    log.info("[{4}]....STD..... GPS1 lat: {0:1.7f} | GPS1 lon: {1:1.7f} | GPS2 lat: {2:1.7f} | GPS2 lon: {3:1.7f}"\
-            #            .format(gps_checker_manager.gps1_lat_std, gps_checker_manager.gps1_lon_std,
-            #                    gps_checker_manager.gps2_lat_std, gps_checker_manager.gps2_lon_std, counter))
-            # except TypeError:
-            #    log.info("[{0}]....STD..... GPS1 lat: NaN | GPS1 lon: NaN | GPS2 lat: NaN | GPS2 lon: NaN".format(counter))
-            #    traceback.print_exc(file=sys.stdout)
 
             # Placeholder for additional checks of:
             # min ship speed (see config file)
             # min battery power (see config file)
 
             # If all checks are good, take radiometry measurements
-            if all([gps_ready, motor_ready, rad_ready, sun_suitable]):
+            if all([gps_ready, rad_ready, sun_suitable]):
                 # Get the current time of the computer and data from the GPS sensor managers
                 trigger_id = datetime.datetime.now()
                 gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
                 gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-
-                #log.info('GPSChecker lock: {0}'.format(gps_checker_manager.checker_thread.locked()))
 
                 # Collect radiometry data and splice together
                 trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
@@ -363,14 +381,14 @@ def run():
                     message += "NotReady | GPS Recorded: {0} [{1}]".format(last_commit_time, db_id)
 
             log.info(message)
-            time.sleep(5)  # FIXME: replace with value from config file
+            time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager)
-        except Exception as emsg:
+            stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios)
+        except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager)
+            stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios)
             raise
 
 if __name__ == '__main__':

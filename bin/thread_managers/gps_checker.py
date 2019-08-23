@@ -292,7 +292,7 @@ class GPSChecker(object):
         log.info("Stopping GPS Checker thread")
         self.checker_thread.stop_checker_thread = True
         time.sleep(1)
-        self.checker_thread.join()
+        self.checker_thread.join(0.1)
         log.info("GPS Checker alive? = {}".format(self.checker_thread.is_alive()))
         self.started = False
 

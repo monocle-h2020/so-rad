@@ -14,7 +14,7 @@ log = logging.getLogger() #import root logger
 
 def connect_db(db_dict):
     """Connect to the sqlite3 database file
-    
+
     :param db_dict: database information dictionary
     :type db_dict: dictionary
     :raises Exception: Exception
@@ -30,6 +30,32 @@ def connect_db(db_dict):
         log.critical(msg)
         raise Exception(msg)
     return conn, cur
+
+
+def create_tables(db_dict):
+    conn, cur = connect_db(db_dict)
+    # test whether table exists
+    sql = """CREATE TABLE IF NOT EXISTS sorad_metadata
+             (id_ integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+             trigger_id datetime, gps1_datetime datetime,
+             gps2_datetime datetime,
+             gps1_fix integer, gps2_fix integer,
+             gps1_latitude float, gps1_longitude float,
+             gps2_latitude float, gps2_longitude float,
+             gps1_poll_rate integer, gps2_poll_rate integer,
+             gps1_speed float, gps2_speed float,
+             ship_bearing float, sun_azimuth float,
+             sun_elevation float, motor_temp float,
+             driver_temp float , n_obs integer)"""
+    cur.execute(sql)
+
+    sql = """CREATE TABLE IF NOT EXISTS sorad_radiometry 
+             (sample_id integer NOT NULL,
+              trigger_id datetime, sensor_id text,
+              inttime integer, measurement text,
+              FOREIGN KEY(sample_id) REFERENCES sorad_metadata(id_))"""
+    cur.execute(sql)
+    conn.close()
 
 
 def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, sun_azi, sun_elev, spectra_data, motor_temp=0, driver_temp=0):

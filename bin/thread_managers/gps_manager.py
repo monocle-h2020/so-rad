@@ -437,8 +437,8 @@ class GPSManager(object):
         time.sleep(2)
         log.info(self.threads)
         for thread in self.threads:
-            thread.join(1)
-            log.info("gps alive? = {0}".format(thread.is_alive()))
+            thread.join(0.1)
+            # log.info("gps alive? = {0}".format(thread.is_alive()))
         self.threads = []
         self.started = False
 
