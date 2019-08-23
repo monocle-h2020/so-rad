@@ -43,8 +43,8 @@ def show_status():
 
     except TemplateNotFound:
         abort(404)
-    except Exception:
-        abort(404)
+    except Exception as msg:
+        return msg
 
 @log_page.route('/log')
 def show_log():
@@ -59,7 +59,7 @@ def show_log():
     except TemplateNotFound:
         abort(404)
     except Exception:
-        abort(404)
+        return "An unexpected error occurred handling your request"
 
 @log_full_page.route('/logfull')
 def show_full_log():
@@ -72,7 +72,7 @@ def show_full_log():
     except TemplateNotFound:
         abort(404)
     except Exception:
-        abort(404)
+        return "An unexpected error occurred handling your request"
 
 def get_one_row_from_db(db_path):
     conn = sqlite3.connect(db_path)
