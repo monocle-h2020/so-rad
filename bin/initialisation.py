@@ -13,12 +13,12 @@ License: under development
 import time
 import serial
 import serial.tools.list_ports as list_ports
-import sqlite3
 import RPi.GPIO as GPIO
 import logging
 from functions import gps_functions as gps_func
 from thread_managers import radiometer_manager
 from thread_managers import battery_manager
+from functions import db_functions
 
 log = logging.getLogger()   # report to root logger
 GPIO.setwarnings(False)
@@ -38,12 +38,10 @@ def db_init(db_config):
             log.critical(msg)
             raise AssertionError(msg)
 
-        # Get the db file, connect to it and create a cursor before returning the db dict
+        # Create tables (only if necessary)
         db['file'] = db_config.get('database_file')
         try:
-            conn = sqlite3.connect(db['file'])
-            cur = conn.cursor()
-            conn.close()
+            db_functions.create_tables(db)  # won't harm existing tables
         except Exception as err:
             msg = "Error connecting to database: \n {0}".format(err)
             log.critical(msg)
