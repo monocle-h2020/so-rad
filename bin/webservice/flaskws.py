@@ -9,14 +9,21 @@ from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
 import sys
+import os
 
 def read_config(config_file):
     config = configparser.ConfigParser()
     config.read(config_file)
     return config
 
-config_file_location = sys.argv[1]
-conf = read_config(config_file_location)
+
+# allow config file to be found from working dir, parent dir or command line arg to allow different ways to start this script
+if os.path.isfile("config.ini"):
+    conf = read_config("config.ini")
+elif os.path.isfile("../config.ini"):
+    conf = read_config("../config.ini")
+else:
+    conf = read_config(sys.argv[1])
 
 log_file_location = conf['LOGGING'].get('log_file_location')
 db_path = conf['DATABASE'].get('database_path')
@@ -32,7 +39,6 @@ log_full_page = Blueprint('log_full_page', __name__,
 def show_status():
     try:
         rows = get_one_row_from_db(db_path)
-
         return render_template('welcome.html', message=rows)
 
     except TemplateNotFound:
@@ -79,6 +85,5 @@ app.register_blueprint(status_page)
 app.register_blueprint(log_page)
 app.register_blueprint(log_full_page)
 
-
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=False)

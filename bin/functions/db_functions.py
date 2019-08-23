@@ -5,6 +5,7 @@ Database Functions
 
 Connects to the database, creates a cursor, commits data and closes the connection to it.
 """
+import os
 import sys
 import traceback
 import logging
@@ -33,6 +34,16 @@ def connect_db(db_dict):
 
 
 def create_tables(db_dict):
+    "Create database and tables, if they don't already exist"
+    if not os.path.exists(db_dict['file']):
+        if not os.path.isdir(os.path.dirname(db_dict['file'])):
+            try:
+                os.makedirs(os.path.dirname(db_dict['file']))
+            except:
+                log.warning("Could not create path to database location: {0}".format(db_dict['file']))
+                raise
+
+    # the following should create a new database file if it does not already exist
     conn, cur = connect_db(db_dict)
     # test whether table exists
     sql = """CREATE TABLE IF NOT EXISTS sorad_metadata

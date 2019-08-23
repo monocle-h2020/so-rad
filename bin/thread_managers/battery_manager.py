@@ -161,4 +161,5 @@ class VictronManager(object):
         self.serial.reset_output_buffer()
 
     def __del__(self):
+        self.stop()
         self.serial.close()
