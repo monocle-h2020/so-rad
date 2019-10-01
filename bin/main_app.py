@@ -263,7 +263,7 @@ def run():
                 if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
                     message += "Battery low, idling. Battery info: {0}".format(bat_manager)
                     log.info(message)
-                    time.sleep(conf['DEFAULT'].getint['main_check_cycle_sec'])
+                    time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
                     continue
                 elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
                     message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
