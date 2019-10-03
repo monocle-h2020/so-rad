@@ -31,3 +31,7 @@ if __name__ == '__main__':
         batman.stop()
         #batman.thread.join()
         sys.exit()
+
+    batman.stop()
+    sys.exit(0)
+
