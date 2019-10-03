@@ -84,8 +84,11 @@ class GPSCheckerThread(threading.Thread):
                 lon2 = self.gps_managers[1].lon
                 gps2_time = self.gps_managers[1].datetime
 
+                gps1_stopping = self.gps_managers[0].stop_gps
+                gps2_stopping = self.gps_managers[1].stop_gps
+                any_gps_stopping = gps1_stopping or gps2_stopping
                 # If there isn't data, wait
-                if gps1_time is None or gps2_time is None:
+                if ((gps1_time is None) or (gps2_time is None)) and (not any_gps_stopping):
                     log.warning("Waiting for GPS data")
                     time.sleep(1.12)
                     continue
@@ -290,11 +293,13 @@ class GPSChecker(object):
     def stop(self):
         """Stop the GPSChecker thread"""
         log.info("Stopping GPS Checker thread")
+        self.checker_lock.acquire(True)
         self.checker_thread.stop_checker_thread = True
         time.sleep(1)
         self.checker_thread.join(0.1)
         log.info("GPS Checker alive? = {}".format(self.checker_thread.is_alive()))
         self.started = False
+        self.checker_lock.release()
 
     def update(self, mean_bearing, median_bearing, gps1_lat_std, gps1_lon_std, gps2_lat_std, gps2_lon_std, gps1_lat_mean, gps1_lon_mean):
         """Update the GPSChecker object values using the values passed in as arguments"""
