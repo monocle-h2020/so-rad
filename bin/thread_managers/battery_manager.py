@@ -74,10 +74,11 @@ class VictronManager(object):
         self.stop_monitor = True
         time.sleep(2*self.sleep_interval)
         log.info(self.thread)
-        self.thread.join(1)
+        self.thread.join(2*self.sleep_interval)
         log.info("Battery manager running = {0}".format(self.thread.is_alive()))
-        self.thread = []
+        #self.thread = []
         self.started = False
+        self.serial.close()
 
     def parse_line(self, line):
         """
@@ -163,4 +164,3 @@ class VictronManager(object):
 
     def __del__(self):
         self.stop()
-        self.serial.close()

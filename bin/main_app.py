@@ -175,22 +175,22 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
 
     # Stop the GPS checker manager
     log.info("Stopping dual-gps monitor thread")
-    del(gps_checker_manager)
+    gps_checker_manager.stop()
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
-    del(radiometry_manager)
+    radiometry_manager.stop()
 
     # Stop the GPS managers
     for gps_manager in gps_managers:
         log.info("Stopping GPS manager thread")
-        del(gps_manager)
+        gps_manager.stop()
         time.sleep(0.5)
 
     # Stop the battery manager
     if battery['used']:
         log.info("Stopping battery manager thread")
-        del(bat_manager)
+        bat_manager.stop()
 
     # Turn all GPIO pins off
     GPIO.output(gpios, GPIO.LOW)

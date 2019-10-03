@@ -441,6 +441,7 @@ class GPSManager(object):
             # log.info("gps alive? = {0}".format(thread.is_alive()))
         self.threads = []
         self.started = False
+        log.info("Stopped GPS manager")
 
     def update(self, gps_dict):
         """

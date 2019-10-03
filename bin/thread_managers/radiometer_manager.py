@@ -44,6 +44,10 @@ class TriosManager(object):
         ps.tchannels = {}
         ps.TClose(self.coms)
 
+    def stop(self):
+        ps.tchannels = {}
+        ps.TClose(self.coms)
+
     def connect_sensors(self):
         """(re)connect all serial ports and query all sensors"""
         self.busy = True
