@@ -20,6 +20,12 @@ def check_gps(gps_managers):
     return True
 
 
+def check_speed(sample_dict, gps_managers):
+    "Verify that speed is above set limit"
+    speeds = [gps_manager.speed for gps_manager in gps_managers]
+    return min(speeds) > float(sample_dict['sampling_speed_limit'])
+
+
 def check_motor(motor_manager):
     "Verify that Motor is in optimal position"
     return motor_manager.within_step_thresh()

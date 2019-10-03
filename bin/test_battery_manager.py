@@ -21,12 +21,12 @@ if __name__ == '__main__':
     time.sleep(1)
     try:
         lastupdate = batman.last_update
-        while True:
+        for i in range(100):
             lastupdate_new = batman.last_update
             if lastupdate_new > lastupdate:
                 print(batman, batman.serial.inWaiting())
                 lastupdate = lastupdate_new
-            time.sleep(0.01)
+            time.sleep(0.1)
     except (KeyboardInterrupt, SystemExit):
         batman.stop()
         #batman.thread.join()

@@ -25,7 +25,7 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed
 from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 
@@ -177,10 +177,6 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
     log.info("Stopping dual-gps monitor thread")
     del(gps_checker_manager)
 
-    # If a db is used, close the connection
-    if db['used']:
-        db['cur'].close()
-
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
     del(radiometry_manager)
@@ -189,6 +185,7 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
     for gps_manager in gps_managers:
         log.info("Stopping GPS manager thread")
         del(gps_manager)
+        time.sleep(0.5)
 
     # Stop the battery manager
     if battery['used']:
@@ -272,6 +269,11 @@ def run():
                 else:
                     message += "Bat {0}, ".format(bat_manager.batt_voltage)
 
+            # reset to default
+            speed_ready = False
+            motor_ready = False
+            sun_suitable = False
+            rad_ready = False
 
             # Check if the GPS sensors have met conditions
             gps_ready = check_gps(gps_managers)
@@ -286,6 +288,9 @@ def run():
                 speed = gps_managers[0].speed
                 nsat0 = gps_managers[0].satellite_number
                 nsat1 = gps_managers[1].satellite_number
+
+                speed_ready = check_speed(sample, gps_managers)
+                message += "Speed {0}, ".format(checks[speed_ready])
 
                 # Get the current motor pos to check if it's ready
                 motor_pos = motor_func.get_motor_pos(motor['serial'])
@@ -318,8 +323,8 @@ def run():
                 # Check if the sun is in a suitable position
                 sun_suitable = check_sun(sample, solar_az, solar_el)
 
-                # If the sun is in a suitable position and the motor is not at the required position, move the motor
-                if sun_suitable and (abs(motor_angles['target_motor_pos_step'] - motor_pos) > motor['step_thresh']):
+                # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
+                if (sun_suitable and (abs(motor_angles['target_motor_pos_step'] - motor_pos) > motor['step_thresh'])) and speed_ready:
                     log.info("Adjust motor angle ({0} --> {1})".format(motor_pos, motor_angles['target_motor_pos_step']))
                     # Rotate the motor to the new position
                     target_pos = motor_angles['target_motor_pos_step']
@@ -334,15 +339,12 @@ def run():
                         time.sleep(2)
 
             else:
-                message += "ShBe: None, SuAz: None, SuEl: None. "
+                message += "ShBe: None, SuAz: None, SuEl: None, Speed: None. "
                 sun_suitable = False
 
-            # Placeholder for additional checks of:
-            # min ship speed (see config file)
-            # min battery power (see config file)
 
             # If all checks are good, take radiometry measurements
-            if all([gps_ready, rad_ready, sun_suitable]):
+            if all([gps_ready, rad_ready, sun_suitable, speed_ready]):
                 # Get the current time of the computer and data from the GPS sensor managers
                 trigger_id = datetime.datetime.now()
                 gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
@@ -364,7 +366,7 @@ def run():
             # If not enough time has passed since the last measurement, wait
             elif abs(datetime.datetime.now().timestamp() - last_commit_time.timestamp()) < 60:
                 # do not execute measurement, do not record metadata
-                message += "NotReady: {0}".format(datetime.datetime.now())
+                message += "Not Ready"
 
             else:
                 # record metadata and GPS data if some checks aren't passed

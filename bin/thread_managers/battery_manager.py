@@ -93,7 +93,8 @@ class VictronManager(object):
             try:
                 val = float(val)
             except: pass
-            self.vedirect[linesplit[0]] = val
+            if val is not None:
+                self.vedirect[linesplit[0]] = val
             self.last_update = datetime.datetime.now()
             self.update_vals()
 
