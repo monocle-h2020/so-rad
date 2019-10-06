@@ -169,7 +169,7 @@ def init_all(conf):
     return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gps_checker_manager, gpios
 
 
-def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios):
+def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
@@ -205,6 +205,7 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
         time.sleep(0.5)
 
     # Exit the program
+    log.info("Idling {0} s before shutdown".format(idle_time))
     sys.exit(0)
 
 
@@ -265,7 +266,7 @@ def run():
                 elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
                     message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
                     log.info(message)
-                    stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios)
+                    stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios, idle_time=1800)
                 else:
                     message += "Bat {0}, ".format(bat_manager.batt_voltage)
 
