@@ -215,6 +215,10 @@ def run():
     Monitors for a keyboard interrupt to provide a clean exit where possible.
     """
 
+    # Add protocol type for GPS section in config file to identify which one the user wants.
+    # Split GPS usage based on that.
+
+
     # Parse the command line arguments for the config file
     args = parse_args()
     conf = read_config(args.config_file)
