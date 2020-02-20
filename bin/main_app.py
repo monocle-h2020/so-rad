@@ -206,6 +206,7 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
+    time.sleep(idle_time)
     sys.exit(0)
 
 
