@@ -127,11 +127,11 @@ def gps_init(gps_config, ports):
 
     # Get all the GPS variables from the config file
     gps['n_gps'] = gps_config.getint('n_gps')
-    gps['baud1'] = gps_config.getint('baud1')
-    gps['baud2'] = gps_config.getint('baud2')
+    gps['baud1'] = gps_config.getint('baud')
+    gps['baud2'] = gps_config.getint('baud')
     gps['set_polling_rate'] = gps_config.getboolean('set_polling_rate')  # True if polling rate can be set?
-    gps['polling_rate1'] = gps_config.getint('polling_rate1')
-    gps['polling_rate2'] = gps_config.getint('polling_rate2')
+    gps['polling_rate1'] = gps_config.getint('polling_rate')
+    gps['polling_rate2'] = gps_config.getint('polling_rate')
     gps['location1'] = gps_config.get('location1').lower()
     gps['location2'] = gps_config.get('location2').lower()
     assert gps['location1'] in ['front', 'rear']
@@ -218,6 +218,57 @@ def gps_init(gps_config, ports):
     # Return the GPS dict
     return gps
 
+def rtk_gps_init(gps_config):
+    """read gps configuration for rtk gps. Any other initialisation should also be called here"""
+    gps = {}
+
+    # Get all the GPS variables from the config file
+    
+    gps['baud1'] = gps_config.getint('baud')
+    gps['set_polling_rate'] = gps_config.getboolean('set_polling_rate')  # True if polling rate can be set?
+    # gps['polling_rate1'] = gps_config.getint('polling_rate')
+    gps['location1'] = gps_config.get('location1').lower()
+    gps['location2'] = gps_config.get('location2').lower()
+    assert gps['location1'] in ['front', 'rear']
+    assert gps['location2'] in ['front', 'rear']
+    gps['id1'] = gps_config.get('id1').lower()
+    gps['heading_speed_limit'] = gps_config.getint('heading_speed_limit')
+    gps['gpio2'] = gps_config.getint('gpio2')
+    gps['gpio_control'] = gps_config.getboolean('use_gpio_control')
+
+    # If port autodetect is wanted, look for what port has the identifying string also provided
+    if gps_config.getboolean('port_autodetect') and gps['gpio_control']:
+        # this is the recommended situation, one gps will be detected, the second after powering the relay switch
+        port_autodetect_string = gps_config.get('port_autodetect_string')
+        gps_counter = 0
+        ports = list_ports.comports()
+        for port, desc, hwid in sorted(ports):
+            #print(port, desc, hwid)
+            if (desc == port_autodetect_string):
+                gps['port1'] = port
+                log.info("GPS1 using port: {0}".format(port))
+    else:
+        # Get the known GPS ports from the config file
+        log.info("Defaulting to GPS port settings in config file")
+        gps['port1'] = gps_config.get('port1_default')
+
+
+    time.sleep(1)
+
+    # Create serial objects for both the GPS sensor ports using variables from the config file
+    gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
+
+    # gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
+    # gps['serial2'] = serial.Serial(port=gps['port2'], baudrate=gps['baud2'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
+
+    #time.sleep(1)
+    # If the polling rate is to be changed, send update commands to the GPS sensors
+    # if gps['set_polling_rate']:
+    #    gps_func.update_gps_rate(gps['serial1'], int(gps['polling_rate1'])) 
+    #    gps_func.update_gps_rate(gps['serial2'], int(gps['polling_rate2']))
+
+    # Return the GPS dict
+    return gps
 
 def rad_init(rad_config, ports):
     """read radiometer configuration. Any other initialisation should also be called here"""
