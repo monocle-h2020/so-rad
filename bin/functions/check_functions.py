@@ -11,10 +11,17 @@ import datetime
 
 def check_gps(gps_managers):
     "Verify that GPSes have recent and accurate data"
-    lat_lons = [gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon]
-    gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
-    if min(gps_fixes)<2:
-        return False
+
+    if(len(gps_managers) == 2):
+        lat_lons = [gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon]
+        gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
+        if min(gps_fixes)<2:
+            return False
+    elif(len(gps_managers == 1)):
+        lat_lons = [gps_managers[0].lat, gps_managers[0].lon]
+        gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
+        if min(gps_fixes)<1:
+            return False
     if None in lat_lons:
         return False
     return True
