@@ -26,9 +26,8 @@ import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed
-from thread_managers.gps_manager import GPSManager
+#from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
-
 
 def parse_args():
     """parse command line arguments"""
@@ -104,7 +103,17 @@ def init_all(conf):
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
     motor = initialisation.motor_init(conf['MOTOR'], ports)
-    gps = initialisation.gps_init(conf['GPS'], ports)
+
+
+    GPSData = conf['GPS']
+    if(GPSData.get('protocol').lower() == "rtk"):
+        import thread_managers.gps_manager.RTKUBX as GPSManager
+        gps = initialisation.gps_rtk_init(conf['GPS'])
+    else:
+        import thread_managers.gps_manager.NMEA0183 as GPSManager
+        gps = initialisation.gps_init(conf['GPS'], ports)
+
+
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
@@ -123,12 +132,16 @@ def init_all(conf):
         gpios.append(rad['gpio2'])
         gpios.append(rad['gpio3'])
 
-
     # Get the GPS serial objects from the GPS dict
     gps_ports = [port for key, port in gps.items() if 'serial' in key]
     # Instantiate GPS monitoring threads
     if len(gps_ports) > 0:
         gps_managers = []
+
+        # if(len(gps_ports) == 1):
+        #     print("send to rtk")
+        # else:
+
         for port in gps_ports:
             gps_manager = GPSManager()
             gps_manager.add_serial_port(port)
@@ -138,9 +151,9 @@ def init_all(conf):
         log.info("Check GPS sensors and Motor connection settings")
     time.sleep(0.1)
 
-    # Start the GPS checker thread
-    gps_checker_manager = GPSChecker(gps_managers)
-    gps_checker_manager.start()
+    # # Start the GPS checker thread
+    # gps_checker_manager = GPSChecker(gps_managers)
+    # gps_checker_manager.start()
 
     # Get the current motor pos and if not at HOME move it to HOME
     motor_pos = motor_func.get_motor_pos(motor['serial'])
@@ -166,16 +179,16 @@ def init_all(conf):
     time.sleep(0.1)
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gps_checker_manager, gpios
+    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios
 
 
-def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios, idle_time=0):
+def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
     # Stop the GPS checker manager
     log.info("Stopping dual-gps monitor thread")
-    gps_checker_manager.stop()
+    #gps_checker_manager.stop()
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
@@ -206,6 +219,7 @@ def stop_all(db, radiometry_manager, gps_managers, gps_checker_manager, battery,
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
+    time.sleep(idle_time)
     sys.exit(0)
 
 
@@ -216,7 +230,6 @@ def run():
     """
 
     # Add protocol type for GPS section in config file to identify which one the user wants.
-    # Split GPS usage based on that.
 
 
     # Parse the command line arguments for the config file
@@ -231,11 +244,11 @@ def run():
     try:
         # Initialise everything
         db_dict, rad, sample, gps_managers, radiometry_manager,\
-            motor, battery, bat_manager, gps_checker_manager, gpios = init_all(conf)
+            motor, battery, bat_manager, gpios = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
         stop_all(db_dict, radiometry_manager, gps_managers,
-                 gps_checker_manager, battery, bat_manager, gpios)
+                battery, bat_manager, gpios)
         raise
     log.info("===Initialisation complete===")
 
@@ -270,7 +283,7 @@ def run():
                 elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
                     message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
                     log.info(message)
-                    stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios, idle_time=1800)
+                    stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)
                 else:
                     message += "Bat {0}, ".format(bat_manager.batt_voltage)
 
@@ -292,7 +305,8 @@ def run():
                 # read latest gps info and calculate angles for motor
                 speed = gps_managers[0].speed
                 nsat0 = gps_managers[0].satellite_number
-                nsat1 = gps_managers[1].satellite_number
+                if(len(gps_managers) == 2):
+                    nsat1 = gps_managers[1].satellite_number
 
                 speed_ready = check_speed(sample, gps_managers)
                 message += "Speed {0}, ".format(checks[speed_ready])
@@ -305,9 +319,9 @@ def run():
                     time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
                     continue
 
-                # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
-                if not bearing_fixed:
-                    ship_bearing_mean = gps_checker_manager.mean_bearing
+                # # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
+                # if not bearing_fixed:
+                #     ship_bearing_mean = gps_checker_manager.mean_bearing
 
                 lat0 = gps_managers[0].lat
                 lon0 = gps_managers[0].lon
@@ -392,10 +406,10 @@ def run():
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios)
+            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps_managers, gps_checker_manager, battery, bat_manager, gpios)
+            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios)
             raise
 
 if __name__ == '__main__':
