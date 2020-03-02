@@ -107,10 +107,10 @@ def init_all(conf):
 
     GPSData = conf['GPS']
     if(GPSData.get('protocol').lower() == "rtk"):
-        import thread_managers.gps_manager.RTKUBX as GPSManager
+        from thread_managers.gps_manager import RTKUBX as GPSManager
         gps = initialisation.gps_rtk_init(conf['GPS'])
     else:
-        import thread_managers.gps_manager.NMEA0183 as GPSManager
+        from thread_managers.gps_manager import NMEA0183 as GPSManager
         gps = initialisation.gps_init(conf['GPS'], ports)
 
 

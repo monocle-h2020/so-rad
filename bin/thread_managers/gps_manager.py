@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -369,14 +370,16 @@ class GPSSerialReader(threading.Thread):
             timeToSleep = 1
             targetChecksPerLine = 1.3
             targetLinesPerCheck = 1/targetChecksPerLine   
-            myPort = self.serial_port
-            serialReader = self.serial_port.Serial(myPort, 460800, timeout = None)
+            serialReader = self.serial_port
             LotOfData = []
             from pymemcache.client import base
 
 
         while not self.parent.stop_gps:
-            old_gps_time = self.parent.datetime
+            if(protocol == "RTK"):
+                pass
+            elif(protocol == "NMEA"):
+                old_gps_time = self.parent.datetime
 
             if self.serial_port.inWaiting() > 1000:
                 # if too much data in buffer, throw it away

@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -218,13 +219,13 @@ def gps_init(gps_config, ports):
     # Return the GPS dict
     return gps
 
-def rtk_gps_init(gps_config):
+def gps_rtk_init(gps_config):
     """read gps configuration for rtk gps. Any other initialisation should also be called here"""
     gps = {}
 
     # Get all the GPS variables from the config file
     
-    gps['baud1'] = gps_config.getint('baud')
+    gps['baud1'] = gps_config.getint('baud1')
     gps['set_polling_rate'] = gps_config.getboolean('set_polling_rate')  # True if polling rate can be set?
     # gps['polling_rate1'] = gps_config.getint('polling_rate')
     gps['location1'] = gps_config.get('location1').lower()
@@ -243,7 +244,7 @@ def rtk_gps_init(gps_config):
         gps_counter = 0
         ports = list_ports.comports()
         for port, desc, hwid in sorted(ports):
-            #print(port, desc, hwid)
+            # print(port, desc, hwid)
             if (desc == port_autodetect_string):
                 gps['port1'] = port
                 log.info("GPS1 using port: {0}".format(port))
@@ -251,9 +252,10 @@ def rtk_gps_init(gps_config):
         # Get the known GPS ports from the config file
         log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
-
-
+   
     time.sleep(1)
+    
+   
 
     # Create serial objects for both the GPS sensor ports using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
@@ -266,7 +268,7 @@ def rtk_gps_init(gps_config):
     # if gps['set_polling_rate']:
     #    gps_func.update_gps_rate(gps['serial1'], int(gps['polling_rate1'])) 
     #    gps_func.update_gps_rate(gps['serial2'], int(gps['polling_rate2']))
-
+   
     # Return the GPS dict
     return gps
 
