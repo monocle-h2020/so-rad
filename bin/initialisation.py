@@ -238,7 +238,7 @@ def gps_rtk_init(gps_config):
     gps['gpio_control'] = gps_config.getboolean('use_gpio_control')
 
     # If port autodetect is wanted, look for what port has the identifying string also provided
-    if gps_config.getboolean('port_autodetect') and gps['gpio_control']:
+    if gps_config.getboolean('port_autodetect'):
         # this is the recommended situation, one gps will be detected, the second after powering the relay switch
         port_autodetect_string = gps_config.get('port_autodetect_string')
         gps_counter = 0
@@ -259,15 +259,6 @@ def gps_rtk_init(gps_config):
 
     # Create serial objects for both the GPS sensor ports using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-
-    # gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-    # gps['serial2'] = serial.Serial(port=gps['port2'], baudrate=gps['baud2'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-
-    #time.sleep(1)
-    # If the polling rate is to be changed, send update commands to the GPS sensors
-    # if gps['set_polling_rate']:
-    #    gps_func.update_gps_rate(gps['serial1'], int(gps['polling_rate1'])) 
-    #    gps_func.update_gps_rate(gps['serial2'], int(gps['polling_rate2']))
    
     # Return the GPS dict
     return gps
