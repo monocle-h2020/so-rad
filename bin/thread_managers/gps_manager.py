@@ -357,30 +357,29 @@ class GPSSerialReader(threading.Thread):
         observer design pattern.
         """
 
-        protocol = type(self.parent)
-        if(protocol == "NMEA"):
-            print("Do old gps: {}".format(protocol))
-        else:
-            print("Do new gps: {}".format(protocol))
-            
-            bitOfData = b''
+        protocol = type(self.parent).__name__
 
-            # Variables to manager a reader timer
-            numberOfChecksToMake = 10
-            timeToSleep = 1
-            targetChecksPerLine = 1.3
-            targetLinesPerCheck = 1/targetChecksPerLine   
-            serialReader = self.serial_port
-            LotOfData = []
-            from pymemcache.client import base
+        bitOfData = b''
+
+        # Variables to manager a reader timer
+        numberOfChecksToMake = 10
+        timeToSleep = 1
+        targetChecksPerLine = 1.3
+        targetLinesPerCheck = 1/targetChecksPerLine   
+        serialReader = self.serial_port
+        LotOfData = []
+        from pymemcache.client import base
 
 
         while not self.parent.stop_gps:
-            if(protocol == "RTK"):
+           # print("port {}".format(self.serial_port.inwaiting()))
+           # print("Length of data in gps buffer: {}".format(len(self.serial_port.inwaiting())))
+            
+            if(protocol == "RTKUBX"):
                 pass
-            elif(protocol == "NMEA"):
+            elif(protocol == "NMEA0183"):
                 old_gps_time = self.parent.datetime
-
+ 
             if self.serial_port.inWaiting() > 1000:
                 # if too much data in buffer, throw it away
                 log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(self.serial_port.port))
@@ -388,7 +387,7 @@ class GPSSerialReader(threading.Thread):
                 time.sleep(0.001)
                 continue
 
-            if(protocol == "nmea"):
+            if(protocol == "NMEA0183"):
                 if self.serial_port.inWaiting() > 0:
                     # if there is data, read it
                     gps_string = self.serial_port.readline()
@@ -491,7 +490,7 @@ class GPSSerialReader(threading.Thread):
                                         'magDec' : data[35], 
                                         'magAcc' :data[36]
                                     }
-
+                                    print(dataDictionary)
                                     # Set up memcache
                                     client = base.Client(('localhost', 11211))
                                     # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
