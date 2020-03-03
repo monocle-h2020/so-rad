@@ -127,7 +127,8 @@ def init_all(conf):
     gpios = []
     if gps['gpio_control']:
         gpios.append(gps['gpio2'])
-    if rad['use_gpio_control']:
+
+    if Rad_manager is not None and rad['use_gpio_control']:
         gpios.append(rad['gpio1'])
         gpios.append(rad['gpio2'])
         gpios.append(rad['gpio3'])
@@ -175,8 +176,11 @@ def init_all(conf):
 
     # Start the radiometry manager
     log.info("Starting radiometry manager")
-    radiometry_manager = Rad_manager(rad)
-    time.sleep(0.1)
+    if Rad_manager is not None:
+        radiometry_manager = Rad_manager(rad)
+        time.sleep(0.1)
+    else:
+        radiometry_manager = None
 
     # Return all the dicts and manager objects
     return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios
@@ -192,7 +196,8 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
-    radiometry_manager.stop()
+    radiometry_manager is not None:
+        radiometry_manager.stop()
 
     # Stop the GPS managers
     for gps_manager in gps_managers:
@@ -255,6 +260,7 @@ def run():
     ship_bearing_mean = None
     solar_az = None
     solar_el = None
+    use_rad = rad['n_sensors'] > 0
 
     # Check if the program is using a fixed bearing or calculated one
     if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
@@ -367,10 +373,11 @@ def run():
                 gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
 
                 # Collect radiometry data and splice together
-                trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
                 spec_data = []
-                for n in range(len(sids)):
-                    spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
+                if use_rad:
+                    trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
+                    for n in range(len(sids)):
+                        spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
                 # If db is used, commit the data to it
                 if db_dict['used']:
