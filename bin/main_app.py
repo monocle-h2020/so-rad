@@ -196,7 +196,7 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
-    radiometry_manager is not None:
+    if radiometry_manager is not None:
         radiometry_manager.stop()
 
     # Stop the GPS managers
