@@ -286,6 +286,10 @@ def rad_init(rad_config, ports):
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
 
+    if rad['n_sensors'] == 0:
+        log.info("No radiometers specified")
+        return rad, None
+
     assert rad['rad_interface'] in ['pytrios',]
 
     # If the sensors are pytrios sensors, get more variables from the config file
