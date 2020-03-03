@@ -308,7 +308,7 @@ def UnpackMessage(structFormat, payload):
 
 def PayloadIdentifier(payload, ID, Class):
     
-    import ublox8Dictionary.ClassIDs
+    from thread_managers import ublox8Dictionary
     Class = str(hex(Class).lstrip("0x")).zfill(2)
     ID = str(hex(ID).lstrip("0x")).zfill(2)
     identifier = str(Class) + str(ID) #+ str(length)
@@ -490,17 +490,18 @@ class GPSSerialReader(threading.Thread):
                                         'magDec' : data[35], 
                                         'magAcc' :data[36]
                                     }
-                                    print(dataDictionary)
                                     # Set up memcache
                                     client = base.Client(('localhost', 11211))
                                     # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
                                     client.set('GPS_UBLOX8', dataDictionary)
-
+                                    print("the dictionary {}".format(dataDictionary))
                                     try:
                                         self.current_gps_dict = dataDictionary
+                                        print("the self dictionary {}".format(self.current_gps_dict))
                                         self.notify_observers()
+                                        print("did the second one")
                                     except Exception:
-                                        log.warning("DecodeError on GPS string: {0}".format(gps_string))
+                                        log.warning("Error on GPS string: {0}".format(dataDictionary))
                                 
                                 # Any data that was not a complete line, and is in fact a part of the next line to be read in
                                 # is kept in the organised hex data list so the rest of the line can be appended. 
@@ -535,9 +536,12 @@ class GPSSerialReader(threading.Thread):
         """
         This pushes the GPS dict to all observers.
         """
+        print("what is this {}".format(self.current_gps_dict))
+        print("We have observers {}".format(self.observers))
         if self.current_gps_dict is not None:
             for observer in self.observers:
                 observer.update(self.current_gps_dict)
+                print("the update failed")
 
 class RTKUBX(object):
     """

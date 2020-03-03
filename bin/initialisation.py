@@ -126,6 +126,8 @@ def gps_init(gps_config, ports):
     """read gps configuration. Any other initialisation should also be called here"""
     gps = {}
 
+    print("GPS innit was used")
+
     # Get all the GPS variables from the config file
     gps['n_gps'] = gps_config.getint('n_gps')
     gps['baud1'] = gps_config.getint('baud')
@@ -221,6 +223,9 @@ def gps_init(gps_config, ports):
 
 def gps_rtk_init(gps_config):
     """read gps configuration for rtk gps. Any other initialisation should also be called here"""
+
+    print("RTK innit was used")
+
     gps = {}
 
     # Get all the GPS variables from the config file
