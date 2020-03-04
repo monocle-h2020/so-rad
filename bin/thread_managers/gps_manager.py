@@ -496,6 +496,7 @@ class GPSSerialReader(threading.Thread):
                                     client.set('GPS_UBLOX8', dataDictionary)
                                     try:
                                         self.current_gps_dict = dataDictionary
+                                        print("set self current gps dict")
                                         self.notify_observers()
                                         print("Notified the observers")
                                     except Exception:
@@ -534,12 +535,9 @@ class GPSSerialReader(threading.Thread):
         """
         This pushes the GPS dict to all observers.
         """
-        print("what is this {}".format(self.current_gps_dict))
-        print("We have observers {}".format(self.observers))
         if self.current_gps_dict is not None:
             for observer in self.observers:
                 observer.update(self.current_gps_dict)
-                print("the update failed")
 
 class RTKUBX(object):
     """
@@ -667,20 +665,21 @@ class RTKUBX(object):
         :param gps_dict: GPS Dictionary passed.
         :type gps_dict: dict
         """
+        print("our dictionary is {}".format(gps_dict))
+
         self.gps_lock.acquire(True)
         if gps_dict is not None:
             self.old = False
             if self.watchdog is not None:
                 self.watchdog.reset()
-            
 
             self.iTOW = gps_dict['iTOW']
             self.year = gps_dict['year']
             self.month = gps_dict['month']
             self.day = gps_dict['day']
             self.hour = gps_dict['hour']
-            self.minute = gps_dict['minute']
-            self.second = gps_dict['second']
+            self.minute = gps_dict['min']
+            self.second = gps_dict['sec']
             self.valid = gps_dict['valid']
             self.tAcc = gps_dict['tAcc']
             self.nano = gps_dict['nano']
@@ -700,7 +699,7 @@ class RTKUBX(object):
             self.velN = gps_dict['velN']
             self.velE = gps_dict['velE']
             self.velD = gps_dict['velD']
-            self.speed = gps_dict['speed']
+            self.speed = gps_dict['gSpeed']
             self.headMot = gps_dict['headMot']
             self.sAcc = gps_dict['sAcc']
             self.headAcc = gps_dict['headAcc']
