@@ -336,10 +336,7 @@ def run():
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
                 log.info("GPS bearing: {0}".format(ship_bearing_mean))
-                log.info("GPS Latitude: {0}".format(lat0))
-                log.info("GPS Longitude: {0}".format(lon0))
-                log.info("GPS Datetime: {0}".format(dt))
-                log.info("GPS Speed: {0}".format(speed))
+                log.info("GPS fix: {0}".format(gps_managers[0].fix))
 
                 # Fetch sun variables
                 solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
@@ -349,7 +346,7 @@ def run():
                                  motor_angles['ach_mot_ccw'], motor_angles['ach_mot_cw'],
                                  motor_angles['target_motor_pos_deg'], motor_angles['target_motor_pos_rel_az_deg'], counter))
 
-                message += "ShBe: {0:1.0f}, SuAz: {1:1.0f}, SuEl: {2:1.1f}. Speed {3:1.1f} nSat [{4}|{5}] "\
+                message += "ShBe: {0:1.6f}, SuAz: {1:1.6f}, SuEl: {2:1.6f}. Speed {3:1.6f} nSat [{4}|{5}] "\
                            .format(ship_bearing_mean, solar_az, solar_el, speed, nsat0, nsat1)
                 # Check if the sun is in a suitable position
                 sun_suitable = check_sun(sample, solar_az, solar_el)

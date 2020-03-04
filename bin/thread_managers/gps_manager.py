@@ -565,7 +565,7 @@ class RTKUBX(object):
         self.valid = None
         self.tAcc = None
         self.nano = None
-        self.fix = 0
+        self.fixType = 0
         self.flags = None
         self.flags2 = None
         self.satellite_number = 0
@@ -574,16 +574,18 @@ class RTKUBX(object):
         self.height = None
         self.hMSL = None
 
-        self.alt = self.hMSL
+        self.alt = None
         self.datetime = None
         self.heading = None
+        self.speed = None
+        self.fix = 0
 
         self.hAcc = None
         self.vAcc = None
         self.velN = None
         self.velE = None
         self.velD = None
-        self.speed = None
+        self.gspeed = None
         self.headMot = None
         self.sAcc = None
         self.headAcc = None
@@ -689,7 +691,7 @@ class RTKUBX(object):
             self.valid = gps_dict['valid']
             self.tAcc = gps_dict['tAcc']
             self.nano = gps_dict['nano']
-            self.fix = gps_dict['fixType']
+            self.fixType = gps_dict['fixType']
             self.flags = gps_dict['flags']
             self.flags2 = gps_dict['flags2']
             self.satellite_number = gps_dict['numSV']
@@ -698,14 +700,13 @@ class RTKUBX(object):
             self.height = gps_dict['height']
             self.hMSL = gps_dict['hMSL']
 
-            self.alt = self.hMSL
             self.datetime = datetime.datetime(int(gps_dict['year']),int(gps_dict['month']),int(gps_dict['day']),int(gps_dict['hour']),int(gps_dict['min']),int(gps_dict['sec']),abs(int(gps_dict['nano'])))
             self.hAcc = gps_dict['hAcc']
             self.vAcc = gps_dict['vAcc']
             self.velN = gps_dict['velN']
             self.velE = gps_dict['velE']
             self.velD = gps_dict['velD']
-            self.speed = gps_dict['gSpeed']
+            self.gSpeed = gps_dict['gSpeed']
             self.headMot = gps_dict['headMot']/100000.0
             self.sAcc = gps_dict['sAcc']
             self.headAcc = gps_dict['headAcc']
@@ -720,7 +721,11 @@ class RTKUBX(object):
             self.magDec = gps_dict['magDec']
             self.magAcc = gps_dict['magAcc']
 
-            self.heading = self.headVeh  # align with NMEA 0183
+            # align the following fields with NMEA 0183
+            self.heading = self.headMot
+            self.speed = self.gSpeed * 0.00194384
+            self.fix = self.fixType
+            self.alt = self.hMSL
 
             self.last_update = datetime.datetime.now()
             log.debug("UBX data updated: {}".format(gps_dict))
