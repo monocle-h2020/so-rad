@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -374,7 +373,7 @@ class GPSSerialReader(threading.Thread):
         while not self.parent.stop_gps:
            # print("port {}".format(self.serial_port.inwaiting()))
            # print("Length of data in gps buffer: {}".format(len(self.serial_port.inwaiting())))
-            
+
             if(protocol == "RTKUBX"):
                 pass
             elif(protocol == "NMEA0183"):
@@ -385,6 +384,7 @@ class GPSSerialReader(threading.Thread):
                 log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(self.serial_port.port))
                 self.serial_port.reset_input_buffer()
                 time.sleep(0.001)
+                print("Thrown data away")
                 continue
 
             if(protocol == "NMEA0183"):
@@ -407,8 +407,9 @@ class GPSSerialReader(threading.Thread):
                 try:
                     # Keep a record of number of lines read this pass, to calculate timer
                     lineCount = 0
-
+                    print("Number of checks to make {}".format(numberOfChecksToMake))
                     for i in range(numberOfChecksToMake):
+                        print("This is i {}".format(i))
                         # Sleep so the program isn't spamming buffer with read requests
                         time.sleep(timeToSleep)
 
@@ -419,10 +420,7 @@ class GPSSerialReader(threading.Thread):
                             
                             bitOfDataInAList = []
                             listOfLines = []
-                            bitOfData = b''
-                            if len(LotOfData) > 600:
-                                raise IOError("Port Failed")
-                            
+                            bitOfData = b'' 
                             startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
                             if(len(startIndices) >= 2):
                                 for currentStartIndex in range(len(startIndices)-1):
@@ -443,13 +441,16 @@ class GPSSerialReader(threading.Thread):
                                             if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
                                                 listOfLines.append(currentLine)
                                                 break
-                                # For all the lines collected, get the payload out and send it to get sorted... eventually... it's a work in progress..    
+                                # For all the lines collected, get the payload out and send it to get sorted... eventually... it's a work in progress..                 
                                 for line in listOfLines:
+                                    if len(line) != 100:
+                                        continue
                                     lineCount += 1
                                     payload = (line[6:-2]) 
                                     ID = line[3]                         
                                     CLASS = line[2]  
                                     data = PayloadIdentifier(payload, ID, CLASS)
+                                    print("This is none {}".format(data))
 
                                     dataDictionary = {
                                         'iTOW' : data[0], 
@@ -490,22 +491,26 @@ class GPSSerialReader(threading.Thread):
                                         'magDec' : data[35], 
                                         'magAcc' :data[36]
                                     }
+
+                                    
                                     # Set up memcache
                                     client = base.Client(('localhost', 11211))
                                     # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
                                     client.set('GPS_UBLOX8', dataDictionary)
                                     try:
                                         self.current_gps_dict = dataDictionary
-                                        print("set self current gps dict")
+                                        print("self current dict is set")
                                         self.notify_observers()
-                                        print("Notified the observers")
-                                    except Exception:
+                                        print("notify observers done")
+                                    except Exception as e:
                                         log.warning("Error on GPS string: {0}".format(dataDictionary))
+                                        print(e)
+                                    
                                 
+
                                 # Any data that was not a complete line, and is in fact a part of the next line to be read in
                                 # is kept in the organised hex data list so the rest of the line can be appended. 
-                                LotOfData = LotOfData[startIndices[len(startIndices)-1]:]           
-                    
+                                LotOfData = LotOfData[startIndices[len(startIndices)-1]:]                                     
                     # Re-calculate the amount of time needed to sleep, with the goal of checking buffer at the speed of 1.3 times that of data being available
                     linesPerCheck = lineCount / numberOfChecksToMake
                     newTimeToSleep = timeToSleep * ( targetLinesPerCheck / linesPerCheck ) 
@@ -537,6 +542,7 @@ class GPSSerialReader(threading.Thread):
         """
         if self.current_gps_dict is not None:
             for observer in self.observers:
+                print("we made it here dict {}".format(self.current_gps_dict))
                 observer.update(self.current_gps_dict)
 
 class RTKUBX(object):
@@ -570,6 +576,7 @@ class RTKUBX(object):
         self.hMSL = None
 
         self.alt = self.hMSL
+        self.datetime = None
 
         self.hAcc = None
         self.vAcc = None
@@ -665,7 +672,6 @@ class RTKUBX(object):
         :param gps_dict: GPS Dictionary passed.
         :type gps_dict: dict
         """
-        print("our dictionary is {}".format(gps_dict))
 
         self.gps_lock.acquire(True)
         if gps_dict is not None:
@@ -693,7 +699,7 @@ class RTKUBX(object):
             self.hMSL = gps_dict['hMSL']
 
             self.alt = self.hMSL
-
+            self.datetime = datetime.datetime(int(gps_dict['year']),int(gps_dict['month']),int(gps_dict['day']),int(gps_dict['hour']),int(gps_dict['min']),int(gps_dict['sec']),abs(int(gps_dict['nano'])))
             self.hAcc = gps_dict['hAcc']
             self.vAcc = gps_dict['vAcc']
             self.velN = gps_dict['velN']

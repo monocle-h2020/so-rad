@@ -242,7 +242,6 @@ def run():
     log = init_logger(conf['LOGGING'])
     #log = logging.getLogger()
     log.info('\n===Started logging===\n')
-
     try:
         # Initialise everything
         db_dict, rad, sample, gps_managers, radiometry_manager,\
@@ -261,6 +260,10 @@ def run():
     solar_az = None
     solar_el = None
     use_rad = rad['n_sensors'] > 0
+    
+    while True:
+        time.sleep(2)
+        print(gps_managers[0].second)
 
     # Check if the program is using a fixed bearing or calculated one
     if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
@@ -310,7 +313,7 @@ def run():
                 nsat0 = gps_managers[0].satellite_number
                 if(len(gps_managers) == 2):
                     nsat1 = gps_managers[1].satellite_number
-
+                time.sleep(2)
                 speed_ready = check_speed(sample, gps_managers)
                 message += "Speed {0}, ".format(checks[speed_ready])
 

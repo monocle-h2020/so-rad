@@ -29,6 +29,7 @@ def check_gps(gps_managers):
 
 def check_speed(sample_dict, gps_managers):
     "Verify that speed is above set limit"
+    print("gps_managers speed {}".format(gps_managers[0].speed))
     speeds = [gps_manager.speed for gps_manager in gps_managers]
     return min(speeds) > float(sample_dict['sampling_speed_limit'])
 
