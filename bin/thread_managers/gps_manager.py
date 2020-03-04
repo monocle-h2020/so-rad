@@ -709,7 +709,7 @@ class RTKUBX(object):
             self.gSpeed = gps_dict['gSpeed']
             self.headMot = gps_dict['headMot']/100000.0
             self.sAcc = gps_dict['sAcc']
-            self.headAcc = gps_dict['headAcc']
+            self.headAcc = gps_dict['headAcc']/100000.0
             self.pDOP = gps_dict['pDOP']
             self.reserved1_1 = gps_dict['reserved1_1']
             self.reserved1_2 = gps_dict['reserved1_2']

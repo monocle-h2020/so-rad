@@ -335,8 +335,7 @@ def run():
                 alt0 = gps_managers[0].alt
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
-                log.info("GPS bearing: {0}".format(ship_bearing_mean))
-                log.info("GPS fix: {0}".format(gps_managers[0].fix))
+                log.info("GPS bearing: {0}(acc: {4})| fix: {1} | valid: {2} | flags: {3}".format(ship_bearing_mean, gps_managers[0].fix, gps_managers[0].valid, gps_managers[0].flags, gps_managers[0].headAcc))
 
                 # Fetch sun variables
                 solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
