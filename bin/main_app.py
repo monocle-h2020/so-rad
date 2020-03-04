@@ -263,7 +263,7 @@ def run():
     
     while True:
         time.sleep(2)
-        print(gps_managers[0].second)
+
 
     # Check if the program is using a fixed bearing or calculated one
     if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':

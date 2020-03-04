@@ -384,7 +384,7 @@ class GPSSerialReader(threading.Thread):
                 log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(self.serial_port.port))
                 self.serial_port.reset_input_buffer()
                 time.sleep(0.001)
-                print("Thrown data away")
+              
                 continue
 
             if(protocol == "NMEA0183"):
@@ -407,9 +407,9 @@ class GPSSerialReader(threading.Thread):
                 try:
                     # Keep a record of number of lines read this pass, to calculate timer
                     lineCount = 0
-                    print("Number of checks to make {}".format(numberOfChecksToMake))
+                 
                     for i in range(numberOfChecksToMake):
-                        print("This is i {}".format(i))
+                    
                         # Sleep so the program isn't spamming buffer with read requests
                         time.sleep(timeToSleep)
 
@@ -450,7 +450,7 @@ class GPSSerialReader(threading.Thread):
                                     ID = line[3]                         
                                     CLASS = line[2]  
                                     data = PayloadIdentifier(payload, ID, CLASS)
-                                    print("This is none {}".format(data))
+           
 
                                     dataDictionary = {
                                         'iTOW' : data[0], 
@@ -492,21 +492,17 @@ class GPSSerialReader(threading.Thread):
                                         'magAcc' :data[36]
                                     }
 
-                                    
                                     # Set up memcache
                                     client = base.Client(('localhost', 11211))
                                     # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
                                     client.set('GPS_UBLOX8', dataDictionary)
                                     try:
                                         self.current_gps_dict = dataDictionary
-                                        print("self current dict is set")
                                         self.notify_observers()
-                                        print("notify observers done")
+
                                     except Exception as e:
                                         log.warning("Error on GPS string: {0}".format(dataDictionary))
-                                        print(e)
-                                    
-                                
+                                        print(e) 
 
                                 # Any data that was not a complete line, and is in fact a part of the next line to be read in
                                 # is kept in the organised hex data list so the rest of the line can be appended. 
@@ -521,7 +517,7 @@ class GPSSerialReader(threading.Thread):
                 except Exception as error:
                     print("Error when trying to read from ublox 8: {}".format(error))
 
-####################################################################################################
+
 
             time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
 
@@ -542,7 +538,6 @@ class GPSSerialReader(threading.Thread):
         """
         if self.current_gps_dict is not None:
             for observer in self.observers:
-                print("we made it here dict {}".format(self.current_gps_dict))
                 observer.update(self.current_gps_dict)
 
 class RTKUBX(object):
@@ -720,7 +715,9 @@ class RTKUBX(object):
             self.magDec = gps_dict['magDec']
             self.magAcc = gps_dict['magAcc']
             
+        
             self.last_update = datetime.datetime.now()
+            print("Latest data: {}".format(gps_dict))
         self.gps_lock.release()
 
     def flushbuffer(self):
