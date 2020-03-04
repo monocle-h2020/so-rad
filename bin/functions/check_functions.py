@@ -40,16 +40,20 @@ def check_motor(motor_manager):
 
 def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
     """Verify that the radiometers fall under the criteria to take a measurement"""
-    if radiometry_manager.busy:
-        return False
-    elif prev_sample_time is None:
-        return True
-    elif not radiometry_manager.check_and_restore_sensor_number():
-        return False
-    elif datetime.datetime.now() - prev_sample_time > datetime.timedelta(seconds=rad_dict['sampling_interval']):
+    if radiometry_manager is None:
         return True
     else:
-        return False
+
+        if radiometry_manager.busy:
+            return False
+        elif prev_sample_time is None:
+            return True
+        elif not radiometry_manager.check_and_restore_sensor_number():
+            return False
+        elif datetime.datetime.now() - prev_sample_time > datetime.timedelta(seconds=rad_dict['sampling_interval']):
+            return True
+        else:
+            return False
 
 def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""

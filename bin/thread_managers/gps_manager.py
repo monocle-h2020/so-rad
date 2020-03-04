@@ -562,6 +562,7 @@ class RTKUBX(object):
         self.valid = None
         self.tAcc = None
         self.nano = None
+        self.fix = 0
         self.flags = None
         self.flags2 = None
         self.satellite_number = 0
@@ -608,7 +609,7 @@ class RTKUBX(object):
 
         The serial port must be an instance of serial.Serial, and the open() method must have been called.
 
-      :param serial_port: Serial object
+        :param serial_port: Serial object
         :type serial_port: serial.Serial
         """
         if not serial_port in self.serial_ports:
@@ -683,6 +684,7 @@ class RTKUBX(object):
             self.valid = gps_dict['valid']
             self.tAcc = gps_dict['tAcc']
             self.nano = gps_dict['nano']
+            self.fix = gps_dict['fixType']
             self.flags = gps_dict['flags']
             self.flags2 = gps_dict['flags2']
             self.satellite_number = gps_dict['numSV']
