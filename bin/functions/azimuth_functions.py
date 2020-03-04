@@ -54,10 +54,6 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     solar_az_deg = math.degrees(sun.az)
     solar_el_deg = math.degrees(sun.alt)
 
-    print(solar_az_deg)
-    print(solar_el_deg)
-
-
     # Viewing positions relative to compass (range 0 - 359, 0 = North)
     view_comp_cw = (solar_az_deg + 135.0) % 360.0
     view_comp_ccw = (solar_az_deg - 135.0) % 360.0

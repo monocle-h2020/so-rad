@@ -14,6 +14,7 @@ import threading
 import time
 import codecs
 import struct
+from numpy import min
 
 log = logging.getLogger()   # report to root logger
 
@@ -295,18 +296,20 @@ def generateFletcherChecksum(byteArray):
 
     for I in range(len(byteArray)):
         CK_A = CK_A + byteArray[I]
-        CK_A &= 0xFF 
-        CK_B = CK_B + CK_A    
+        CK_A &= 0xFF
+        CK_B = CK_B + CK_A
         CK_B &= 0xFF
 
     return (CK_A, CK_B)
 
+
 def UnpackMessage(structFormat, payload):
-    messageData = struct.unpack(structFormat, bytearray(payload)) 
+    messageData = struct.unpack(structFormat, bytearray(payload))
     return (messageData)
 
+
 def PayloadIdentifier(payload, ID, Class):
-    
+
     from thread_managers import ublox8Dictionary
     Class = str(hex(Class).lstrip("0x")).zfill(2)
     ID = str(hex(ID).lstrip("0x")).zfill(2)
@@ -318,12 +321,13 @@ def PayloadIdentifier(payload, ID, Class):
             return (data)
             # UnpackMessage(ClassIDs[identifier][0], payload)
         else:
-            pass #MAKE THE LOGGER to say this message hasn't been implemented yet.  
-        
+            pass # TODO: MAKE THE LOGGER to say this message hasn't been implemented yet.
+
+
 def ValidateLine(currentLine):
     loadsOfHexData = []
     # check if line is valid using checksum
-    loadsOfHex = list(bytearray(currentLine).hex())                 
+    loadsOfHex = list(bytearray(currentLine).hex())
     # Organise the hex data into the correct pairs.
     for index in range(0, len(loadsOfHex), 2):
         val = loadsOfHex[index] + loadsOfHex[index+1]
@@ -333,6 +337,7 @@ def ValidateLine(currentLine):
     currentByteLine = bytearray(base16Data)
     checkSumA, checkSumB = generateFletcherChecksum(currentByteLine[2:-2])
     return (currentByteLine, checkSumA, checkSumB)
+
 
 class GPSSerialReader(threading.Thread):
     """
@@ -358,33 +363,32 @@ class GPSSerialReader(threading.Thread):
 
         protocol = type(self.parent).__name__
 
-        bitOfData = b''
 
-        # Variables to manager a reader timer
-        numberOfChecksToMake = 10
-        timeToSleep = 1
-        targetChecksPerLine = 1.3
-        targetLinesPerCheck = 1/targetChecksPerLine   
+        # Variables to manager a reader timer (currenlty only used in ublox protocol)
+        bitOfData = b''
+        timeToSleep = 0.5
+        #newTimeToSleep = 1
+        #targetChecksPerLine = 1.3
+        #targetLinesPerCheck = 1/targetChecksPerLine
         serialReader = self.serial_port
         LotOfData = []
         from pymemcache.client import base
 
-
         while not self.parent.stop_gps:
-           # print("port {}".format(self.serial_port.inwaiting()))
-           # print("Length of data in gps buffer: {}".format(len(self.serial_port.inwaiting())))
+            # print("port {}".format(self.serial_port.inwaiting()))
+            # print("Length of data in gps buffer: {}".format(len(self.serial_port.inwaiting())))
 
             if(protocol == "RTKUBX"):
                 pass
             elif(protocol == "NMEA0183"):
                 old_gps_time = self.parent.datetime
- 
+
             if self.serial_port.inWaiting() > 1000:
                 # if too much data in buffer, throw it away
                 log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(self.serial_port.port))
                 self.serial_port.reset_input_buffer()
                 time.sleep(0.001)
-              
+
                 continue
 
             if(protocol == "NMEA0183"):
@@ -403,63 +407,63 @@ class GPSSerialReader(threading.Thread):
                     self.notify_observers()
                 except UnicodeDecodeError:
                     log.warning("UnicodeDecodeError on GPS string: {0}".format(gps_string))
-            elif(protocol == "RTKUBX"):
+
+            elif(protocol == "RTKUBX") and not self.parent.stop_gps:
                 try:
-                    # Keep a record of number of lines read this pass, to calculate timer
-                    lineCount = 0
-                 
-                    for i in range(numberOfChecksToMake):
-                    
-                        # Sleep so the program isn't spamming buffer with read requests
-                        time.sleep(timeToSleep)
+                    # update timToSleep here
+                    #timeToSleep = newTimeToSleep
+                    #log.info("Updated Ublox sleep timer to {0}".format(timeToSleep))
 
-                        if serialReader.in_waiting != 0:
-                            bitOfData = serialReader.read(serialReader.in_waiting)
-                            bitOfDataInAList = list(bitOfData)           
-                            LotOfData =  LotOfData + bitOfDataInAList
-                            
-                            bitOfDataInAList = []
-                            listOfLines = []
-                            bitOfData = b'' 
-                            startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
-                            if(len(startIndices) >= 2):
-                                for currentStartIndex in range(len(startIndices)-1):
-                                    # For all indexes that are start points, check if each is a full line.
-                                    currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[currentStartIndex+1]]                               
-                                    currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+                    # Sleep so the program isn't spamming buffer with read requests
+                    time.sleep(timeToSleep)
 
-                                    assert (len(currentHexLine)>1),"{} shorter then 2".format(currentHexLine)
-                                    # If the line is complete and correct then append it to a list of lines.
-                                    if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
-                                        listOfLines.append(currentLine)
-                                    else:
-                                        # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
-                                        # If it was, check the following start indexes. If none are correct then discard the data.
-                                        for x in range(len(startIndices)-1):
-                                            currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
-                                            currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
-                                            if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
-                                                listOfLines.append(currentLine)
-                                                break
-                                # For all the lines collected, get the payload out and send it to get sorted... eventually... it's a work in progress..                 
-                                for line in listOfLines:
-                                    if len(line) != 100:
-                                        continue
-                                    lineCount += 1
-                                    payload = (line[6:-2]) 
-                                    ID = line[3]                         
-                                    CLASS = line[2]  
-                                    data = PayloadIdentifier(payload, ID, CLASS)
-           
+                    if serialReader.in_waiting != 0:
+                        bitOfData = serialReader.read(serialReader.in_waiting)
+                        bitOfDataInAList = list(bitOfData)
+                        LotOfData =  LotOfData + bitOfDataInAList
 
-                                    dataDictionary = {
-                                        'iTOW' : data[0], 
-                                        'year' : data[1], 
-                                        'month' : data[2], 
-                                        'day' : data[3], 
-                                        'hour' : data[4], 
+                        bitOfDataInAList = []
+                        listOfLines = []
+                        bitOfData = b''
+                        startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
+                        if(len(startIndices) >= 2):
+                            for currentStartIndex in range(len(startIndices)-1):
+                                # For all indexes that are start points, check if each is a full line.
+                                currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[currentStartIndex+1]]
+                                currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+
+                                assert (len(currentHexLine)>1),"{} shorter then 2".format(currentHexLine)
+                                # If the line is complete and correct then append it to a list of lines.
+                                if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
+                                    listOfLines.append(currentLine)
+                                else:
+                                    # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
+                                    # If it was, check the following start indexes. If none are correct then discard the data.
+                                    for x in range(len(startIndices)-1):
+                                        currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
+                                        currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+                                        if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
+                                            listOfLines.append(currentLine)
+                                            break
+
+                            lineCount = 0
+                            for line in listOfLines:
+                                if len(line) != 100:
+                                    continue
+                                lineCount += 1
+                                payload = (line[6:-2])
+                                ID = line[3]
+                                CLASS = line[2]
+                                data = PayloadIdentifier(payload, ID, CLASS)
+
+                                dataDictionary = {
+                                        'iTOW' : data[0],
+                                        'year' : data[1],
+                                        'month' : data[2],
+                                        'day' : data[3],
+                                        'hour' : data[4],
                                         'min' : data[5], 
-                                        'sec' : data[6], 
+                                        'sec' : data[6],
                                         'valid' : data[7], 
                                         'tAcc' : data[8], 
                                         'nano' : data[9], 
@@ -492,32 +496,31 @@ class GPSSerialReader(threading.Thread):
                                         'magAcc' :data[36]
                                     }
 
-                                    # Set up memcache
-                                    client = base.Client(('localhost', 11211))
-                                    # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
-                                    client.set('GPS_UBLOX8', dataDictionary)
-                                    try:
-                                        self.current_gps_dict = dataDictionary
-                                        self.notify_observers()
+                                # Set up memcache if needed
+                                # client = base.Client(('localhost', 11211))
+                                # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
+                                # client.set('GPS_UBLOX8', dataDictionary)
+                                try:
+                                    self.current_gps_dict = dataDictionary
+                                    self.notify_observers()
 
-                                    except Exception as e:
-                                        log.warning("Error on GPS string: {0}".format(dataDictionary))
-                                        print(e) 
+                                except Exception as e:
+                                    log.warning("Error on GPS string: {0}".format(dataDictionary))
+                                    print(e)
 
-                                # Any data that was not a complete line, and is in fact a part of the next line to be read in
-                                # is kept in the organised hex data list so the rest of the line can be appended. 
-                                LotOfData = LotOfData[startIndices[len(startIndices)-1]:]                                     
+                            # Any data that was not a complete line, and is in fact a part of the next line to be read in
+                            # is kept in the organised hex data list so the rest of the line can be appended. 
+                            LotOfData = LotOfData[startIndices[len(startIndices)-1]:]                                     
                     # Re-calculate the amount of time needed to sleep, with the goal of checking buffer at the speed of 1.3 times that of data being available
-                    linesPerCheck = lineCount / numberOfChecksToMake
-                    newTimeToSleep = timeToSleep * ( targetLinesPerCheck / linesPerCheck ) 
-                    timeToSleep = newTimeToSleep
+                    #if lineCount > 0:
+                    #    newTimeToSleep = min([0.1, timeToSleep / (lineCount / targetLinesPerCheck) ])
+                    #else:
+                    #    newTimeToSleep = max([2, timeToSleep * 1.1])
+                    log.debug("Lines parsed: {0}".format(lineCount))
+
                     # Slowly increase the number of checks before re-adjusting the timer
-                    if(numberOfChecksToMake < 100):
-                        numberOfChecksToMake += 10
                 except Exception as error:
-                    print("Error when trying to read from ublox 8: {}".format(error))
-
-
+                    log.info("Error when trying to read from ublox 8: {}".format(error))
 
             time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
 
@@ -540,6 +543,7 @@ class GPSSerialReader(threading.Thread):
             for observer in self.observers:
                 observer.update(self.current_gps_dict)
 
+
 class RTKUBX(object):
     """
     Main GPS class which oversees the management and reading of GPS ports.
@@ -550,7 +554,7 @@ class RTKUBX(object):
         self.watchdog = None
         self.started = False
         self.threads = []
-        
+
         self.iTOW = None
         self.year = None
         self.month = None
@@ -572,6 +576,7 @@ class RTKUBX(object):
 
         self.alt = self.hMSL
         self.datetime = None
+        self.heading = None
 
         self.hAcc = None
         self.vAcc = None
@@ -592,7 +597,7 @@ class RTKUBX(object):
         self.headVeh = None
         self.magDec = None
         self.magAcc = None
-        
+
         self.update_rate = 0
         self.gps_lock = threading.Lock()
         self.gps_observers = []
@@ -641,7 +646,7 @@ class RTKUBX(object):
             for thread in self.threads:
                 thread.start()
 
-            log.info("Started RTK GPS managers")
+            log.info("Started RTK GPS manager")
         else:
             log.warn("RTK GPS manager already started")
 
@@ -688,8 +693,8 @@ class RTKUBX(object):
             self.flags = gps_dict['flags']
             self.flags2 = gps_dict['flags2']
             self.satellite_number = gps_dict['numSV']
-            self.lon = gps_dict['lon']
-            self.lat = gps_dict['lat']
+            self.lon = gps_dict['lon']/10000000.0
+            self.lat = gps_dict['lat']/10000000.0
             self.height = gps_dict['height']
             self.hMSL = gps_dict['hMSL']
 
@@ -701,7 +706,7 @@ class RTKUBX(object):
             self.velE = gps_dict['velE']
             self.velD = gps_dict['velD']
             self.speed = gps_dict['gSpeed']
-            self.headMot = gps_dict['headMot']
+            self.headMot = gps_dict['headMot']/100000.0
             self.sAcc = gps_dict['sAcc']
             self.headAcc = gps_dict['headAcc']
             self.pDOP = gps_dict['pDOP']
@@ -711,13 +716,14 @@ class RTKUBX(object):
             self.reserved1_4 = gps_dict['reserved1_4']
             self.reserved1_5 = gps_dict['reserved1_5']
             self.reserved1_6 = gps_dict['reserved1_6']
-            self.headVeh = gps_dict['headVeh']
+            self.headVeh = gps_dict['headVeh']/100000.0
             self.magDec = gps_dict['magDec']
             self.magAcc = gps_dict['magAcc']
-            
-        
+
+            self.heading = self.headVeh  # align with NMEA 0183
+
             self.last_update = datetime.datetime.now()
-            print("Latest data: {}".format(gps_dict))
+            log.debug("UBX data updated: {}".format(gps_dict))
         self.gps_lock.release()
 
     def flushbuffer(self):

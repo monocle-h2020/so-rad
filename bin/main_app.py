@@ -260,10 +260,6 @@ def run():
     solar_az = None
     solar_el = None
     use_rad = rad['n_sensors'] > 0
-    
-    while True:
-        time.sleep(2)
-
 
     # Check if the program is using a fixed bearing or calculated one
     if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
@@ -311,8 +307,10 @@ def run():
                 # read latest gps info and calculate angles for motor
                 speed = gps_managers[0].speed
                 nsat0 = gps_managers[0].satellite_number
-                if(len(gps_managers) == 2):
+                if len(gps_managers) == 2:
                     nsat1 = gps_managers[1].satellite_number
+                else:
+                    nsat1 = None
                 time.sleep(2)
                 speed_ready = check_speed(sample, gps_managers)
                 message += "Speed {0}, ".format(checks[speed_ready])
@@ -325,15 +323,23 @@ def run():
                     time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
                     continue
 
-                # # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
-                # if not bearing_fixed:
-                #     ship_bearing_mean = gps_checker_manager.mean_bearing
+                # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
+                if not bearing_fixed:
+                    if len(gps_managers) == 2:
+                        ship_bearing_mean = gps_checker_manager.mean_bearing
+                    else:
+                        ship_bearing_mean = gps_managers[0].heading
 
                 lat0 = gps_managers[0].lat
                 lon0 = gps_managers[0].lon
                 alt0 = gps_managers[0].alt
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
+                log.info("GPS bearing: {0}".format(ship_bearing_mean))
+                log.info("GPS Latitude: {0}".format(lat0))
+                log.info("GPS Longitude: {0}".format(lon0))
+                log.info("GPS Datetime: {0}".format(dt))
+                log.info("GPS Speed: {0}".format(speed))
 
                 # Fetch sun variables
                 solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,

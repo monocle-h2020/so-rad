@@ -11,7 +11,6 @@ import datetime
 
 def check_gps(gps_managers):
     "Verify that GPSes have recent and accurate data"
-
     if(len(gps_managers) == 2):
         lat_lons = [gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon]
         gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
@@ -29,7 +28,6 @@ def check_gps(gps_managers):
 
 def check_speed(sample_dict, gps_managers):
     "Verify that speed is above set limit"
-    print("gps_managers speed {}".format(gps_managers[0].speed))
     speeds = [gps_manager.speed for gps_manager in gps_managers]
     return min(speeds) > float(sample_dict['sampling_speed_limit'])
 
