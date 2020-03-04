@@ -494,12 +494,10 @@ class GPSSerialReader(threading.Thread):
                                     client = base.Client(('localhost', 11211))
                                     # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
                                     client.set('GPS_UBLOX8', dataDictionary)
-                                    print("the dictionary {}".format(dataDictionary))
                                     try:
                                         self.current_gps_dict = dataDictionary
-                                        print("the self dictionary {}".format(self.current_gps_dict))
                                         self.notify_observers()
-                                        print("did the second one")
+                                        print("Notified the observers")
                                     except Exception:
                                         log.warning("Error on GPS string: {0}".format(dataDictionary))
                                 

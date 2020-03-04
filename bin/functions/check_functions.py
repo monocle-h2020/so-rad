@@ -17,7 +17,7 @@ def check_gps(gps_managers):
         gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
         if min(gps_fixes)<2:
             return False
-    elif(len(gps_managers == 1)):
+    elif(len(gps_managers) == 1):
         lat_lons = [gps_managers[0].lat, gps_managers[0].lon]
         gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
         if min(gps_fixes)<1:
