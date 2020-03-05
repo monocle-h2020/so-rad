@@ -296,7 +296,7 @@ def run():
             rad_ready = False
 
             # Check if the GPS sensors have met conditions
-            gps_ready = check_gps(gps_managers, conf['GPS'].getint('gps_heading_speed_limit'))
+            gps_ready = check_gps(gps_managers, conf['GPS'].getint('gps_heading_accuracy_limit'), conf['GPS'].get('protocol').lower())
             message += "GPS {0}, ".format(checks[gps_ready])
 
             # Check if the radiometers have met conditions
