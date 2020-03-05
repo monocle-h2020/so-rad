@@ -317,11 +317,23 @@ def PayloadIdentifier(payload, ID, Class):
 
     if identifier in ublox8Dictionary.ClassIDs.keys():
         if(identifier == "0107"):
+            flag = payload[11]
+            binaryFlag = "{0:b}".format(flag)
+            binaryFlag = binaryFlag.zfill(8)
+            valid = payload[7]
+            binaryValid = "{0:b}".format(valid)
+            binaryValid = binaryValid.zfill(8)
+            flag2 = payload[12]
+            binaryFlag2 = "{0:b}".format(flag2)
             data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
+
+            data[11] = binaryFlag
+            data[12] = binaryFlag2
+            data[7] = binaryValid
             return (data)
             # UnpackMessage(ClassIDs[identifier][0], payload)
         else:
-            pass # TODO: MAKE THE LOGGER to say this message hasn't been implemented yet.
+            pass
 
 
 def ValidateLine(currentLine):
@@ -370,6 +382,7 @@ class GPSSerialReader(threading.Thread):
         #newTimeToSleep = 1
         #targetChecksPerLine = 1.3
         #targetLinesPerCheck = 1/targetChecksPerLine
+        lineCount = 0
         serialReader = self.serial_port
         LotOfData = []
         from pymemcache.client import base
@@ -562,12 +575,12 @@ class RTKUBX(object):
         self.hour = None
         self.minute = None
         self.second = None
-        self.valid = None
+        self.Wholevalid = None
         self.tAcc = None
         self.nano = None
         self.fixType = 0
-        self.flags = None
-        self.flags2 = None
+        self.Wholeflags = None
+        self.Wholeflags2 = None
         self.satellite_number = 0
         self.lon = None
         self.lat = None
@@ -579,6 +592,8 @@ class RTKUBX(object):
         self.heading = None
         self.speed = None
         self.fix = 0
+        self.valid = None
+        self.flags = None
 
         self.hAcc = None
         self.vAcc = None
@@ -599,6 +614,21 @@ class RTKUBX(object):
         self.headVeh = None
         self.magDec = None
         self.magAcc = None
+
+        self.carrSoln = None
+        self.headVehValid = None
+        self.psmState = None
+        self.diffsolN = None
+        self.gnssFixOK = None
+
+        self.confirmedTime = None
+        self.confirmedDate = None
+        self.confirmedAvai = None
+
+        self.validMag = None
+        self.fullyResolved = None
+        self.validTime = None
+        self.validDate = None
 
         self.update_rate = 0
         self.gps_lock = threading.Lock()
@@ -688,12 +718,12 @@ class RTKUBX(object):
             self.hour = gps_dict['hour']
             self.minute = gps_dict['min']
             self.second = gps_dict['sec']
-            self.valid = gps_dict['valid']
+            self.Wholevalid = gps_dict['valid']
             self.tAcc = gps_dict['tAcc']
             self.nano = gps_dict['nano']
             self.fixType = gps_dict['fixType']
-            self.flags = gps_dict['flags']
-            self.flags2 = gps_dict['flags2']
+            self.Wholeflags = gps_dict['flags']
+            self.Wholeflags2 = gps_dict['flags2']
             self.satellite_number = gps_dict['numSV']
             self.lon = gps_dict['lon']/10000000.0
             self.lat = gps_dict['lat']/10000000.0
@@ -726,6 +756,28 @@ class RTKUBX(object):
             self.speed = self.gSpeed * 0.00194384
             self.fix = self.fixType
             self.alt = self.hMSL
+            self.flags = gps_dict['flags'][3]
+            self.valid = gps_dict['valid'][5]
+
+
+            log.info(type(gps_dict['flags']))
+
+            self.carrSoln = gps_dict['flags'][0:2]
+            self.headVehValid = gps_dict['flags'][3]
+            self.psmState = gps_dict['flags'][4:7]
+            self.diffSoln = gps_dict['flags'][7]
+            self.gnssFixOK = gps_dict['flags'][8]
+
+            self.confirmedTime = gps_dict['flags2'][0]
+            self.confirmedDate = gps_dict['flags2'][1]
+            self.confirmedAvai = gps_dict['flags2'][2]
+
+            self.validMag = gps_dict['valid'][4]
+            self.fullyResolved = gps_dict['valid'][5]
+            self.validTime = gps_dict['valid'][6]
+            self.validDate = gps_dict['valid'][7]
+
+
 
             self.last_update = datetime.datetime.now()
             log.debug("UBX data updated: {}".format(gps_dict))
