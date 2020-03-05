@@ -326,7 +326,7 @@ def PayloadIdentifier(payload, ID, Class):
             flag2 = payload[12]
             binaryFlag2 = "{0:b}".format(flag2)
             data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
-
+            data = list(data)
             data[11] = binaryFlag
             data[12] = binaryFlag2
             data[7] = binaryValid
