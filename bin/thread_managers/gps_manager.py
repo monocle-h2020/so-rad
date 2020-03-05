@@ -475,37 +475,37 @@ class GPSSerialReader(threading.Thread):
                                         'month' : data[2],
                                         'day' : data[3],
                                         'hour' : data[4],
-                                        'min' : data[5], 
+                                        'min' : data[5],
                                         'sec' : data[6],
-                                        'valid' : data[7], 
-                                        'tAcc' : data[8], 
-                                        'nano' : data[9], 
-                                        'fixType' : data[10], 
-                                        'flags' : data[11], 
-                                        'flags2' : data[12], 
-                                        'numSV' : data[13], 
-                                        'lon' : data[14], 
-                                        'lat' : data[15], 
-                                        'height' : data[16], 
-                                        'hMSL' : data[17], 
-                                        'hAcc' : data[18], 
-                                        'vAcc' : data[19], 
-                                        'velN' : data[20], 
-                                        'velE' : data[21], 
-                                        'velD' : data[22], 
-                                        'gSpeed' : data[23], 
-                                        'headMot' : data[24], 
-                                        'sAcc' : data[25], 
-                                        'headAcc' : data[26], 
-                                        'pDOP' : data[27], 
-                                        'reserved1_1' : data[28], 
-                                        'reserved1_2' : data[29], 
-                                        'reserved1_3' : data[30], 
-                                        'reserved1_4' : data[31], 
-                                        'reserved1_5' : data[32], 
-                                        'reserved1_6' : data[33], 
-                                        'headVeh' : data[34], 
-                                        'magDec' : data[35], 
+                                        'valid' : data[7],
+                                        'tAcc' : data[8],
+                                        'nano' : data[9],
+                                        'fixType' : data[10],
+                                        'flags' : data[11],
+                                        'flags2' : data[12],
+                                        'numSV' : data[13],
+                                        'lon' : data[14],
+                                        'lat' : data[15],
+                                        'height' : data[16],
+                                        'hMSL' : data[17],
+                                        'hAcc' : data[18],
+                                        'vAcc' : data[19],
+                                        'velN' : data[20],
+                                        'velE' : data[21],
+                                        'velD' : data[22],
+                                        'gSpeed' : data[23],
+                                        'headMot' : data[24],
+                                        'sAcc' : data[25],
+                                        'headAcc' : data[26],
+                                        'pDOP' : data[27],
+                                        'reserved1_1' : data[28],
+                                        'reserved1_2' : data[29],
+                                        'reserved1_3' : data[30],
+                                        'reserved1_4' : data[31],
+                                        'reserved1_5' : data[32],
+                                        'reserved1_6' : data[33],
+                                        'headVeh' : data[34],
+                                        'magDec' : data[35],
                                         'magAcc' :data[36]
                                     }
 
@@ -594,6 +594,7 @@ class RTKUBX(object):
         self.fix = 0
         self.valid = None
         self.flags = None
+        self.flags2 = None
 
         self.hAcc = None
         self.vAcc = None
@@ -615,20 +616,20 @@ class RTKUBX(object):
         self.magDec = None
         self.magAcc = None
 
-        self.carrSoln = None
-        self.headVehValid = None
-        self.psmState = None
-        self.diffsolN = None
-        self.gnssFixOK = None
+        self.flags_carrSoln = None
+        self.flags_headVehValid = None
+        self.flags_psmState = None
+        self.flags_diffsolN = None
+        self.flags_gnssFixOK = None
 
-        self.confirmedTime = None
-        self.confirmedDate = None
-        self.confirmedAvai = None
+        self.flags2_confirmedTime = None
+        self.flags2_confirmedDate = None
+        self.flags2_confirmedAvai = None
 
-        self.validMag = None
-        self.fullyResolved = None
-        self.validTime = None
-        self.validDate = None
+        self.valid_validMag = None
+        self.valid_fullyResolved = None
+        self.valid_validTime = None
+        self.valid_validDate = None
 
         self.update_rate = 0
         self.gps_lock = threading.Lock()
@@ -756,28 +757,25 @@ class RTKUBX(object):
             self.speed = self.gSpeed * 0.00194384
             self.fix = self.fixType
             self.alt = self.hMSL
-            self.flags = gps_dict['flags'][3]
-            self.valid = gps_dict['valid'][5]
-
+            self.flags = gps_dict['flags']
+            self.valid = gps_dict['valid']
 
             log.info(type(gps_dict['flags']))
 
-            self.carrSoln = gps_dict['flags'][0:2]
-            self.headVehValid = gps_dict['flags'][3]
-            self.psmState = gps_dict['flags'][4:7]
-            self.diffSoln = gps_dict['flags'][7]
-            self.gnssFixOK = gps_dict['flags'][8]
+            self.flags_carrSoln = gps_dict['flags'][0:2]
+            self.flags_headVehValid = gps_dict['flags'][3]
+            self.flags_psmState = gps_dict['flags'][4:7]
+            self.flags_diffSoln = gps_dict['flags'][7]
+            self.flags_gnssFixOK = gps_dict['flags'][8]
 
-            self.confirmedTime = gps_dict['flags2'][0]
-            self.confirmedDate = gps_dict['flags2'][1]
-            self.confirmedAvai = gps_dict['flags2'][2]
+            self.flags2_confirmedTime = gps_dict['flags2'][0]
+            self.flags2_confirmedDate = gps_dict['flags2'][1]
+            self.flags2_confirmedAvai = gps_dict['flags2'][2]
 
-            self.validMag = gps_dict['valid'][4]
-            self.fullyResolved = gps_dict['valid'][5]
-            self.validTime = gps_dict['valid'][6]
-            self.validDate = gps_dict['valid'][7]
-
-
+            self.valid_validMag = gps_dict['valid'][4]
+            self.valid_fullyResolved = gps_dict['valid'][5]
+            self.valid_validTime = gps_dict['valid'][6]
+            self.valid_validDate = gps_dict['valid'][7]
 
             self.last_update = datetime.datetime.now()
             log.debug("UBX data updated: {}".format(gps_dict))

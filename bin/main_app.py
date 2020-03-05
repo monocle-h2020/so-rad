@@ -335,7 +335,10 @@ def run():
                 alt0 = gps_managers[0].alt
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
-                log.info("GPS bearing: {0}(acc: {4})| fix: {1} | valid: {2} | flags: {3}".format(ship_bearing_mean, gps_managers[0].fix, gps_managers[0].valid, gps_managers[0].flags, gps_managers[0].headAcc))
+                log.info("GPS bearing: {0}(acc: {4})| fix: {1} | valid: {2} | flags: {3} | validHeading: {5}"\
+                    .format(ship_bearing_mean, gps_managers[0].fix,
+                            gps_managers[0].valid, gps_managers[0].flags,
+                            gps_managers[0].headAcc, gps_managers[0].flags_headVehValid))
 
                 # Fetch sun variables
                 solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
@@ -399,7 +402,14 @@ def run():
             else:
                 # record metadata and GPS data if some checks aren't passed
                 gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-                gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                if len(gps_managers) == 2:
+                    gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                    gps2_manager_dict['used'] = True
+                else:
+                    gps2_manager_dict = {}
+                    for key in gps1_manager_dict.keys():
+                        gps2_manager_dict[key] = None
+                    gps2_manager_dict['used'] = False
 
                 no_trigger_id = datetime.datetime.now()
                 spec_data = None
