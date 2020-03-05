@@ -11,13 +11,14 @@ import datetime
 
 def check_gps(gps_managers, gps_heading_accuracy_limit, gps_protocol):
     "Verify that GPSes have recent and accurate data"
-    if(len(gps_managers) == 2):
+    if (len(gps_managers) == 2):
         lat_lons = [gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon]
         gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
         if min(gps_fixes)<2:
             return False
-    elif(len(gps_managers) == 1 and gps_protocol == "rtk"):
-        if(gps_managers[0].flags_headVehValid == 1 and gps_managers[0].flags_hAcc < gps_heading_accuracy_limit:
+    # TODO add case for 1 gps under NMEA protocol
+    elif (len(gps_managers) == 1 and gps_protocol == "rtk"):
+        if (gps_managers[0].flags_headVehValid == 1) and (gps_managers[0].flags_hAcc < gps_heading_accuracy_limit):
             lat_lons = [gps_managers[0].lat, gps_managers[0].lon]
             gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
             if min(gps_fixes)<1:

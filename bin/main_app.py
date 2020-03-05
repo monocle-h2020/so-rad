@@ -251,6 +251,12 @@ def run():
         stop_all(db_dict, radiometry_manager, gps_managers,
                 battery, bat_manager, gpios)
         raise
+
+
+    main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
+    gps_heading_accuracy_limit = conf['GPS'].getfloat('gps_heading_accuracy_limit')
+    gps_protocol = conf['GPS'].get('protocol').lower()
+
     log.info("===Initialisation complete===")
 
     last_commit_time = datetime.datetime.now()
@@ -280,7 +286,7 @@ def run():
                 if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
                     message += "Battery low, idling. Battery info: {0}".format(bat_manager)
                     log.info(message)
-                    time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
+                    time.sleep(main_check_cycle_sec)
                     continue
                 elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
                     message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
@@ -296,7 +302,7 @@ def run():
             rad_ready = False
 
             # Check if the GPS sensors have met conditions
-            gps_ready = check_gps(gps_managers, conf['GPS'].getint('gps_heading_accuracy_limit'), conf['GPS'].get('protocol').lower())
+            gps_ready = check_gps(gps_managers, gps_heading_accuracy_limit, gps_protocol)
             message += "GPS {0}, ".format(checks[gps_ready])
 
             # Check if the radiometers have met conditions
@@ -320,7 +326,7 @@ def run():
                 if motor_pos is None:
                     message += "Motor position not read. NotReady: {0}".format(datetime.datetime.now())
                     log.info(message)
-                    time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
+                    time.sleep(main_check_cycle_sec)
                     continue
 
                 # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
@@ -421,7 +427,7 @@ def run():
                     message += "NotReady | GPS Recorded: {0} [{1}]".format(last_commit_time, db_id)
 
             log.info(message)
-            time.sleep(conf['DEFAULT'].getint('main_check_cycle_sec'))
+            time.sleep(main_check_cycle_sec)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
