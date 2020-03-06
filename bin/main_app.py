@@ -25,7 +25,7 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 
@@ -252,7 +252,6 @@ def run():
                 battery, bat_manager, gpios)
         raise
 
-
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
     gps_heading_accuracy_limit = conf['GPS'].getfloat('gps_heading_accuracy_limit')
     gps_protocol = conf['GPS'].get('protocol').lower()
@@ -300,10 +299,13 @@ def run():
             motor_ready = False
             sun_suitable = False
             rad_ready = False
+            heading_ok = False
 
             # Check if the GPS sensors have met conditions
-            gps_ready = check_gps(gps_managers, gps_heading_accuracy_limit, gps_protocol)
+            gps_ready = check_gps(gps_managers, gps_protocol)
             message += "GPS {0}, ".format(checks[gps_ready])
+            heading_ok = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
+            message += "GPS Heading {0}, ".format(checks[heading_ok])
 
             # Check if the radiometers have met conditions
             rad_ready = check_sensors(rad, trigger_id, radiometry_manager)
@@ -331,6 +333,7 @@ def run():
 
                 # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
                 if not bearing_fixed:
+                    heading_ok = True
                     if len(gps_managers) == 2:
                         ship_bearing_mean = gps_checker_manager.mean_bearing
                     else:
@@ -341,7 +344,7 @@ def run():
                 alt0 = gps_managers[0].alt
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
-                log.info("GPS bearing: {0}(acc: {4})| fix: {1} | valid: {2} | flags: {3} | validHeading: {5}"\
+                log.info("GPS heading: {0}(acc: {4})| fix: {1} | valid: {2} | flags: {3} | validHeading: {5}"\
                     .format(ship_bearing_mean, gps_managers[0].fix,
                             gps_managers[0].valid, gps_managers[0].flags,
                             gps_managers[0].headAcc, gps_managers[0].flags_headVehValid))
@@ -354,13 +357,13 @@ def run():
                                  motor_angles['ach_mot_ccw'], motor_angles['ach_mot_cw'],
                                  motor_angles['target_motor_pos_deg'], motor_angles['target_motor_pos_rel_az_deg'], counter))
 
-                message += "ShBe: {0:1.6f}, SuAz: {1:1.6f}, SuEl: {2:1.6f}. Speed {3:1.6f} nSat [{4}|{5}] "\
+                message += "ShBe: {0:1.2f}, SuAz: {1:1.2f}, SuEl: {2:1.2f}. Speed {3:1.2f} nSat [{4}|{5}] "\
                            .format(ship_bearing_mean, solar_az, solar_el, speed, nsat0, nsat1)
                 # Check if the sun is in a suitable position
                 sun_suitable = check_sun(sample, solar_az, solar_el)
 
                 # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
-                if (sun_suitable and (abs(motor_angles['target_motor_pos_step'] - motor_pos) > motor['step_thresh'])) and speed_ready:
+                if (sun_suitable and (abs(motor_angles['target_motor_pos_step'] - motor_pos) > motor['step_thresh'])) and (speed_ready) and (heading_ok):
                     log.info("Adjust motor angle ({0} --> {1})".format(motor_pos, motor_angles['target_motor_pos_step']))
                     # Rotate the motor to the new position
                     target_pos = motor_angles['target_motor_pos_step']
@@ -380,11 +383,18 @@ def run():
 
 
             # If all checks are good, take radiometry measurements
-            if all([gps_ready, rad_ready, sun_suitable, speed_ready]):
+            if all([gps_ready, rad_ready, sun_suitable, speed_ready, heading_ok]):
                 # Get the current time of the computer and data from the GPS sensor managers
                 trigger_id = datetime.datetime.now()
                 gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-                gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                if len(gps_managers) == 2:
+                    gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                    gps2_manager_dict['used'] = True
+                else:
+                    gps2_manager_dict = {}
+                    for key in gps1_manager_dict.keys():
+                        gps2_manager_dict[key] = None
+                    gps2_manager_dict['used'] = False
 
                 # Collect radiometry data and splice together
                 spec_data = []

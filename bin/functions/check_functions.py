@@ -9,7 +9,7 @@ The system components include GPS sensors, radiometers and motor controller.
 import datetime
 
 
-def check_gps(gps_managers, gps_heading_accuracy_limit, gps_protocol):
+def check_gps(gps_managers, gps_protocol):
     "Verify that GPSes have recent and accurate data"
     if (len(gps_managers) == 2):
         lat_lons = [gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon]
@@ -18,16 +18,29 @@ def check_gps(gps_managers, gps_heading_accuracy_limit, gps_protocol):
             return False
     # TODO add case for 1 gps under NMEA protocol
     elif (len(gps_managers) == 1 and gps_protocol == "rtk"):
-        if (gps_managers[0].flags_headVehValid == 1) and (gps_managers[0].flags_hAcc < gps_heading_accuracy_limit):
-            lat_lons = [gps_managers[0].lat, gps_managers[0].lon]
-            gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
-            if min(gps_fixes)<1:
-                return False
-        else:
+        lat_lons = [gps_managers[0].lat, gps_managers[0].lon]
+        gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
+        if min(gps_fixes)<1:
             return False
+    else:
+        return False
     if None in lat_lons:
         return False
-    return True
+    else:
+        return True
+
+
+def check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol):
+    "Verify that gps derived heading is usable"
+    # TODO: extend with check for single or dual NMEA GPS
+    if (len(gps_managers) == 1) and (gps_protocol == "rtk"):
+
+        if (gps_managers[0].flags_headVehValid == 1) and (gps_managers[0].headAcc < gps_heading_accuracy_limit) and (gps_managers[0].heading is not None):
+            return True
+    else:
+        return False
+
+    return False
 
 
 def check_speed(sample_dict, gps_managers):
@@ -58,9 +71,11 @@ def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
         else:
             return False
 
+
 def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""
     return solar_elevation >= sample_dict['solar_elevation_limit']
+
 
 def check_battery(bat_manager, battery):
     """Check whether battery voltage is OK
