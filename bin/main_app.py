@@ -29,6 +29,7 @@ from functions.check_functions import check_gps, check_motor, check_sensors, che
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 
+
 def parse_args():
     """parse command line arguments"""
     parser = argparse.ArgumentParser()
@@ -303,9 +304,9 @@ def run():
 
             # Check if the GPS sensors have met conditions
             gps_ready = check_gps(gps_managers, gps_protocol)
-            message += "GPS {0}, ".format(checks[gps_ready])
+            message += "Pos {0}, ".format(checks[gps_ready])
             heading_ok = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
-            message += "GPS Heading {0}, ".format(checks[heading_ok])
+            message += "Head {0}, ".format(checks[heading_ok])
 
             # Check if the radiometers have met conditions
             rad_ready = check_sensors(rad, trigger_id, radiometry_manager)
@@ -344,15 +345,15 @@ def run():
                 alt0 = gps_managers[0].alt
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
-                log.info("GPS heading: {0}(acc: {4})| fix: {1} | valid: {2} | flags: {3} | validHeading: {5}"\
-                    .format(ship_bearing_mean, gps_managers[0].fix,
-                            gps_managers[0].valid, gps_managers[0].flags,
-                            gps_managers[0].headAcc, gps_managers[0].flags_headVehValid))
-
+                log.info("Heading: Mot {0} Veh {1} Acc: {2})| fix: {3} | HFlag: {4} | diffSoln: {5} | gnssFix {6}"\
+                    .format(gps_managers[0].headMot, gps_managers[0].headVeh,
+                            gps_managers[0].headAcc, gps_managers[0].fix,
+                            gps_managers[0].flags_headVehValid,
+                            gps_managers[0].flags_diffSoln, gps_managers[0].flags_gnssFixOK))
                 # Fetch sun variables
                 solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
                                                                                 ship_bearing_mean, motor, motor_pos)
-                log.info("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
+                log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
                          .format(solar_az, solar_el, motor_angles['view_comp_ccw'], motor_angles['view_comp_cw'],
                                  motor_angles['ach_mot_ccw'], motor_angles['ach_mot_cw'],
                                  motor_angles['target_motor_pos_deg'], motor_angles['target_motor_pos_rel_az_deg'], counter))

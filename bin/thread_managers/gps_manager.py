@@ -510,7 +510,7 @@ class GPSSerialReader(threading.Thread):
                                         'magAcc' :data[36]
                                     }
 
-                                if counter > 10:
+                                if counter > 100:
                                     log.info("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
                                     counter = 0
                                 else:
@@ -583,12 +583,9 @@ class RTKUBX(object):
         self.hour = None
         self.minute = None
         self.second = None
-        self.Wholevalid = None
         self.tAcc = None
         self.nano = None
         self.fixType = 0
-        self.Wholeflags = None
-        self.Wholeflags2 = None
         self.satellite_number = 0
         self.lon = None
         self.lat = None
