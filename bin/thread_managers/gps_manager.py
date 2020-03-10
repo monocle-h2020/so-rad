@@ -15,6 +15,7 @@ import time
 import codecs
 import struct
 from numpy import min
+import math
 
 log = logging.getLogger()   # report to root logger
 
@@ -339,9 +340,11 @@ def GetRelposned(payload, ID, Class):
 
             relposN = data[4]
             relposE = data[5]
+            relHeading = math.degrees(math.atan(float(relposE)/float(relposN))) % 360
 
-            log.info("relposN: {}".format(relposN))
-            log.info("relposE: {}".format(relposE))
+            #log.info("relposN: {}".format(relposN))
+            #log.info("relposE: {}".format(relposE))
+            log.info("relH: {0}, relN: {1}, relE: {2}".format(relHeading, relposN, relposE))
 
 
 def ValidateLine(currentLine):
