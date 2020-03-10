@@ -329,12 +329,12 @@ def GetRelposned(payload, ID, Class):
 
     if identifier in ublox8Dictionary.ClassIDs.keys():
         if identifier == "013c":
-            log.info("length of the payload is {}".format(len(payload)))
-            log.info("payload {}".format(payload))
+#            log.info("length of the payload is {}".format(len(payload)))
+#            log.info("payload {}".format(payload))
             data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
             data = list(data)
 
-            log.info("Full relposned message: {}".format(data))
+#            log.info("Full relposned message: {}".format(data))
 
 
             relposN = data[4]
@@ -494,17 +494,21 @@ class GPSSerialReader(threading.Thread):
                                 if len(line) != 100:
                                     #if(len(line) == 60 or len(line) == 40):
                                     #continue
-                                    log.info("Full line is {}".format(line))
+                                    #log.info("Full line is {}".format(line))
                                     ID = line[3]
                                     CLASS = line[2]
                                     payload = (line[6:-2])
                                     GetRelposned(payload, ID, CLASS)
+                                    continue
                                 lineCount += 1
                                 payload = (line[6:-2])
+                                if(len(payload) != 92):
+                                    continue
                                 ID = line[3]
                                 CLASS = line[2]
                                 data = PayloadIdentifier(payload, ID, CLASS)
-                                log.info("The data is: {}".format(data))
+                                #log.info("The data is: {}".format(data))
+                                log.info("Data updated")
                                 dataDictionary = {
                                         'iTOW' : data[0],
                                         'year' : data[1],
