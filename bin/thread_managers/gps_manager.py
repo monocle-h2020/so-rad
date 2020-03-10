@@ -319,6 +319,30 @@ def PayloadIdentifier(payload, ID, Class):
         else:
             pass
 
+def GetRelposned(payload, ID, Class):
+    from thread_managers import ublox8Dictionary
+    Class = str(hex(Class).lstrip("0x")).zfill(2)
+    ID = str(hex(ID).lstrip("0x")).zfill(2)
+    identifier = str(Class) + str(ID)
+
+#    log.info("identifier {}".format(identifier))
+
+    if identifier in ublox8Dictionary.ClassIDs.keys():
+        if identifier == "013c":
+            log.info("length of the payload is {}".format(len(payload)))
+            log.info("payload {}".format(payload))
+            data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
+            data = list(data)
+
+            log.info("Full relposned message: {}".format(data))
+
+
+            relposN = data[4]
+            relposE = data[5]
+
+            log.info("relposN: {}".format(relposN))
+            log.info("relposE: {}".format(relposE))
+
 
 def ValidateLine(currentLine):
     loadsOfHexData = []
@@ -448,7 +472,11 @@ class GPSSerialReader(threading.Thread):
 
                                 assert (len(currentHexLine)>1),"{} shorter then 2".format(currentHexLine)
                                 # If the line is complete and correct then append it to a list of lines.
+                                #log.info("The class {} the id {}".format(currentLine[2], currentLine[3]))
+                                #log.info("Length of currentHexLine {}".format(len(currentHexLine)))
+                                #log.info("checkSumA: {}, currentHexLine[-2]: {}, checkSumB: {}, currentHexLine[-1]: {}".format(checkSumA, currentHexLine[-2], checkSumB, currentHexLine[-1]))
                                 if (checkSumA == currentHexLine[-2]) and (checkSumB == currentHexLine[-1]):
+                                    #log.info("current line {}".format(currentLine))
                                     listOfLines.append(currentLine)
                                 else:
                                     # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
@@ -456,6 +484,7 @@ class GPSSerialReader(threading.Thread):
                                     for x in range(len(startIndices)-1):
                                         currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
                                         currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+                                        #log.info("2.0 The current hex line {}".format(currentHexLine))
                                         if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
                                             listOfLines.append(currentLine)
                                             break
@@ -463,13 +492,16 @@ class GPSSerialReader(threading.Thread):
                             lineCount = 0
                             for line in listOfLines:
                                 if len(line) != 100:
-                                    continue
+                                    ID = line[3]
+                                    CLASS = line[2]
+                                    payload = (line[6:-2])
+                                    relposned = GetRelposned(payload, ID, CLASS)
                                 lineCount += 1
                                 payload = (line[6:-2])
                                 ID = line[3]
                                 CLASS = line[2]
                                 data = PayloadIdentifier(payload, ID, CLASS)
-
+                                #log.info("The data is: {}".format(data))
                                 dataDictionary = {
                                         'iTOW' : data[0],
                                         'year' : data[1],
