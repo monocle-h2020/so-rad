@@ -340,11 +340,17 @@ def GetRelposned(payload, ID, Class):
 
             relposN = data[4]
             relposE = data[5]
-            relHeading = math.degrees(math.atan(float(relposE)/float(relposN))) % 360
+            #relHeading = math.degrees(math.atan(float(relposE)/float(relposN))) % 360
+
+            heading_signed = math.atan2(relposE, relposN)/math.pi*180
+            if heading_signed < 0:
+                heading = 360 + heading_signed
+            else:
+                heading = heading_signed
 
             #log.info("relposN: {}".format(relposN))
             #log.info("relposE: {}".format(relposE))
-            log.info("relH: {0}, relN: {1}, relE: {2}".format(relHeading, relposN, relposE))
+            log.info("relH: {0}, relN: {1}, relE: {2}".format(heading, relposN, relposE))
 
 
 def ValidateLine(currentLine):
