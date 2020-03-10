@@ -324,7 +324,7 @@ def GetRelposned(payload, ID, Class):
     Class = str(hex(Class).lstrip("0x")).zfill(2)
     ID = str(hex(ID).lstrip("0x")).zfill(2)
     identifier = str(Class) + str(ID)
-
+    payload = payload[0:40]
 #    log.info("identifier {}".format(identifier))
 
     if identifier in ublox8Dictionary.ClassIDs.keys():
@@ -492,16 +492,19 @@ class GPSSerialReader(threading.Thread):
                             lineCount = 0
                             for line in listOfLines:
                                 if len(line) != 100:
+                                    #if(len(line) == 60 or len(line) == 40):
+                                    #continue
+                                    log.info("Full line is {}".format(line))
                                     ID = line[3]
                                     CLASS = line[2]
                                     payload = (line[6:-2])
-                                    relposned = GetRelposned(payload, ID, CLASS)
+                                    GetRelposned(payload, ID, CLASS)
                                 lineCount += 1
                                 payload = (line[6:-2])
                                 ID = line[3]
                                 CLASS = line[2]
                                 data = PayloadIdentifier(payload, ID, CLASS)
-                                #log.info("The data is: {}".format(data))
+                                log.info("The data is: {}".format(data))
                                 dataDictionary = {
                                         'iTOW' : data[0],
                                         'year' : data[1],
