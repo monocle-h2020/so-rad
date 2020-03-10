@@ -466,14 +466,7 @@ class GPSSerialReader(threading.Thread):
                         bitOfDataInAList = []
                         listOfLines = []
                         bitOfData = b''
-                        try:
-                            startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
-                        except IndexError:
-                            # get rid of poorly formatted package
-                            log.info("Error parsing UBX GPS, clearing input buffer")
-                            self.serial_port.reset_input_buffer()
-                            LotOfData = []
-                            startIndices = []
+                        startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
                         if len(startIndices) >= 2:
                             for currentStartIndex in range(len(startIndices)-1):
                                 # For all indexes that are start points, check if each is a full line.
@@ -485,19 +478,26 @@ class GPSSerialReader(threading.Thread):
                                 #log.info("The class {} the id {}".format(currentLine[2], currentLine[3]))
                                 #log.info("Length of currentHexLine {}".format(len(currentHexLine)))
                                 #log.info("checkSumA: {}, currentHexLine[-2]: {}, checkSumB: {}, currentHexLine[-1]: {}".format(checkSumA, currentHexLine[-2], checkSumB, currentHexLine[-1]))
-                                if (checkSumA == currentHexLine[-2]) and (checkSumB == currentHexLine[-1]):
-                                    #log.info("current line {}".format(currentLine))
-                                    listOfLines.append(currentLine)
-                                else:
-                                    # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
-                                    # If it was, check the following start indexes. If none are correct then discard the data.
-                                    for x in range(len(startIndices)-1):
-                                        currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
-                                        currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
-                                        #log.info("2.0 The current hex line {}".format(currentHexLine))
-                                        if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
-                                            listOfLines.append(currentLine)
-                                            break
+                                try:
+                                    if (checkSumA == currentHexLine[-2]) and (checkSumB == currentHexLine[-1]):
+                                        #log.info("current line {}".format(currentLine))
+                                        listOfLines.append(currentLine)
+                                    else:
+                                        # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
+                                        # If it was, check the following start indexes. If none are correct then discard the data.
+                                        for x in range(len(startIndices)-1):
+                                            currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
+                                            currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+                                            #log.info("2.0 The current hex line {}".format(currentHexLine))
+                                            if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
+                                                listOfLines.append(currentLine)
+                                                break
+                                except IndexError:
+                                    # get rid of poorly formatted package
+                                    log.info("Error parsing UBX GPS, clearing input buffer")
+                                    self.serial_port.reset_input_buffer()
+                                    LotOfData = []
+                                    startIndices = []
 
                             lineCount = 0
                             for line in listOfLines:
