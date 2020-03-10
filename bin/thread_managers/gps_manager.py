@@ -506,9 +506,11 @@ class GPSSerialReader(threading.Thread):
                                     continue
                                 ID = line[3]
                                 CLASS = line[2]
+
+                                log.info("length of the payload {}".format(len(payload)))
+
                                 data = PayloadIdentifier(payload, ID, CLASS)
                                 #log.info("The data is: {}".format(data))
-                                log.info("Data updated")
                                 dataDictionary = {
                                         'iTOW' : data[0],
                                         'year' : data[1],
