@@ -466,7 +466,14 @@ class GPSSerialReader(threading.Thread):
                         bitOfDataInAList = []
                         listOfLines = []
                         bitOfData = b''
-                        startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
+                        try:
+                            startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
+                        except IndexError:
+                            # get rid of poorly formatted package
+                            log.info("Error parsing UBX GPS, clearing input buffer")
+                            self.serial_port.reset_input_buffer()
+                            LotOfData = []
+                            startIndices = []
                         if len(startIndices) >= 2:
                             for currentStartIndex in range(len(startIndices)-1):
                                 # For all indexes that are start points, check if each is a full line.
