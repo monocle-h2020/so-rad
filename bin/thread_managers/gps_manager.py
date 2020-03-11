@@ -317,8 +317,21 @@ def PayloadIdentifier(payload, ID, Class):
             data[7] = binaryValid
             return (data)
             # UnpackMessage(ClassIDs[identifier][0], payload)
+        elif identifier == "013c":
+            data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
+            data = list(data)
+            relPosHeading = data[8]
+            accHeading = data[18]
+            relPosHeading = relPosHeading / 100000
+            accHeading = accHeading / 100000
+
+            if(relPosHeading < 0):
+                relPosHeading = 360 + relPosHeading
+
+            returnData = [relPosHeading, accHeading]
+            return (returnData)
         else:
-            pass
+            return None
 
 def GetRelposned(payload, ID, Class):
     from thread_managers import ublox8Dictionary
@@ -412,6 +425,7 @@ class GPSSerialReader(threading.Thread):
         buffer_bytes_total = 0
         buffer_bytes_from_read = 0
         # from pymemcache.client import base
+        dataDictionary = {}
         minute_start_counter = datetime.datetime.now()
 
         counter = 0
@@ -515,65 +529,57 @@ class GPSSerialReader(threading.Thread):
 
                             lineCount = 0
                             for line in listOfLines:
-                                if len(line) != 100:
-                                    #if(len(line) == 60 or len(line) == 40):
-                                    #continue
-                                    #log.info("Full line is {}".format(line))
-                                    ID = line[3]
-                                    CLASS = line[2]
-                                    payload = (line[6:-2])
-                                    GetRelposned(payload, ID, CLASS)
-                                    continue
                                 lineCount += 1
+
                                 payload = (line[6:-2])
-                                if(len(payload) != 92):
-                                    continue
                                 ID = line[3]
                                 CLASS = line[2]
 
-                                log.info("length of the payload {}".format(len(payload)))
-
                                 data = PayloadIdentifier(payload, ID, CLASS)
-                                #log.info("The data is: {}".format(data))
-                                dataDictionary = {
-                                        'iTOW' : data[0],
-                                        'year' : data[1],
-                                        'month' : data[2],
-                                        'day' : data[3],
-                                        'hour' : data[4],
-                                        'min' : data[5],
-                                        'sec' : data[6],
-                                        'valid' : data[7],
-                                        'tAcc' : data[8],
-                                        'nano' : data[9],
-                                        'fixType' : data[10],
-                                        'flags' : data[11],
-                                        'flags2' : data[12],
-                                        'numSV' : data[13],
-                                        'lon' : data[14],
-                                        'lat' : data[15],
-                                        'height' : data[16],
-                                        'hMSL' : data[17],
-                                        'hAcc' : data[18],
-                                        'vAcc' : data[19],
-                                        'velN' : data[20],
-                                        'velE' : data[21],
-                                        'velD' : data[22],
-                                        'gSpeed' : data[23],
-                                        'headMot' : data[24],
-                                        'sAcc' : data[25],
-                                        'headAcc' : data[26],
-                                        'pDOP' : data[27],
-                                        'reserved1_1' : data[28],
-                                        'reserved1_2' : data[29],
-                                        'reserved1_3' : data[30],
-                                        'reserved1_4' : data[31],
-                                        'reserved1_5' : data[32],
-                                        'reserved1_6' : data[33],
-                                        'headVeh' : data[34],
-                                        'magDec' : data[35],
-                                        'magAcc' :data[36]
-                                    }
+ 
+                                if(len(data) == 2):
+                                    dataDictionary['relPosHeading'] = data[0]
+                                    dataDictionary['accHeading'] = data[1]
+                                else:
+
+                                    dataDictionary['iTOW'] = data[0]
+                                    dataDictionary['year'] = data[1]
+                                    dataDictionary['month'] = data[2]
+                                    dataDictionary['day'] = data[3]
+                                    dataDictionary['hour'] = data[4]
+                                    dataDictionary['min'] = data[5]
+                                    dataDictionary['sec'] = data[6]
+                                    dataDictionary['valid'] = data[7]
+                                    dataDictionary['tAcc'] = data[8]
+                                    dataDictionary['nano'] = data[9]
+                                    dataDictionary['fixType'] = data[10]
+                                    dataDictionary['flags'] = data[11]
+                                    dataDictionary['flags2'] = data[12]
+                                    dataDictionary['numSV'] = data[13]
+                                    dataDictionary['lon'] = data[14]
+                                    dataDictionary['lat'] = data[15]
+                                    dataDictionary['height'] = data[16]
+                                    dataDictionary['hMSL'] = data[17]
+                                    dataDictionary['hAcc'] = data[18]
+                                    dataDictionary['vAcc'] = data[19]
+                                    dataDictionary['velN'] = data[20]
+                                    dataDictionary['velE'] = data[21]
+                                    dataDictionary['velD'] = data[22]
+                                    dataDictionary['gSpeed'] = data[23]
+                                    dataDictionary['headMot'] = data[24]
+                                    dataDictionary['sAcc'] = data[25]
+                                    dataDictionary['headAcc'] = data[26]
+                                    dataDictionary['pDOP'] = data[27]
+                                    dataDictionary['reserved1_1'] = data[28]
+                                    dataDictionary['reserved1_2'] = data[29]
+                                    dataDictionary['reserved1_3'] = data[30]
+                                    dataDictionary['reserved1_4'] = data[31]
+                                    dataDictionary['reserved1_5'] = data[32]
+                                    dataDictionary['reserved1_6'] = data[33]
+                                    dataDictionary['headVeh'] = data[34]
+                                    dataDictionary['magDec'] = data[35]
+                                    dataDictionary['magAcc'] = data[36]
+
 
                                 if counter > 100:
                                     log.info("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
@@ -586,13 +592,16 @@ class GPSSerialReader(threading.Thread):
                                 # client = base.Client(('localhost', 11211))
                                 # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
                                 # client.set('GPS_UBLOX8', dataDictionary)
-                                try:
-                                    self.current_gps_dict = dataDictionary
-                                    self.notify_observers()
 
-                                except Exception as e:
-                                    log.exception("Error on GPS string: {0}".format(dataDictionary))
-                                    print(e)
+                                # Check to see if the dictionary has all the data it needs from both messages before updating.
+                                if(len(dataDictionary) == 39):
+                                    try:
+                                        self.current_gps_dict = dataDictionary
+                                        self.notify_observers()
+
+                                    except Exception as e:
+                                        log.exception("Error on GPS string: {0}".format(dataDictionary))
+                                        print(e)
 
                             # Any data that was not a complete line, and is in fact a part of the next line to be read in
                             # is kept in the organised hex data list so the rest of the line can be appended.
@@ -685,6 +694,9 @@ class RTKUBX(object):
         self.headVeh = None
         self.magDec = None
         self.magAcc = None
+
+        self.relPosHeading = 0
+        self.accHeading = 0
 
         self.flags_carrSoln = None
         self.flags_headVehValid = None
@@ -783,6 +795,9 @@ class RTKUBX(object):
             if self.watchdog is not None:
                 self.watchdog.reset()
 
+            self.relPosHeading = gps_dict['relPosHeading']
+            self.accHeading = gps_dict['accHeading']
+
             self.iTOW = gps_dict['iTOW']
             self.year = gps_dict['year']
             self.month = gps_dict['month']
@@ -821,7 +836,7 @@ class RTKUBX(object):
             self.magAcc = gps_dict['magAcc']
 
             # align the following fields with NMEA 0183
-            self.heading = self.headMot
+            self.heading = self.relPosHeading
             self.speed = self.gSpeed * 0.00194384
             self.fix = self.fixType
             self.alt = self.hMSL

@@ -346,8 +346,8 @@ def run():
                 dt = gps_managers[0].datetime
                 #dt1 = gps_managers[1].datetime
                 log.info("Heading: Mot {0} Veh {1} Acc: {2})| fix: {3} | HFlag: {4} | diffSoln: {5} | gnssFix {6}"\
-                    .format(gps_managers[0].headMot, gps_managers[0].headVeh,
-                            gps_managers[0].headAcc, gps_managers[0].fix,
+                    .format(gps_managers[0].headMot, gps_managers[0].relPosHeading,
+                            gps_managers[0].accHeading, gps_managers[0].fix,
                             gps_managers[0].flags_headVehValid,
                             gps_managers[0].flags_diffSoln, gps_managers[0].flags_gnssFixOK))
                 # Fetch sun variables
