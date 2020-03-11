@@ -325,7 +325,6 @@ def GetRelposned(payload, ID, Class):
     Class = str(hex(Class).lstrip("0x")).zfill(2)
     ID = str(hex(ID).lstrip("0x")).zfill(2)
     identifier = str(Class) + str(ID)
-    payload = payload[0:40]
 #    log.info("identifier {}".format(identifier))
 
     if identifier in ublox8Dictionary.ClassIDs.keys():
@@ -340,6 +339,15 @@ def GetRelposned(payload, ID, Class):
 
             relposN = data[4]
             relposE = data[5]
+
+            relPosHeading = data[8]
+            accHeading = data[18]
+
+            relPosHeading = relPosHeading / 100000
+            accHeading = accHeading / 100000
+
+            log.info("relPosHeading {}, accHeading {}".format(relPosHeading, accHeading))
+
             #relHeading = math.degrees(math.atan(float(relposE)/float(relposN))) % 360
 
             heading_signed = math.atan2(relposE, relposN)/math.pi*180

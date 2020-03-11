@@ -150,7 +150,7 @@ CONST_UBX_UPD_SOS2 = "09148"
 
     # b for 1, i for 4, h for 2
 ClassIDs = {
-    CONST_UBX_NAV_RELPOSNED: ("BBHIiiibbbBIIII",["version","reserved1","refStationId","iTOW","relPosN","relPosE","relPosD","relPosHPN","relPosHPE","relPosHPD","reserved2","accN","accE","accD","flags"]),
+    CONST_UBX_NAV_RELPOSNED: ("BBHIiiiiiBBBBbbbbIIIIIBBBBi",["version","reserved1","refStationId","iTOW","relPosN","relPosE","relPosD","relPosHPN","relPosHPE","relPosHPD","reserved2","accN","accE","accD","flags"]),
     CONST_UBX_NAV_PVT: ("IHBBBBBBIiBbbBiiiiIIiiiiiIIHBBBBBBihH",["iTOW","year","month","day","hour","min","sec","valid","tAcc","nano","fixType","flags","flags2","numSV","lon","lat","height","hMSL","hAcc","vAcc","velN","velE","velD","gSpeed","headMot","sAcc","headAcc","pDOP","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","headVeh","magDec","magAcc"]),
 
     CONST_UBX_ACK_ACK: ("bb",["clsID","msgID"]),
