@@ -35,7 +35,7 @@ def check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol):
     # TODO: extend with check for single or dual NMEA GPS
     if (len(gps_managers) == 1) and (gps_protocol == "rtk"):
 
-        if (gps_managers[0].flags_headVehValid == 1) and (gps_managers[0].headAcc < gps_heading_accuracy_limit) and (gps_managers[0].heading is not None):
+        if (gps_managers[0].flags_headVehValid == 1) and (gps_managers[0].accHeading < gps_heading_accuracy_limit) and (gps_managers[0].heading is not None):
             return True
     else:
         return False

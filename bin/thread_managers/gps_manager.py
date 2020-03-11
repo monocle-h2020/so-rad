@@ -333,46 +333,6 @@ def PayloadIdentifier(payload, ID, Class):
         else:
             return None
 
-def GetRelposned(payload, ID, Class):
-    from thread_managers import ublox8Dictionary
-    Class = str(hex(Class).lstrip("0x")).zfill(2)
-    ID = str(hex(ID).lstrip("0x")).zfill(2)
-    identifier = str(Class) + str(ID)
-#    log.info("identifier {}".format(identifier))
-
-    if identifier in ublox8Dictionary.ClassIDs.keys():
-        if identifier == "013c":
-#            log.info("length of the payload is {}".format(len(payload)))
-#            log.info("payload {}".format(payload))
-            data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
-            data = list(data)
-
-#            log.info("Full relposned message: {}".format(data))
-
-
-            relposN = data[4]
-            relposE = data[5]
-
-            relPosHeading = data[8]
-            accHeading = data[18]
-
-            relPosHeading = relPosHeading / 100000
-            accHeading = accHeading / 100000
-
-            log.info("relPosHeading {}, accHeading {}".format(relPosHeading, accHeading))
-
-            #relHeading = math.degrees(math.atan(float(relposE)/float(relposN))) % 360
-
-            heading_signed = math.atan2(relposE, relposN)/math.pi*180
-            if heading_signed < 0:
-                heading = 360 + heading_signed
-            else:
-                heading = heading_signed
-
-            #log.info("relposN: {}".format(relposN))
-            #log.info("relposE: {}".format(relposE))
-            log.info("relH: {0}, relN: {1}, relE: {2}".format(heading, relposN, relposE))
-
 
 def ValidateLine(currentLine):
     loadsOfHexData = []
@@ -415,9 +375,6 @@ class GPSSerialReader(threading.Thread):
 
         bitOfData = b''
         timeToSleep = 0.5
-        #newTimeToSleep = 1
-        #targetChecksPerLine = 1.3
-        #targetLinesPerCheck = 1/targetChecksPerLine
         lineCount = 0
         serialReader = self.serial_port
         LotOfData = []
@@ -466,26 +423,11 @@ class GPSSerialReader(threading.Thread):
 
             elif protocol == "RTKUBX":
                 try:
-                    # update timToSleep here
-                    #timeToSleep = newTimeToSleep
-                    #log.info("Updated Ublox sleep timer to {0}".format(timeToSleep))
 
                     # Sleep so the program isn't spamming buffer with read requests
                     time.sleep(timeToSleep)
 
                     if serialReader.inWaiting() != 0:
-
-                        buffer_bytes_from_read = serialReader.inWaiting()
-                        buffer_bytes_per_minute += buffer_bytes_from_read
-
-                        current_time = datetime.datetime.now()
-                        if (current_time - minute_start_counter).total_seconds() > 60:
-                            minute_start_counter = current_time
-                            if buffer_bytes_per_minute < 100:
-                                log.warning("Only {0} bytes read from GPS in last minute".format(buffer_bytes_per_minute))
-                                buffer_bytes_per_minute = 0
-                            else:
-                                log.debug("{0} bytes read from GPS in last minute".format(buffer_bytes_per_minute))
 
                         bitOfData = serialReader.read(serialReader.inWaiting())
                         bitOfDataInAList = list(bitOfData)
@@ -503,12 +445,8 @@ class GPSSerialReader(threading.Thread):
 
                                 assert (len(currentHexLine)>1),"{} shorter then 2".format(currentHexLine)
                                 # If the line is complete and correct then append it to a list of lines.
-                                #log.info("The class {} the id {}".format(currentLine[2], currentLine[3]))
-                                #log.info("Length of currentHexLine {}".format(len(currentHexLine)))
-                                #log.info("checkSumA: {}, currentHexLine[-2]: {}, checkSumB: {}, currentHexLine[-1]: {}".format(checkSumA, currentHexLine[-2], checkSumB, currentHexLine[-1]))
                                 try:
                                     if (checkSumA == currentHexLine[-2]) and (checkSumB == currentHexLine[-1]):
-                                        #log.info("current line {}".format(currentLine))
                                         listOfLines.append(currentLine)
                                     else:
                                         # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
@@ -516,7 +454,6 @@ class GPSSerialReader(threading.Thread):
                                         for x in range(len(startIndices)-1):
                                             currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
                                             currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
-                                            #log.info("2.0 The current hex line {}".format(currentHexLine))
                                             if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
                                                 listOfLines.append(currentLine)
                                                 break
@@ -526,6 +463,7 @@ class GPSSerialReader(threading.Thread):
                                     self.serial_port.reset_input_buffer()
                                     LotOfData = []
                                     startIndices = []
+                                    continue
 
                             lineCount = 0
                             for line in listOfLines:
@@ -606,11 +544,7 @@ class GPSSerialReader(threading.Thread):
                             # Any data that was not a complete line, and is in fact a part of the next line to be read in
                             # is kept in the organised hex data list so the rest of the line can be appended.
                             LotOfData = LotOfData[startIndices[len(startIndices)-1]:]
-                    # Re-calculate the amount of time needed to sleep, with the goal of checking buffer at the speed of 1.3 times that of data being available
-                    #if lineCount > 0:
-                    #    newTimeToSleep = min([0.1, timeToSleep / (lineCount / targetLinesPerCheck) ])
-                    #else:
-                    #    newTimeToSleep = max([2, timeToSleep * 1.1])
+
                     log.debug("Lines parsed: {0}".format(lineCount))
 
                     # Slowly increase the number of checks before re-adjusting the timer
