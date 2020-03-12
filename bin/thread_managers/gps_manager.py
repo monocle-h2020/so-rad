@@ -492,7 +492,7 @@ def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, co
 
 
                 if counter > 100:
-                    log.info("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
+                    log.debug("After 100 passes, bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
                     counter = 0
                 else:
                     log.debug("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
@@ -517,9 +517,7 @@ def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, co
             # is kept in the organised hex data list so the rest of the line can be appended.
             LotOfData = LotOfData[startIndices[len(startIndices)-1]:]
 
-            return(dataDictionary, LotOfData)
-
-    log.debug("Lines parsed: {0}".format(lineCount))
+    return(dataDictionary, LotOfData)
 
 class GPSSerialReader(threading.Thread):
     """
@@ -598,170 +596,8 @@ class GPSSerialReader(threading.Thread):
 
                     dataDictionary, LotOfData = readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter)
 
-                    # # Sleep so the program isn't spamming buffer with read requests
-                    # time.sleep(timeToSleep)
+                    log.debug("Lines parsed: {0}".format(lineCount)) 
 
-                    # if serialReader.inWaiting() != 0:
-
-                    #     bitOfData = serialReader.read(serialReader.inWaiting())
-                    #     bitOfDataInAList = list(bitOfData)
-                    #     LotOfData =  LotOfData + bitOfDataInAList
-
-                    #     bitOfDataInAList = []
-                    #     listOfLines = []
-                    #     bitOfData = b''
-                    #     startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
-                    #     if len(startIndices) >= 2:
-                    #         for currentStartIndex in range(len(startIndices)-1):
-                    #             # For all indexes that are start points, check if each is a full line.
-                    #             currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[currentStartIndex+1]]
-                    #             currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
-
-                    #             assert (len(currentHexLine)>1),"{} shorter then 2".format(currentHexLine)
-                    #             # If the line is complete and correct then append it to a list of lines.
-                    #             try:
-                    #                 if (checkSumA == currentHexLine[-2]) and (checkSumB == currentHexLine[-1]):
-                    #                     listOfLines.append(currentLine)
-                    #                 else:
-                    #                     # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
-                    #                     # If it was, check the following start indexes. If none are correct then discard the data.
-                    #                     for x in range(len(startIndices)-1):
-                    #                         currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
-                    #                         currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
-                    #                         if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
-                    #                             listOfLines.append(currentLine)
-                    #                             break
-                    #             except IndexError:
-                    #                 # get rid of poorly formatted package
-                    #                 log.info("Error parsing UBX GPS, clearing input buffer")
-                    #                 self.serial_port.reset_input_buffer()
-                    #                 LotOfData = []
-                    #                 startIndices = []
-                    #                 continue
-
-                    #         lineCount = 0
-                    #         for line in listOfLines:
-                    #             lineCount += 1
-
-                    #             payload = (line[6:-2])
-                    #             ID = line[3]
-                    #             CLASS = line[2]
-
-                    #             data = PayloadIdentifier(payload, ID, CLASS)
- 
-                    #             if(len(data) == 27):
-                    #                 dataDictionary['version'] = data[0]
-                    #                 dataDictionary['reserved1'] = data[1]
-                    #                 dataDictionary['refStationId'] = data[2]
-                    #                 dataDictionary['relPosNed_iTOW'] = data[3]
-                    #                 dataDictionary['relPosN'] = data[4]
-                    #                 dataDictionary['relPosE'] = data[5]
-                    #                 dataDictionary['relPosD'] = data[6]
-                    #                 dataDictionary['relPosLength'] = data[7]
-
-                    #                 dataDictionary['relPosHeading'] = data[8]
-                                    
-                    #                 dataDictionary['reserved2_1'] = data[9]
-                    #                 dataDictionary['reserved2_2'] = data[10]
-                    #                 dataDictionary['reserved2_3'] = data[11]
-                    #                 dataDictionary['reserved2_4'] = data[12]
-                    #                 dataDictionary['relPosHPN'] = data[13]
-                    #                 dataDictionary['relPosHPE'] = data[14]
-                    #                 dataDictionary['relPosHPD'] = data[15]
-                    #                 dataDictionary['relPosHPLength'] = data[16]
-                    #                 dataDictionary['accN'] = data[17]
-                    #                 dataDictionary['accE'] = data[18]
-                    #                 dataDictionary['accD'] = data[19]
-                    #                 dataDictionary['accLength'] = data[20]
-
-                    #                 dataDictionary['accHeading'] = data[21]
-
-                    #                 dataDictionary['reserved3_1'] = data[22]
-                    #                 dataDictionary['reserved3_2'] = data[23]
-                    #                 dataDictionary['reserved3_3'] = data[24]
-                    #                 dataDictionary['reserved3_4'] = data[25]
-                    #                 dataDictionary['relPosNed_flags'] = data[26]
-                    #                 dataDictionary['flag_relPosNormalized'] = data[26][21]
-                    #                 dataDictionary['flag_relPosHeadingValid'] = data[26][22]
-                    #                 dataDictionary['flag_refObsMiss'] = data[26][23]
-                    #                 dataDictionary['flag_refPosMiss'] = data[26][24]
-                    #                 dataDictionary['flag_isMoving'] = data[26][25]
-                    #                 dataDictionary['flag_carrSoln'] = data[26][26:28]
-                    #                 dataDictionary['flag_relPosValid'] = data[26][28]
-                    #                 dataDictionary['flag_diffSolN'] = data[26][29]
-                    #                 dataDictionary['flag_gnssFixOK'] = data[26][30]
-
-
-                    #             else:
-
-                    #                 dataDictionary['iTOW'] = data[0]
-                    #                 dataDictionary['year'] = data[1]
-                    #                 dataDictionary['month'] = data[2]
-                    #                 dataDictionary['day'] = data[3]
-                    #                 dataDictionary['hour'] = data[4]
-                    #                 dataDictionary['min'] = data[5]
-                    #                 dataDictionary['sec'] = data[6]
-                    #                 dataDictionary['valid'] = data[7]
-                    #                 dataDictionary['tAcc'] = data[8]
-                    #                 dataDictionary['nano'] = data[9]
-                    #                 dataDictionary['fixType'] = data[10]
-                    #                 dataDictionary['flags'] = data[11]
-                    #                 dataDictionary['flags2'] = data[12]
-                    #                 dataDictionary['numSV'] = data[13]
-                    #                 dataDictionary['lon'] = data[14]
-                    #                 dataDictionary['lat'] = data[15]
-                    #                 dataDictionary['height'] = data[16]
-                    #                 dataDictionary['hMSL'] = data[17]
-                    #                 dataDictionary['hAcc'] = data[18]
-                    #                 dataDictionary['vAcc'] = data[19]
-                    #                 dataDictionary['velN'] = data[20]
-                    #                 dataDictionary['velE'] = data[21]
-                    #                 dataDictionary['velD'] = data[22]
-                    #                 dataDictionary['gSpeed'] = data[23]
-                    #                 dataDictionary['headMot'] = data[24]
-                    #                 dataDictionary['sAcc'] = data[25]
-                    #                 dataDictionary['headAcc'] = data[26]
-                    #                 dataDictionary['pDOP'] = data[27]
-                    #                 dataDictionary['reserved1_1'] = data[28]
-                    #                 dataDictionary['reserved1_2'] = data[29]
-                    #                 dataDictionary['reserved1_3'] = data[30]
-                    #                 dataDictionary['reserved1_4'] = data[31]
-                    #                 dataDictionary['reserved1_5'] = data[32]
-                    #                 dataDictionary['reserved1_6'] = data[33]
-                    #                 dataDictionary['headVeh'] = data[34]
-                    #                 dataDictionary['magDec'] = data[35]
-                    #                 dataDictionary['magAcc'] = data[36]
-
-
-                    #             if counter > 100:
-                    #                 log.info("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
-                    #                 counter = 0
-                    #             else:
-                    #                 log.debug("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
-
-
-                    #             # Set up memcache if needed
-                    #             # client = base.Client(('localhost', 11211))
-                    #             # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
-                    #             # client.set('GPS_UBLOX8', dataDictionary)
-
-                    #             # Check to see if the dictionary has all the data it needs from both messages before updating.
-                    #             if(len(dataDictionary) == 73):
-                    #                 try:
-                    #                     self.current_gps_dict = dataDictionary
-                    #                     self.notify_observers()
-
-                    #                 except Exception as e:
-                    #                     log.exception("Error on GPS string: {0}".format(dataDictionary))
-                    #                     print(e)
-
-                    #         # Any data that was not a complete line, and is in fact a part of the next line to be read in
-                    #         # is kept in the organised hex data list so the rest of the line can be appended.
-                    #         LotOfData = LotOfData[startIndices[len(startIndices)-1]:]
-
-                    # log.debug("Lines parsed: {0}".format(lineCount))
-
-                    # # Slowly increase the number of checks before re-adjusting the timer
                 except Exception as error:
                     log.exception("Error reading from ublox 8: {}".format(error))
 
