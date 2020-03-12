@@ -13,29 +13,12 @@ import re
 import threading
 import time
 import codecs
+import struct
+from numpy import min
+import math
 
 log = logging.getLogger()   # report to root logger
 
-# GPGGA $GPGGA,113657.32,5021.9979,N,00407.9635,W,1,9,0.9,8.1,M,53.6,M,,*43
-#  GPS Fix Data:
-#    Time, Lat, Lon, Fix Quality, No. Satellites, HDOP, Altitude, HELIP, DGPS, DGPS Ref
-# GPGSV
-#  Satellites in view:
-#    Total messages, Message number, No. Satellites, SV PRN, Elevation, Azimuth, SNR, 4-7, 4-7, 4-7
-# GPRMC $GPRMC,113745.12,A,5021.9979,N,00407.9635,W,0.0,358.1,310315,2.2,W,A*3B
-#  Minimum GPS Data:
-#    Time, Valid, Lat, Lon, Speed, Course, Date, Variation
-# GPVTG $GPVTG,232.7,T,234.9,M,1.3,N,2.4,K,A*2F
-#  Track Made Good and Ground Speed
-#    True Track, Magnetic Track, Ground Speed (knots), Ground Speed (Km/h)
-# HCHDG $HCHDG,359.6,0.0,E,2.2,W*59
-#  Compass Data:
-#    Heading, deviation, variation
-# PAMTR
-# PAMTT
-# WIMDA
-# WIMWD
-# WIMWV
 
 class GPSParser(object):
     """
@@ -284,6 +267,258 @@ class GPSParser(object):
         return result
 
 
+def generateFletcherChecksum(byteArray):
+    """
+    Function to calculate the checksum from the received line of data.
+    Returns the checksum generated from the line.
+    """
+    CK_A = 0
+    CK_B = 0
+
+    for I in range(len(byteArray)):
+        CK_A = CK_A + byteArray[I]
+        CK_A &= 0xFF
+        CK_B = CK_B + CK_A
+        CK_B &= 0xFF
+
+    return (CK_A, CK_B)
+
+
+def UnpackMessage(structFormat, payload):
+    messageData = struct.unpack(structFormat, bytearray(payload))
+    return (messageData)
+
+
+def PayloadIdentifier(payload, ID, Class):
+    """
+    TODO: docstring
+    """
+    from thread_managers import ublox8Dictionary
+    Class = str(hex(Class).lstrip("0x")).zfill(2)
+    ID = str(hex(ID).lstrip("0x")).zfill(2)
+    identifier = str(Class) + str(ID) #+ str(length)
+
+    if identifier in ublox8Dictionary.ClassIDs.keys():
+        if identifier == "0107":
+            flag = payload[11]
+            binaryFlag = "{0:b}".format(flag)
+            binaryFlag = binaryFlag.zfill(8)
+            valid = payload[7]
+            binaryValid = "{0:b}".format(valid)
+            binaryValid = binaryValid.zfill(8)
+            flag2 = payload[12]
+            binaryFlag2 = "{0:b}".format(flag2)
+            binaryFlag2 = binaryFlag2.zfill(8)
+
+            data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
+            data = list(data)
+            data[11] = binaryFlag
+            data[12] = binaryFlag2
+            data[7] = binaryValid
+            return (data)
+            # UnpackMessage(ClassIDs[identifier][0], payload)
+        elif identifier == "013c":
+            flags = payload[26]
+            binaryFlags = "{0:b}".format(flags)
+            binaryFlags = binaryFlags.zfill(31)
+            data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
+            data = list(data)
+            relPosHeading = data[8]
+            accHeading = data[18]
+            relPosHeading = relPosHeading / 100000
+            accHeading = accHeading / 100000
+
+            if(relPosHeading < 0):
+                relPosHeading = 360 + relPosHeading
+
+            data[8] = relPosHeading
+            data[26] = binaryFlags
+            data[21] = accHeading
+            #returnData = [relPosHeading, accHeading]
+            return (data)
+        else:
+            return None
+
+
+def ValidateLine(currentLine):
+    loadsOfHexData = []
+    # check if line is valid using checksum
+    loadsOfHex = list(bytearray(currentLine).hex())
+    # Organise the hex data into the correct pairs.
+    for index in range(0, len(loadsOfHex), 2):
+        val = loadsOfHex[index] + loadsOfHex[index+1]
+        if len(val) == 2:
+            loadsOfHexData.append(val)
+    base16Data = [int(x, 16) for x in loadsOfHexData]
+    currentByteLine = bytearray(base16Data)
+    checkSumA, checkSumB = generateFletcherChecksum(currentByteLine[2:-2])
+    return (currentByteLine, checkSumA, checkSumB)
+
+def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter):
+
+    # Sleep so the program isn't spamming buffer with read requests
+    time.sleep(timeToSleep)
+
+    if serialReader.inWaiting() != 0:
+
+        bitOfData = serialReader.read(serialReader.inWaiting())
+        bitOfDataInAList = list(bitOfData)
+        LotOfData =  LotOfData + bitOfDataInAList
+
+        bitOfDataInAList = []
+        listOfLines = []
+        bitOfData = b''
+        startIndices = [ i for i in range(len(LotOfData)-1) if (LotOfData[i] == 181 and LotOfData[i+1] == 98) ]
+        if len(startIndices) >= 2:
+            for currentStartIndex in range(len(startIndices)-1):
+                # For all indexes that are start points, check if each is a full line.
+                currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[currentStartIndex+1]]
+                currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+
+                assert (len(currentHexLine)>1),"{} shorter then 2".format(currentHexLine)
+                # If the line is complete and correct then append it to a list of lines.
+                try:
+                    if (checkSumA == currentHexLine[-2]) and (checkSumB == currentHexLine[-1]):
+                        listOfLines.append(currentLine)
+                    else:
+                        # If the line is not complete, check if the "start index" was actually generated in the payload (middle of the message)
+                        # If it was, check the following start indexes. If none are correct then discard the data.
+                        for x in range(len(startIndices)-1):
+                            currentLine = LotOfData[startIndices[currentStartIndex]:startIndices[x+1]]
+                            currentHexLine, checkSumA, checkSumB = ValidateLine(currentLine)
+                            if(checkSumA == currentHexLine[-2] and checkSumB == currentHexLine[-1]):
+                                listOfLines.append(currentLine)
+                                break
+                except IndexError:
+                    # get rid of poorly formatted package
+                    log.info("Error parsing UBX GPS, clearing input buffer")
+                    self.serial_port.reset_input_buffer()
+                    LotOfData = []
+                    startIndices = []
+                    continue
+
+            lineCount = 0
+            for line in listOfLines:
+                lineCount += 1
+
+                payload = (line[6:-2])
+                ID = line[3]
+                CLASS = line[2]
+
+                data = PayloadIdentifier(payload, ID, CLASS)
+
+                if(len(data) == 27):
+                    dataDictionary['version'] = data[0]
+                    dataDictionary['reserved1'] = data[1]
+                    dataDictionary['refStationId'] = data[2]
+                    dataDictionary['relPosNed_iTOW'] = data[3]
+                    dataDictionary['relPosN'] = data[4]
+                    dataDictionary['relPosE'] = data[5]
+                    dataDictionary['relPosD'] = data[6]
+                    dataDictionary['relPosLength'] = data[7]
+
+                    dataDictionary['relPosHeading'] = data[8]
+                    
+                    dataDictionary['reserved2_1'] = data[9]
+                    dataDictionary['reserved2_2'] = data[10]
+                    dataDictionary['reserved2_3'] = data[11]
+                    dataDictionary['reserved2_4'] = data[12]
+                    dataDictionary['relPosHPN'] = data[13]
+                    dataDictionary['relPosHPE'] = data[14]
+                    dataDictionary['relPosHPD'] = data[15]
+                    dataDictionary['relPosHPLength'] = data[16]
+                    dataDictionary['accN'] = data[17]
+                    dataDictionary['accE'] = data[18]
+                    dataDictionary['accD'] = data[19]
+                    dataDictionary['accLength'] = data[20]
+
+                    dataDictionary['accHeading'] = data[21]
+
+                    dataDictionary['reserved3_1'] = data[22]
+                    dataDictionary['reserved3_2'] = data[23]
+                    dataDictionary['reserved3_3'] = data[24]
+                    dataDictionary['reserved3_4'] = data[25]
+                    dataDictionary['relPosNed_flags'] = data[26]
+                    dataDictionary['flag_relPosNormalized'] = data[26][21]
+                    dataDictionary['flag_relPosHeadingValid'] = data[26][22]
+                    dataDictionary['flag_refObsMiss'] = data[26][23]
+                    dataDictionary['flag_refPosMiss'] = data[26][24]
+                    dataDictionary['flag_isMoving'] = data[26][25]
+                    dataDictionary['flag_carrSoln'] = data[26][26:28]
+                    dataDictionary['flag_relPosValid'] = data[26][28]
+                    dataDictionary['flag_diffSolN'] = data[26][29]
+                    dataDictionary['flag_gnssFixOK'] = data[26][30]
+
+
+                else:
+
+                    dataDictionary['iTOW'] = data[0]
+                    dataDictionary['year'] = data[1]
+                    dataDictionary['month'] = data[2]
+                    dataDictionary['day'] = data[3]
+                    dataDictionary['hour'] = data[4]
+                    dataDictionary['min'] = data[5]
+                    dataDictionary['sec'] = data[6]
+                    dataDictionary['valid'] = data[7]
+                    dataDictionary['tAcc'] = data[8]
+                    dataDictionary['nano'] = data[9]
+                    dataDictionary['fixType'] = data[10]
+                    dataDictionary['flags'] = data[11]
+                    dataDictionary['flags2'] = data[12]
+                    dataDictionary['numSV'] = data[13]
+                    dataDictionary['lon'] = data[14]
+                    dataDictionary['lat'] = data[15]
+                    dataDictionary['height'] = data[16]
+                    dataDictionary['hMSL'] = data[17]
+                    dataDictionary['hAcc'] = data[18]
+                    dataDictionary['vAcc'] = data[19]
+                    dataDictionary['velN'] = data[20]
+                    dataDictionary['velE'] = data[21]
+                    dataDictionary['velD'] = data[22]
+                    dataDictionary['gSpeed'] = data[23]
+                    dataDictionary['headMot'] = data[24]
+                    dataDictionary['sAcc'] = data[25]
+                    dataDictionary['headAcc'] = data[26]
+                    dataDictionary['pDOP'] = data[27]
+                    dataDictionary['reserved1_1'] = data[28]
+                    dataDictionary['reserved1_2'] = data[29]
+                    dataDictionary['reserved1_3'] = data[30]
+                    dataDictionary['reserved1_4'] = data[31]
+                    dataDictionary['reserved1_5'] = data[32]
+                    dataDictionary['reserved1_6'] = data[33]
+                    dataDictionary['headVeh'] = data[34]
+                    dataDictionary['magDec'] = data[35]
+                    dataDictionary['magAcc'] = data[36]
+
+
+                if counter > 100:
+                    log.debug("After 100 passes, bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
+                    counter = 0
+                else:
+                    log.debug("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
+
+
+                # Set up memcache if needed
+                # client = base.Client(('localhost', 11211))
+                # Set key and value for memcache, with the line data as the value, and constantly update to be latest data.
+                # client.set('GPS_UBLOX8', dataDictionary)
+
+                # Check to see if the dictionary has all the data it needs from both messages before updating.
+                if(len(dataDictionary) == 73):
+                    try:
+                        self.current_gps_dict = dataDictionary
+                        self.notify_observers()
+
+                    except Exception as e:
+                        log.exception("Error on GPS string: {0}".format(dataDictionary))
+                        print(e)
+
+            # Any data that was not a complete line, and is in fact a part of the next line to be read in
+            # is kept in the organised hex data list so the rest of the line can be appended.
+            LotOfData = LotOfData[startIndices[len(startIndices)-1]:]
+
+    return(dataDictionary, LotOfData)
+
 class GPSSerialReader(threading.Thread):
     """
     Thread to read from a serial port
@@ -305,35 +540,66 @@ class GPSSerialReader(threading.Thread):
         This will run and read from a GPS string and when it is valid and decoded it'll be passed via the
         observer design pattern.
         """
+
+        protocol = type(self.parent).__name__
+
+        bitOfData = b''
+        timeToSleep = 0.5
+        lineCount = 0
+        serialReader = self.serial_port
+        LotOfData = []
+        buffer_bytes_per_minute = 100
+        buffer_bytes_total = 0
+        buffer_bytes_from_read = 0
+        # from pymemcache.client import base
+        dataDictionary = {}
+        minute_start_counter = datetime.datetime.now()
+
+        counter = 0
+
         while not self.parent.stop_gps:
-            old_gps_time = self.parent.datetime
+            counter +=1
+            if protocol == "RTKUBX":
+                pass
+            elif protocol == "NMEA0183":
+                old_gps_time = self.parent.datetime
+            else:
+                log.error("gps protocol '{0}' not implemented".format(protocol))
 
             if self.serial_port.inWaiting() > 1000:
                 # if too much data in buffer, throw it away
                 log.warning(">1kb in gps buffer on port {0}. Clearing input buffer.".format(self.serial_port.port))
                 self.serial_port.reset_input_buffer()
                 time.sleep(0.001)
+
                 continue
 
-            if self.serial_port.inWaiting() > 0:
-                # if there is data, read it
-                gps_string = self.serial_port.readline()
-            else:
-                time.sleep(0.01)
-                # sleep a bit longer than usual
-                continue
+            if protocol == "NMEA0183":
+                if self.serial_port.inWaiting() > 0:
+                    # if there is data, read it
+                    gps_string = self.serial_port.readline()
+                else:
+                    time.sleep(0.01)
+                    # sleep a bit longer than usual
+                    continue
 
-            log.debug("NMEA: {0}".format(gps_string.strip()))
+                log.debug("NMEA: {0}".format(gps_string.strip()))
 
-            try:
-                self.current_gps_dict = GPSParser.parse(codecs.decode(gps_string, 'utf-8'))
-                self.notify_observers()
-            except UnicodeDecodeError:
-                log.warning("UnicodeDecodeError on GPS string: {0}".format(gps_string))
+                try:
+                    self.current_gps_dict = GPSParser.parse(codecs.decode(gps_string, 'utf-8'))
+                    self.notify_observers()
+                except UnicodeDecodeError:
+                    log.warning("UnicodeDecodeError on GPS string: {0}".format(gps_string))
 
-            #if datetime.datetime.now().timestamp() - self.parent.last_update.timestamp() > 1.0:
-            #    if old_gps_time.timestamp() == self.current_gps_dict['date']:
-            #        self.parent.reset_comports()
+            elif protocol == "RTKUBX":
+                try:
+
+                    dataDictionary, LotOfData = readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter)
+
+                    log.debug("Lines parsed: {0}".format(lineCount)) 
+
+                except Exception as error:
+                    log.exception("Error reading from ublox 8: {}".format(error))
 
             time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
 
@@ -357,7 +623,343 @@ class GPSSerialReader(threading.Thread):
                 observer.update(self.current_gps_dict)
 
 
-class GPSManager(object):
+class RTKUBX(object):
+    """
+    Main GPS class which oversees the management and reading of GPS ports.
+    """
+    def __init__(self):
+        self.serial_ports = []
+        self.stop_gps = False
+        self.watchdog = None
+        self.started = False
+        self.threads = []
+
+        # UBX-NAV-PVT message data
+        self.iTOW = None
+        self.year = None
+        self.month = None
+        self.day = None
+        self.hour = None
+        self.minute = None
+        self.second = None
+        self.tAcc = None
+        self.nano = None
+        self.fixType = 0
+        self.satellite_number = 0
+        self.lon = None
+        self.lat = None
+        self.height = None
+        self.hMSL = None
+        self.hAcc = None
+        self.vAcc = None
+        self.velN = None
+        self.velE = None
+        self.velD = None
+        self.gspeed = None
+        self.headMot = None
+        self.sAcc = None
+        self.headAcc = None
+        self.pDOP = None
+        self.reserved1_1 = None
+        self.reserved1_2 = None
+        self.reserved1_3 = None
+        self.reserved1_4 = None
+        self.reserved1_5 = None
+        self.reserved1_6 = None
+        self.headVeh = None
+        self.magDec = None
+        self.magAcc = None
+
+        # flag data from PVT message
+        self.flags_carrSoln = None
+        self.flags_headVehValid = None
+        self.flags_psmState = None
+        self.flags_diffsolN = None
+        self.flags_gnssFixOK = None
+
+        self.flags2_confirmedTime = None
+        self.flags2_confirmedDate = None
+        self.flags2_confirmedAvai = None
+
+        self.valid_validMag = None
+        self.valid_fullyResolved = None
+        self.valid_validTime = None
+        self.valid_validDate = None
+
+        # standadising data to nmea format
+        self.alt = None
+        self.datetime = None
+        self.heading = None
+        self.speed = None
+        self.fix = 0
+        self.valid = None
+        self.flags = None
+        self.flags2 = None
+
+
+        # relposned message data
+        self.version = None
+        self.reserved1 = None
+        self.refStationId = None
+        self.relPosNed_iTOW = None
+        self.relPosN = None
+        self.relPosE = None
+        self.relPosD = None
+        self.relPosLength = None
+
+        # Heading
+        self.relPosHeading = None
+        
+        self.reserved2_1 = None
+        self.reserved2_2 = None
+        self.reserved2_3 = None
+        self.reserved2_4 = None
+        self.relPosHPN = None
+        self.relPosHPE = None
+        self.relPosHPD = None
+        self.relPosHPLength = None
+        self.accN = None
+        self.accE = None
+        self.accD = None
+        self.accLength = None
+
+        # Heading Accuracy
+        self.accHeading = None
+
+        self.reserved3_1 = None
+        self.reserved3_2 = None
+        self.reserved3_3 = None
+        self.reserved3_4 = None
+        self.relPosNed_flags = None
+
+        # flags data for relposned message
+        self.flag_relPosNormalized = None
+        self.flag_relPosHeadingValid = None
+        self.flag_refObsMiss = None
+        self.flag_refPosMiss = None
+        self.flag_isMoving = None
+        self.flag_carrSoln = None
+        self.flag_relPosValid = None
+        self.flag_diffSolN = None
+        self.flag_gnssFixOK = None
+
+        # data for classes to manage threading + misc
+        self.update_rate = 0
+        self.gps_lock = threading.Lock()
+        self.gps_observers = []
+        self.watchdog_callbacks = []
+        self.last_update = datetime.datetime.now()
+        self.update_counter = 0
+
+    def __del__(self):
+        #self.disable_watchdog()
+        self.stop()
+
+    def add_serial_port(self, serial_port):
+        """
+        Add a serial port to the list of ports to read from.
+
+        The serial port must be an instance of serial.Serial, and the open() method must have been called.
+
+        :param serial_port: Serial object
+        :type serial_port: serial.Serial
+        """
+        if not serial_port in self.serial_ports:
+            self.serial_ports.append(serial_port)
+
+    def remove_serial_port(self, serial_port):
+        """
+        Remove serial port from the list of ports to remove.
+
+        This wont kill any threads reading serial ports. Run stop then remove then start again.
+        :param serial_port: Serial object
+        :type serial_port: serial.Serial
+        """
+        if serial_port in self.serial_ports:
+            self.serial_ports.remove(serial_port)
+
+    def start(self):
+        """
+        Starts serial reading threads.
+        """
+        if not self.started:
+            self.started = True
+            for port in self.serial_ports:
+
+                new_thread = GPSSerialReader(port, self)
+                new_thread.register_observer(self)
+                self.threads.append(new_thread)
+
+            for thread in self.threads:
+                thread.start()
+
+            log.info("Started RTK GPS manager")
+        else:
+            log.warn("RTK GPS manager already started")
+
+    def stop(self):
+        """
+        Tells the serial threads to stop.
+        """
+        log.info("Stopping RTK GPS manager")
+        self.stop_gps = True
+        time.sleep(2)
+        log.info(self.threads)
+        for thread in self.threads:
+            thread.join(0.1)
+            # log.info("gps alive? = {0}".format(thread.is_alive()))
+        self.threads = []
+        self.started = False
+        log.info("Stopped RTK GPS manager")
+
+    def update(self, gps_dict):
+        """
+        Updates the gps info held by this class, a lock is used to prevent corruption.
+
+        :param gps_dict: GPS Dictionary passed.
+        :type gps_dict: dict
+        """
+
+        #self.gps_lock.acquire(True)
+        if gps_dict is not None:
+            self.old = False
+            if self.watchdog is not None:
+                self.watchdog.reset()
+
+            
+
+            # data for message UBX-NAV-PVT
+            self.iTOW = gps_dict['iTOW']
+            self.year = gps_dict['year']
+            self.month = gps_dict['month']
+            self.day = gps_dict['day']
+            self.hour = gps_dict['hour']
+            self.minute = gps_dict['min']
+            self.second = gps_dict['sec']
+            self.tAcc = gps_dict['tAcc']
+            self.nano = gps_dict['nano']
+            self.fixType = gps_dict['fixType']
+            self.satellite_number = gps_dict['numSV']
+            self.lon = gps_dict['lon']/10000000.0
+            self.lat = gps_dict['lat']/10000000.0
+            self.height = gps_dict['height']
+            self.hMSL = gps_dict['hMSL']
+
+            self.datetime = datetime.datetime(int(gps_dict['year']),int(gps_dict['month']),int(gps_dict['day']),int(gps_dict['hour']),int(gps_dict['min']),int(gps_dict['sec']),abs(int(gps_dict['nano'])))
+            self.hAcc = gps_dict['hAcc']
+            self.vAcc = gps_dict['vAcc']
+            self.velN = gps_dict['velN']
+            self.velE = gps_dict['velE']
+            self.velD = gps_dict['velD']
+            self.gSpeed = gps_dict['gSpeed']
+            self.headMot = gps_dict['headMot']/100000.0
+            self.sAcc = gps_dict['sAcc']
+            self.headAcc = gps_dict['headAcc']/100000.0
+            self.pDOP = gps_dict['pDOP']
+            self.reserved1_1 = gps_dict['reserved1_1']
+            self.reserved1_2 = gps_dict['reserved1_2']
+            self.reserved1_3 = gps_dict['reserved1_3']
+            self.reserved1_4 = gps_dict['reserved1_4']
+            self.reserved1_5 = gps_dict['reserved1_5']
+            self.reserved1_6 = gps_dict['reserved1_6']
+            self.headVeh = gps_dict['headVeh']/100000.0
+            self.magDec = gps_dict['magDec']
+            self.magAcc = gps_dict['magAcc']
+
+            # align the following fields with NMEA 0183
+            self.heading = self.relPosHeading
+            self.speed = self.gSpeed * 0.00194384
+            self.fix = self.fixType
+            self.alt = self.hMSL
+            self.flags = gps_dict['flags']
+            self.valid = gps_dict['valid']
+
+            # Flag data from message PVT
+            self.flags_carrSoln = gps_dict['flags'][0:2]
+            self.flags_headVehValid = int(gps_dict['flags'][2])
+            self.flags_psmState = gps_dict['flags'][3:6]
+            self.flags_diffSoln = int(gps_dict['flags'][6])
+            self.flags_gnssFixOK = int(gps_dict['flags'][7])
+
+            self.flags2_confirmedTime = int(gps_dict['flags2'][0])
+            self.flags2_confirmedDate = int(gps_dict['flags2'][1])
+            self.flags2_confirmedAvai = int(gps_dict['flags2'][2])
+
+            self.valid_validMag = int(gps_dict['valid'][4])
+            self.valid_fullyResolved = int(gps_dict['valid'][5])
+            self.valid_validTime = int(gps_dict['valid'][6])
+            self.valid_validDate = int(gps_dict['valid'][7])
+
+
+            # relposned message data
+            self.version = gps_dict['version']
+            self.reserved1 = gps_dict['reserved1']
+            self.refStationId = gps_dict['refStationId']
+            self.relPosNed_iTOW = gps_dict['relPosNed_iTOW']
+            self.relPosN = gps_dict['relPosN']
+            self.relPosE = gps_dict['relPosE']
+            self.relPosD = gps_dict['relPosD']
+            self.relPosLength = gps_dict['relPosLength']
+
+            # Heading
+            self.relPosHeading = gps_dict['relPosHeading']
+
+            self.reserved2_1 = gps_dict['reserved2_1']
+            self.reserved2_2 = gps_dict['reserved2_2']
+            self.reserved2_3 = gps_dict['reserved2_3']
+            self.reserved2_4 = gps_dict['reserved2_4']
+            self.relPosHPN = gps_dict['relPosHPN']
+            self.relPosHPE = gps_dict['relPosHPE']
+            self.relPosHPD = gps_dict['relPosHPD']
+            self.relPosHPLength = gps_dict['relPosHPLength']
+            self.accN = gps_dict['accN']
+            self.accE = gps_dict['accE']
+            self.accD = gps_dict['accD']
+            self.accLength = gps_dict['accLength']
+
+            # Heading Accuracy
+            self.accHeading = gps_dict['accHeading']
+
+            self.reserved3_1 = gps_dict['reserved3_1']
+            self.reserved3_2 = gps_dict['reserved3_2']
+            self.reserved3_3 = gps_dict['reserved3_3']
+            self.reserved3_4 = gps_dict['reserved3_4']
+            self.relPosNed_flags = gps_dict['relPosNed_flags']
+
+            # flags data for relposned message
+            self.flag_relPosNormalized = gps_dict['flag_relPosNormalized']
+            self.flag_relPosHeadingValid = gps_dict['flag_relPosHeadingValid']
+            self.flag_refObsMiss = gps_dict['flag_refObsMiss']
+            self.flag_refPosMiss = gps_dict['flag_refPosMiss']
+            self.flag_isMoving = gps_dict['flag_isMoving']
+            self.flag_carrSoln = gps_dict['flag_carrSoln']
+            self.flag_relPosValid = gps_dict['flag_relPosValid']
+            self.flag_diffSolN = gps_dict['flag_diffSolN']
+            self.flag_gnssFixOK = gps_dict['flag_gnssFixOK']
+
+            self.last_update = datetime.datetime.now()
+            self.update_counter += 1
+
+            if self.update_counter % 10 == 0:
+                log.info("GPS update: PC time: {0}, GPS time: {1}".format(self.last_update.isoformat(), self.datetime.isoformat()))
+            else:
+                log.debug("GPS update: PC time: {0}, GPS time: {1}".format(self.last_update.isoformat(), self.datetime.isoformat()))
+
+        #self.gps_lock.release()
+
+    def flushbuffer(self):
+        self.serial_ports[0].reset_input_buffer()
+
+    def reset_comports(self):
+        """Reset the comports so that the data are fresh and the GPS sensors are in sync"""
+        self.gps_lock.acquire(True)
+        self.serial_ports[0].close()
+        time.sleep(0.05)
+        self.serial_ports[0].open()
+        log.info("Reset RTK GPS ports: {0}".format(datetime.datetime.now()))
+        self.gps_lock.release()
+
+class NMEA0183(object):
     """
     Main GPS class which oversees the management and reading of GPS ports.
     """
@@ -393,7 +995,7 @@ class GPSManager(object):
 
         The serial port must be an instance of serial.Serial, and the open() method must have been called.
 
-        :param serial_port: Serial object
+      :param serial_port: Serial object
         :type serial_port: serial.Serial
         """
         if not serial_port in self.serial_ports:
