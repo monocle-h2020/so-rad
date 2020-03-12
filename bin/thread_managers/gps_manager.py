@@ -318,10 +318,9 @@ def PayloadIdentifier(payload, ID, Class):
             return (data)
             # UnpackMessage(ClassIDs[identifier][0], payload)
         elif identifier == "013c":
-            flags = payload[20]
+            flags = payload[26]
             binaryFlags = "{0:b}".format(flags)
-            binaryFlags = binaryFlags.zfill(24)
-
+            binaryFlags = binaryFlags.zfill(31)
             data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
             data = list(data)
             relPosHeading = data[8]
@@ -333,9 +332,8 @@ def PayloadIdentifier(payload, ID, Class):
                 relPosHeading = 360 + relPosHeading
 
             data[8] = relPosHeading
-            data[20] = binaryFlags
-            data[18] = accHeading
-
+            data[26] = binaryFlags
+            data[21] = accHeading
             #returnData = [relPosHeading, accHeading]
             return (data)
         else:
@@ -515,16 +513,15 @@ class GPSSerialReader(threading.Thread):
                                     dataDictionary['reserved3_3'] = data[24]
                                     dataDictionary['reserved3_4'] = data[25]
                                     dataDictionary['relPosNed_flags'] = data[26]
-
-                                    dataDictionary['flag_relPosNormalized'] = data[26][22]
-                                    dataDictionary['flag_relPosHeadingValid'] = data[26][23]
-                                    dataDictionary['flag_refObsMiss'] = data[26][24]
-                                    dataDictionary['flag_refPosMiss'] = data[26][25]
-                                    dataDictionary['flag_isMoving'] = data[26][26]
-                                    dataDictionary['flag_carrSoln'] = data[26][27:29]
-                                    dataDictionary['flag_relPosValid'] = data[26][29]
-                                    dataDictionary['flag_diffSolN'] = data[26][30]
-                                    dataDictionary['flag_gnssFixOK'] = data[26][31]
+                                    dataDictionary['flag_relPosNormalized'] = data[26][21]
+                                    dataDictionary['flag_relPosHeadingValid'] = data[26][22]
+                                    dataDictionary['flag_refObsMiss'] = data[26][23]
+                                    dataDictionary['flag_refPosMiss'] = data[26][24]
+                                    dataDictionary['flag_isMoving'] = data[26][25]
+                                    dataDictionary['flag_carrSoln'] = data[26][26:28]
+                                    dataDictionary['flag_relPosValid'] = data[26][28]
+                                    dataDictionary['flag_diffSolN'] = data[26][29]
+                                    dataDictionary['flag_gnssFixOK'] = data[26][30]
 
 
                                 else:
