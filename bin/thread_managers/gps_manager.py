@@ -318,6 +318,10 @@ def PayloadIdentifier(payload, ID, Class):
             return (data)
             # UnpackMessage(ClassIDs[identifier][0], payload)
         elif identifier == "013c":
+            flags = payload[20]
+            binaryFlags = "{0:b}".format(flags)
+            binaryFlags = binaryFlags.zfill(24)
+
             data = UnpackMessage(ublox8Dictionary.ClassIDs[identifier][0], payload)
             data = list(data)
             relPosHeading = data[8]
@@ -328,8 +332,12 @@ def PayloadIdentifier(payload, ID, Class):
             if(relPosHeading < 0):
                 relPosHeading = 360 + relPosHeading
 
-            returnData = [relPosHeading, accHeading]
-            return (returnData)
+            data[8] = relPosHeading
+            data[20] = binaryFlags
+            data[18] = accHeading
+
+            #returnData = [relPosHeading, accHeading]
+            return (data)
         else:
             return None
 
@@ -475,9 +483,50 @@ class GPSSerialReader(threading.Thread):
 
                                 data = PayloadIdentifier(payload, ID, CLASS)
  
-                                if(len(data) == 2):
-                                    dataDictionary['relPosHeading'] = data[0]
-                                    dataDictionary['accHeading'] = data[1]
+                                if(len(data) == 27):
+                                    dataDictionary['version'] = data[0]
+                                    dataDictionary['reserved1'] = data[1]
+                                    dataDictionary['refStationId'] = data[2]
+                                    dataDictionary['relPosNed_iTOW'] = data[3]
+                                    dataDictionary['relPosN'] = data[4]
+                                    dataDictionary['relPosE'] = data[5]
+                                    dataDictionary['relPosD'] = data[6]
+                                    dataDictionary['relPosLength'] = data[7]
+
+                                    dataDictionary['relPosHeading'] = data[8]
+                                    
+                                    dataDictionary['reserved2_1'] = data[9]
+                                    dataDictionary['reserved2_2'] = data[10]
+                                    dataDictionary['reserved2_3'] = data[11]
+                                    dataDictionary['reserved2_4'] = data[12]
+                                    dataDictionary['relPosHPN'] = data[13]
+                                    dataDictionary['relPosHPE'] = data[14]
+                                    dataDictionary['relPosHPD'] = data[15]
+                                    dataDictionary['relPosHPLength'] = data[16]
+                                    dataDictionary['accN'] = data[17]
+                                    dataDictionary['accE'] = data[18]
+                                    dataDictionary['accD'] = data[19]
+                                    dataDictionary['accLength'] = data[20]
+
+                                    dataDictionary['accHeading'] = data[21]
+
+                                    dataDictionary['reserved3_1'] = data[22]
+                                    dataDictionary['reserved3_2'] = data[23]
+                                    dataDictionary['reserved3_3'] = data[24]
+                                    dataDictionary['reserved3_4'] = data[25]
+                                    dataDictionary['relPosNed_flags'] = data[26]
+
+                                    dataDictionary['flag_relPosNormalized'] = data[26][22]
+                                    dataDictionary['flag_relPosHeadingValid'] = data[26][23]
+                                    dataDictionary['flag_refObsMiss'] = data[26][24]
+                                    dataDictionary['flag_refPosMiss'] = data[26][25]
+                                    dataDictionary['flag_isMoving'] = data[26][26]
+                                    dataDictionary['flag_carrSoln'] = data[26][27:29]
+                                    dataDictionary['flag_relPosValid'] = data[26][29]
+                                    dataDictionary['flag_diffSolN'] = data[26][30]
+                                    dataDictionary['flag_gnssFixOK'] = data[26][31]
+
+
                                 else:
 
                                     dataDictionary['iTOW'] = data[0]
@@ -532,7 +581,7 @@ class GPSSerialReader(threading.Thread):
                                 # client.set('GPS_UBLOX8', dataDictionary)
 
                                 # Check to see if the dictionary has all the data it needs from both messages before updating.
-                                if(len(dataDictionary) == 39):
+                                if(len(dataDictionary) == 73):
                                     try:
                                         self.current_gps_dict = dataDictionary
                                         self.notify_observers()
@@ -584,6 +633,7 @@ class RTKUBX(object):
         self.started = False
         self.threads = []
 
+        # UBX-NAV-PVT message data
         self.iTOW = None
         self.year = None
         self.month = None
@@ -599,16 +649,6 @@ class RTKUBX(object):
         self.lat = None
         self.height = None
         self.hMSL = None
-
-        self.alt = None
-        self.datetime = None
-        self.heading = None
-        self.speed = None
-        self.fix = 0
-        self.valid = None
-        self.flags = None
-        self.flags2 = None
-
         self.hAcc = None
         self.vAcc = None
         self.velN = None
@@ -629,9 +669,7 @@ class RTKUBX(object):
         self.magDec = None
         self.magAcc = None
 
-        self.relPosHeading = 0
-        self.accHeading = 0
-
+        # flag data from PVT message
         self.flags_carrSoln = None
         self.flags_headVehValid = None
         self.flags_psmState = None
@@ -647,6 +685,64 @@ class RTKUBX(object):
         self.valid_validTime = None
         self.valid_validDate = None
 
+        # standadising data to nmea format
+        self.alt = None
+        self.datetime = None
+        self.heading = None
+        self.speed = None
+        self.fix = 0
+        self.valid = None
+        self.flags = None
+        self.flags2 = None
+
+
+        # relposned message data
+        self.version = None
+        self.reserved1 = None
+        self.refStationId = None
+        self.relPosNed_iTOW = None
+        self.relPosN = None
+        self.relPosE = None
+        self.relPosD = None
+        self.relPosLength = None
+
+        # Heading
+        self.relPosHeading = None
+        
+        self.reserved2_1 = None
+        self.reserved2_2 = None
+        self.reserved2_3 = None
+        self.reserved2_4 = None
+        self.relPosHPN = None
+        self.relPosHPE = None
+        self.relPosHPD = None
+        self.relPosHPLength = None
+        self.accN = None
+        self.accE = None
+        self.accD = None
+        self.accLength = None
+
+        # Heading Accuracy
+        self.accHeading = None
+
+        self.reserved3_1 = None
+        self.reserved3_2 = None
+        self.reserved3_3 = None
+        self.reserved3_4 = None
+        self.relPosNed_flags = None
+
+        # flags data for relposned message
+        self.flag_relPosNormalized = None
+        self.flag_relPosHeadingValid = None
+        self.flag_refObsMiss = None
+        self.flag_refPosMiss = None
+        self.flag_isMoving = None
+        self.flag_carrSoln = None
+        self.flag_relPosValid = None
+        self.flag_diffSolN = None
+        self.flag_gnssFixOK = None
+
+        # data for classes to manage threading + misc
         self.update_rate = 0
         self.gps_lock = threading.Lock()
         self.gps_observers = []
@@ -729,9 +825,9 @@ class RTKUBX(object):
             if self.watchdog is not None:
                 self.watchdog.reset()
 
-            self.relPosHeading = gps_dict['relPosHeading']
-            self.accHeading = gps_dict['accHeading']
+            
 
+            # data for message UBX-NAV-PVT
             self.iTOW = gps_dict['iTOW']
             self.year = gps_dict['year']
             self.month = gps_dict['month']
@@ -777,6 +873,7 @@ class RTKUBX(object):
             self.flags = gps_dict['flags']
             self.valid = gps_dict['valid']
 
+            # Flag data from message PVT
             self.flags_carrSoln = gps_dict['flags'][0:2]
             self.flags_headVehValid = int(gps_dict['flags'][2])
             self.flags_psmState = gps_dict['flags'][3:6]
@@ -791,6 +888,53 @@ class RTKUBX(object):
             self.valid_fullyResolved = int(gps_dict['valid'][5])
             self.valid_validTime = int(gps_dict['valid'][6])
             self.valid_validDate = int(gps_dict['valid'][7])
+
+
+            # relposned message data
+            self.version = gps_dict['version']
+            self.reserved1 = gps_dict['reserved1']
+            self.refStationId = gps_dict['refStationId']
+            self.relPosNed_iTOW = gps_dict['relPosNed_iTOW']
+            self.relPosN = gps_dict['relPosN']
+            self.relPosE = gps_dict['relPosE']
+            self.relPosD = gps_dict['relPosD']
+            self.relPosLength = gps_dict['relPosLength']
+
+            # Heading
+            self.relPosHeading = gps_dict['relPosHeading']
+
+            self.reserved2_1 = gps_dict['reserved2_1']
+            self.reserved2_2 = gps_dict['reserved2_2']
+            self.reserved2_3 = gps_dict['reserved2_3']
+            self.reserved2_4 = gps_dict['reserved2_4']
+            self.relPosHPN = gps_dict['relPosHPN']
+            self.relPosHPE = gps_dict['relPosHPE']
+            self.relPosHPD = gps_dict['relPosHPD']
+            self.relPosHPLength = gps_dict['relPosHPLength']
+            self.accN = gps_dict['accN']
+            self.accE = gps_dict['accE']
+            self.accD = gps_dict['accD']
+            self.accLength = gps_dict['accLength']
+
+            # Heading Accuracy
+            self.accHeading = gps_dict['accHeading']
+
+            self.reserved3_1 = gps_dict['reserved3_1']
+            self.reserved3_2 = gps_dict['reserved3_2']
+            self.reserved3_3 = gps_dict['reserved3_3']
+            self.reserved3_4 = gps_dict['reserved3_4']
+            self.relPosNed_flags = gps_dict['relPosNed_flags']
+
+            # flags data for relposned message
+            self.flag_relPosNormalized = gps_dict['flag_relPosNormalized']
+            self.flag_relPosHeadingValid = gps_dict['flag_relPosHeadingValid']
+            self.flag_refObsMiss = gps_dict['flag_refObsMiss']
+            self.flag_refPosMiss = gps_dict['flag_refPosMiss']
+            self.flag_isMoving = gps_dict['flag_isMoving']
+            self.flag_carrSoln = gps_dict['flag_carrSoln']
+            self.flag_relPosValid = gps_dict['flag_relPosValid']
+            self.flag_diffSolN = gps_dict['flag_diffSolN']
+            self.flag_gnssFixOK = gps_dict['flag_gnssFixOK']
 
             self.last_update = datetime.datetime.now()
             self.update_counter += 1
