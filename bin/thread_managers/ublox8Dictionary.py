@@ -148,7 +148,8 @@ CONST_UBX_TIM_VRFY = "0d0620"
 CONST_UBX_UPD_SOS = "09144"
 CONST_UBX_UPD_SOS2 = "09148"
 
-    # b for 1, i for 4, h for 2
+    # b = 1 unsigned (x1) (no translation needed?), i = 4 signed (i4), h = 2 (i2), I = 4 unsigned (U4), H = 2 unsigned (U2), B = 1 unsigned (U1)
+
 ClassIDs = {
     CONST_UBX_NAV_RELPOSNED: ("BBHIiiiiiBBBBbbbbIIIIIBBBBi",["version","reserved1","refStationId","iTOW","relPosN","relPosE","relPosD","relPosHPN","relPosHPE","relPosHPD","reserved2","accN","accE","accD","flags"]),
     CONST_UBX_NAV_PVT: ("IHBBBBBBIiBbbBiiiiIIiiiiiIIHBBBBBBihH",["iTOW","year","month","day","hour","min","sec","valid","tAcc","nano","fixType","flags","flags2","numSV","lon","lat","height","hMSL","hAcc","vAcc","velN","velE","velD","gSpeed","headMot","sAcc","headAcc","pDOP","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","reserved1","headVeh","magDec","magAcc"]),
