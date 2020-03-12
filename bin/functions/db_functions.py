@@ -78,10 +78,13 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                 pr1 = 0
             else:
                 pr1 = int(1000/gps1_dict['poll_rate'])
-            if gps2_dict['poll_rate'] == 0:
-                pr2 = 0
+            if gps2_dict['used']:
+                if gps2_dict['poll_rate'] == 0:
+                   pr2 = 0
+                else:
+                   pr2 = int(1000/gps2_dict['poll_rate'])
             else:
-                pr2 = int(1000/gps2_dict['poll_rate'])
+                   pr2 = None
 
             conn, cur = connect_db(db_dict)
             if (trigger_id is None) or (spectra_data is None):
