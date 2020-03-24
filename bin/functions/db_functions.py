@@ -48,28 +48,26 @@ def create_tables(db_dict):
     # test whether table exists
     sql ="""CREATE TABLE IF NOT EXISTS sorad_metadata
             (id_ integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-            measurement_datetime datetime, gps1_datetime datetime,
-            gps2_datetime datetime, gps1_fix integer,
-            gps2_fix integer, gps1_latitude float,
-            gps1_longitude float, gps2_latitude float,
-            gps2_longitude float, gps1_poll_rate integer,
-            gps2_poll_rate integer, gps1_speed float,
-            gps2_speed float, ship_bearing float,
+            pc_time datetime, gps1_time datetime,
+            gps2_time datetime, gps1_fix integer,
+            gps2_fix integer, gps1_lat float,
+            gps1_long float, gps2_lat float,
+            gps2_long float, gps1_speed float,
+            gps2_speed float, platform_bearing float,
             sun_azimuth float, sun_elevation float,
             motor_temp float, driver_temp float,
             pi_cpu_temp float, tilt float,
             pitch float, roll float,
-            heading_accuracy float, software_version float,
-            batt_v float, n_obs integer,
-            sos_inserted bool, sos_tries integer)"""
+            bearing_accuracy float, sorad_version float,
+            batt_v float, n_rad_obs integer,
+            sos_inserted bool, sos_insertion_attempts integer)"""
     cur.execute(sql)
 
     sql ="""CREATE TABLE IF NOT EXISTS sorad_radiometry
-            (sample_id integer NOT NULL, trigger_id datetime,
-            sensor_id text, integration_time integer,
-            measurement text, sos_inserted bool,
-            sos_tries integer,
-            FOREIGN KEY(sample_id) REFERENCES sorad_metadata(id_))"""
+            (metadata_id integer NOT NULL,
+            sensor_id text, integr_time integer,
+            measurement text,
+            FOREIGN KEY(metadata_id) REFERENCES sorad_metadata(id_))"""
     cur.execute(sql)
     conn.close()
 
@@ -93,15 +91,15 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
 
             conn, cur = connect_db(db_dict)
             if (trigger_id is None) or (spectra_data is None):
-                cur.execute("""INSERT INTO sorad_metadata(trigger_id, gps1_datetime, gps2_datetime,
-                               gps1_fix, gps2_fix, gps1_latitude, gps1_longitude, gps2_latitude,
-                               gps2_longitude, gps1_poll_rate, gps2_poll_rate, gps1_speed, gps2_speed,
-                               ship_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
-                               tilt, pitch, roll, heading_accuracy, software_version, batt_v, n_obs, sos_inserted, sos_tries)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                cur.execute("""INSERT INTO sorad_metadata(pc_time, gps1_time, gps2_time,
+                               gps1_fix, gps2_fix, gps1_lat, gps1_long, gps2_lat,
+                               gps2_long, gps1_speed, gps2_speed,
+                               platform_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
+                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, n_rad_obs, sos_inserted, sos_insertion_attempts)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                                (trigger_id, gps1_dict['datetime'], gps2_dict['datetime'], gps1_dict['fix'],
                                 gps2_dict['fix'], gps1_dict['latitude'], gps1_dict['longitude'],
-                                gps2_dict['latitude'], gps2_dict['longitude'], pr1, pr2,
+                                gps2_dict['latitude'], gps2_dict['longitude'],
                                 gps1_dict['speed'], gps2_dict['speed'],
                                 str(ship_bearing), str(sun_azi), str(sun_elev),
                                 str(pi_cpu_temp), str(tilt), str(pitch), str(roll),
@@ -119,15 +117,15 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                             #    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"""
 
             else:
-                cur.execute("""INSERT INTO sorad_metadata(trigger_id, gps1_datetime, gps2_datetime,
-                               gps1_fix, gps2_fix, gps1_latitude, gps1_longitude, gps2_latitude,
-                               gps2_longitude, gps1_poll_rate, gps2_poll_rate, gps1_speed, gps2_speed,
-                               ship_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
-                               tilt, pitch, roll, heading_accuracy, software_version, batt_v, n_obs, sos_inserted, sos_tries)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
+                cur.execute("""INSERT INTO sorad_metadata(pc_time, gps1_time, gps2_time,
+                               gps1_fix, gps2_fix, gps1_lat, gps1_long, gps2_lat,
+                               gps2_long, gps1_speed, gps2_speed,
+                               platform_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
+                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, n_rad_obs, sos_inserted, sos_insertion_attempts)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                                (trigger_id, gps1_dict['datetime'], gps2_dict['datetime'], gps1_dict['fix'],
                                 gps2_dict['fix'], gps1_dict['latitude'], gps1_dict['longitude'],
-                                gps2_dict['latitude'], gps2_dict['longitude'], pr1, pr2,
+                                gps2_dict['latitude'], gps2_dict['longitude'],
                                 gps1_dict['speed'], gps2_dict['speed'],
                                 str(ship_bearing), str(sun_azi), str(sun_elev),
                                 str(pi_cpu_temp), str(tilt), str(pitch), str(roll),
@@ -137,9 +135,9 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                 sample_id = cur.lastrowid
 
                 for n in range(len(spectra_data)):
-                    cur.execute("""INSERT INTO sorad_radiometry(sample_id, trigger_id,
-                                   sensor_id, inttime, measurement, sos_inserted, sos_tries) VALUES(?,?,?,?,?, NULL, NULL)""",
-                                   (sample_id, trigger_id.isoformat(' '), spectra_data[n][0],
+                    cur.execute("""INSERT INTO sorad_radiometry(metadata_id,
+                                   sensor_id, inttime, measurement) VALUES(?,?,?,?)""",
+                                   (sample_id, spectra_data[n][0],
                                     spectra_data[n][1], spectra_data[n][2]))
 
                 conn.commit()
