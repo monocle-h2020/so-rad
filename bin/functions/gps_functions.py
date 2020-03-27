@@ -96,5 +96,6 @@ def create_gps_dict(gps_manager):
     gps_dict['longitude'] = gps_manager.lon
     gps_dict['poll_rate'] = gps_manager.update_rate
     gps_dict['speed'] = gps_manager.speed
+    gps_dict['bearing_accuracy'] = gps_manager.relPosHeading
 
     return gps_dict
