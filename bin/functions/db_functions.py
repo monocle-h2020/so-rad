@@ -59,7 +59,7 @@ def create_tables(db_dict):
             pi_cpu_temp float, tilt float,
             pitch float, roll float,
             bearing_accuracy float, sorad_version float,
-            batt_v float, n_rad_obs integer,
+            batt_v float, rel_hum float, n_rad_obs integer,
             sos_inserted bool, sos_insertion_attempts integer)"""
     cur.execute(sql)
 
@@ -72,7 +72,7 @@ def create_tables(db_dict):
     conn.close()
 
 
-def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, sun_azi, sun_elev, spectra_data, batt_v=0, pi_cpu_temp=0, motor_temp=0, driver_temp=0, tilt=0, pitch=0, roll=0, software_version=0):
+def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, sun_azi, sun_elev, spectra_data, batt_v=0, pi_cpu_temp=0, motor_temp=0, driver_temp=0, tilt=0, pitch=0, roll=0, software_version=0, rel_hum=0):
     """Commit all the required values to the database object, or just gps/meta data if sensor data isn't available"""
     try:
         # if db is being used
@@ -95,8 +95,8 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                                gps1_fix, gps2_fix, gps1_lat, gps1_long, gps2_lat,
                                gps2_long, gps1_speed, gps2_speed,
                                platform_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
-                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, n_rad_obs, sos_inserted, sos_insertion_attempts)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, rel_hum, n_rad_obs, sos_inserted, sos_insertion_attempts)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                                (trigger_id, gps1_dict['datetime'], gps2_dict['datetime'], gps1_dict['fix'],
                                 gps2_dict['fix'], gps1_dict['latitude'], gps1_dict['longitude'],
                                 gps2_dict['latitude'], gps2_dict['longitude'],
@@ -121,8 +121,8 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                                gps1_fix, gps2_fix, gps1_lat, gps1_long, gps2_lat,
                                gps2_long, gps1_speed, gps2_speed,
                                platform_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
-                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, n_rad_obs, sos_inserted, sos_insertion_attempts)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
+                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, rel_hum, n_rad_obs, sos_inserted, sos_insertion_attempts)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                                (trigger_id, gps1_dict['datetime'], gps2_dict['datetime'], gps1_dict['fix'],
                                 gps2_dict['fix'], gps1_dict['latitude'], gps1_dict['longitude'],
                                 gps2_dict['latitude'], gps2_dict['longitude'],
