@@ -96,6 +96,9 @@ def check_battery(bat_manager, battery):
 
 def check_pi_cpu_temperature():
     """Get the temperature of the cpu"""
-    from gpiozero import CPUTemperature
-    cpu = CPUTemperature()
-    return cpu.temperature
+    import os
+    import time
+    temp = os.popen("vcgencmd measure_temp").readline()
+    temp = temp.replace("temp=","")
+    temp = temp.replace("'C","")
+    return temp

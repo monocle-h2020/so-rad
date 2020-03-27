@@ -94,8 +94,8 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                 cur.execute("""INSERT INTO sorad_metadata(pc_time, gps1_time, gps2_time,
                                gps1_fix, gps2_fix, gps1_lat, gps1_long, gps2_lat,
                                gps2_long, gps1_speed, gps2_speed,
-                               platform_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
-                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, rel_hum, n_rad_obs, sos_inserted, sos_insertion_attempts)
+                               platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
+                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, rel_hum, motor_temp, driver_temp, n_rad_obs, sos_inserted, sos_insertion_attempts)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                                (trigger_id, gps1_dict['datetime'], gps2_dict['datetime'], gps1_dict['fix'],
                                 gps2_dict['fix'], gps1_dict['latitude'], gps1_dict['longitude'],
@@ -103,7 +103,7 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                                 gps1_dict['speed'], gps2_dict['speed'],
                                 str(ship_bearing), str(sun_azi), str(sun_elev),
                                 str(pi_cpu_temp), str(tilt), str(pitch), str(roll),
-                                gps1_dict['bearing_accuracy'], str(software_version), str(batt_v),
+                                gps1_dict['bearing_accuracy'], str(software_version), str(batt_v), str(rel_hum),
                                 str(motor_temp), str(driver_temp)))
                 sample_id = cur.lastrowid
                 conn.commit()
@@ -120,8 +120,8 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                 cur.execute("""INSERT INTO sorad_metadata(pc_time, gps1_time, gps2_time,
                                gps1_fix, gps2_fix, gps1_lat, gps1_long, gps2_lat,
                                gps2_long, gps1_speed, gps2_speed,
-                               platform_bearing, sun_azimuth, sun_elevation, motor_temp, driver_temp, pi_cpu_temp,
-                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, rel_hum, n_rad_obs, sos_inserted, sos_insertion_attempts)
+                               platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
+                               tilt, pitch, roll, bearing_accuracy, sorad_version, batt_v, rel_hum, motor_temp, driver_temp, n_rad_obs, sos_inserted, sos_insertion_attempts)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                                (trigger_id, gps1_dict['datetime'], gps2_dict['datetime'], gps1_dict['fix'],
                                 gps2_dict['fix'], gps1_dict['latitude'], gps1_dict['longitude'],
@@ -129,7 +129,7 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                                 gps1_dict['speed'], gps2_dict['speed'],
                                 str(ship_bearing), str(sun_azi), str(sun_elev),
                                 str(pi_cpu_temp), str(tilt), str(pitch), str(roll),
-                                gps1_dict['bearing_accuracy'], str(software_version), str(batt_v),
+                                gps1_dict['bearing_accuracy'], str(software_version), str(batt_v), str(rel_hum),
                                 str(motor_temp), str(driver_temp), len(spectra_data)))
 
                 sample_id = cur.lastrowid
