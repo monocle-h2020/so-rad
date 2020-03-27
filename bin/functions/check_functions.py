@@ -76,7 +76,6 @@ def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""
     return solar_elevation >= sample_dict['solar_elevation_limit']
 
-
 def check_battery(bat_manager, battery):
     """Check whether battery voltage is OK
     returns:
@@ -94,3 +93,9 @@ def check_battery(bat_manager, battery):
         return 1
     else:
         return 2
+
+def check_pi_cpu_temperature():
+    """Get the temperature of the cpu"""
+    from gpiozero import CPUTemperature
+    cpu = CPUTemperature()
+    return cpu.temperature

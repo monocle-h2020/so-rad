@@ -72,7 +72,7 @@ def create_tables(db_dict):
     conn.close()
 
 
-def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, sun_azi, sun_elev, spectra_data, motor_temp=0, driver_temp=0, pi_cpu_temp=0, tilt=0, pitch=0, roll=0, heading_accuracy=0, software_version=0, batt_v=0):
+def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, sun_azi, sun_elev, spectra_data, batt_v=0, pi_cpu_temp=0, motor_temp=0, driver_temp=0, tilt=0, pitch=0, roll=0, software_version=0):
     """Commit all the required values to the database object, or just gps/meta data if sensor data isn't available"""
     try:
         # if db is being used
@@ -103,7 +103,7 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                                 gps1_dict['speed'], gps2_dict['speed'],
                                 str(ship_bearing), str(sun_azi), str(sun_elev),
                                 str(pi_cpu_temp), str(tilt), str(pitch), str(roll),
-                                str(heading_accuracy), str(software_version), str(batt_v),
+                                gps1_dict['bearing_accuracy'], str(software_version), str(batt_v),
                                 str(motor_temp), str(driver_temp)))
                 sample_id = cur.lastrowid
                 conn.commit()
@@ -129,7 +129,7 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
                                 gps1_dict['speed'], gps2_dict['speed'],
                                 str(ship_bearing), str(sun_azi), str(sun_elev),
                                 str(pi_cpu_temp), str(tilt), str(pitch), str(roll),
-                                str(heading_accuracy), str(software_version), str(batt_v),
+                                gps1_dict['bearing_accuracy'], str(software_version), str(batt_v),
                                 str(motor_temp), str(driver_temp), len(spectra_data)))
 
                 sample_id = cur.lastrowid

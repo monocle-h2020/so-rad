@@ -25,7 +25,7 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 
@@ -406,8 +406,10 @@ def run():
 
                 # If db is used, commit the data to it
                 if db_dict['used']:
+                    cpu_temp = check_pi_cpu_temperature()
                     db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                                              trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data)
+                        trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data, 
+                        bat_manager.batt_voltage, cpu_temp, 0, 0, 0, 0, 0, 0)
                     last_commit_time = datetime.datetime.now()
                     message += "Trig: {0} [{1}]".format(trigger_id, db_id)
 
@@ -432,8 +434,10 @@ def run():
                 spec_data = None
 
                 if db_dict['used']:
-                    db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                                              no_trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data)
+                    cpu_temp = check_pi_cpu_temperature()
+                    db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict, 
+                        no_trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data, 
+                        bat_manager.batt_voltage, cpu_temp, 0, 0, 0, 0, 0, 0)
                     last_commit_time = datetime.datetime.now()
                     message += "NotReady | GPS Recorded: {0} [{1}]".format(last_commit_time, db_id)
 
