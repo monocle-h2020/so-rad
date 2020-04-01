@@ -229,7 +229,7 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
     time.sleep(idle_time)
     sys.exit(0)
 
-def update_gps_values(gps_managers):
+def update_gps_values(gps_managers, values):
     """update the gps values to the latest available in the gps managers""" 
     values['lat0'] = gps_managers[0].lat
     values['lon0'] = gps_managers[0].lon
@@ -242,7 +242,10 @@ def update_gps_values(gps_managers):
     values['flags_headVehValid'] = gps_managers[0].flags_headVehValid
     values['flags_diffSoln'] = gps_managers[0].flags_diffSoln
     values['flags_gnssFixOK'] = gps_managers[0].flags_gnssFixOK
+    values['speed'] = gps_managers[0].speed
+    values['nsat0'] = gps_managers[0].satellite_number
     if len(gps_managers) == 2:
+        values['nsat1'] = gps_managers[1].satellite_number
         values['dt1'] = gps_managers[1].datetime
 
     return values
@@ -269,7 +272,7 @@ def format_log_message(counter, ready, values):
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
                   motor, battery, bat_manager, gpios, trigger_id, verbose):
     """run one measurement cycle
-    
+
     : counter               - measurement cycle number, included for logging
     : conf                  - main configuration (parsed from file)
     : sample                - main sampling settings configuration
@@ -280,10 +283,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     : battery               - battery management configuration
     : motor                 - motor configuration
     : pgios                 - gpio pins in use
-    
+
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
     """
+
+    log = logging.getLogger()
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
@@ -326,16 +331,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
     if ready['gps']:
         # read latest gps info and calculate angles for motor
-        values['speed'] = gps_managers[0].speed
-        values['nsat0'] = gps_managers[0].satellite_number
-        if len(gps_managers) == 2:
-            values['nsat1'] = gps_managers[1].satellite_number
+        values = update_gps_values(gps_managers, values)
         # time.sleep(2)  # not needed?
         ready['speed'] = check_speed(sample, gps_managers)
 
         # read motor position to see if it is ready
         values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
-        if motor_pos is None:
+        if values['motor_pos'] is None:
             ready['motor'] = False
             message = format_log_message(counter, ready, values)
             message += "Motor position not read."
@@ -344,14 +346,14 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
         # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
         if not bearing_fixed:
-            heading_ok = True
+            ready['heading'] = True
             if len(gps_managers) == 2:
                 values['ship_bearing_mean'] = gps_checker_manager.mean_bearing
             else:
                 values['ship_bearing_mean'] = gps_managers[0].heading
 
         # collect latest GPS data
-        values = update_gps_values(gps_managers)
+        values = update_gps_values(gps_managers, values)
 
         # Fetch sun variables
         values['solar_az'], values['solar_el'],\
@@ -362,13 +364,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
         log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
                  .format(values['solar_az'], values['solar_el'],
-                         motor_angles['view_comp_ccw'], motor_angles['view_comp_cw'],
+                         values['motor_angles']['view_comp_ccw'], values['motor_angles']['view_comp_cw'],
                          values['motor_angles']['ach_mot_ccw'], values['motor_angles']['ach_mot_cw'],
                          values['motor_angles']['target_motor_pos_deg'],
                          values['motor_angles']['target_motor_pos_rel_az_deg'], counter))
 
         # Check if the sun is in a suitable position
-        ready['sun'] = check_sun(sample, values['solar_az'], ['solar_el'])
+        ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
         # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
         # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
@@ -395,8 +397,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
         # collect latest GPS data now that a measurement will be triggered
-        values = update_gps_values(gps_managers)
-        
+        values = update_gps_values(gps_managers, values)
+
         # TODO: the gps dicts are really not needed since we can pass the values dict into the database.
         gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
         if len(gps_managers) == 2:
@@ -419,10 +421,11 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['all_sensors'], values['ship_bearing_mean'],
                                       values['solar_az'], values['solar_el'], spec_data)
-            message += "\nNew record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id)
+            log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
-    elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
+    elif (trigger_id['ed_sensor'] not in [nan, None])\
+            and (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
             and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>0])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
         # trigger Ed
@@ -436,12 +439,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['all_sensors'], values['ship_bearing_mean'],
                                       values['solar_az'], values['solar_el'], spec_data)
-        
-        message += "\nNew record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id)
 
-    elif abs(datetime.datetime.now().timestamp() - nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']]).timestamp()) > 60:
+        log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
+
+    elif (trigger_id['all_sensors'] not in [nan, None])\
+            and (abs(datetime.datetime.now().timestamp() - nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']]).timestamp()) > 60):
+
         trigger_id['gps_location'] = datetime.datetime.now()
-
         # record metadata and GPS data at least every minute
         values = update_gps_values(gps_managers) # collect latest GPS data
         # TODO remove use of these dicts, pass value dict to db instead
@@ -459,13 +463,14 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['gps_location'], values['ship_bearing_mean'],
                                       values['solar_az'], values['solar_el'], spec_data=None)
-            message += "\nNew record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id)
-            
+            log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+
     else:
         # nothing to do
         time.sleep(0.1)
         log.debug("No actions triggered")
 
+    message = format_log_message(counter, ready, values)
     log.info(message)
     return trigger_id
 
