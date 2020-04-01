@@ -262,7 +262,7 @@ def format_log_message(counter, ready, values):
                        checks[ready['sun']], values['solar_el'])
     message += "\n"
     message += "[{10}] Heading: Sun {0} Mot {1} Veh {2} Acc: {3}) | fix: {4}, HeadOk: {5}, diffSolnOk: {6}, FixOk {7} | nSat [{8}|{9}] "\
-                .format(valus['solar_az'], values['headMot'], values['relPosHeading'],
+                .format(values['solar_az'], values['headMot'], values['relPosHeading'],
                         values['accHeading'], values['fix'], values['flags_headVehValid'],
                         values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], values['nsat1'], counter)
 
@@ -293,7 +293,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
-              'solar_az': None, 'solar_el': None, 'motor_angles': None,
+              'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'dt1': None, 'nsat0': None, 'nsat1': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None}
@@ -320,6 +320,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             log.warning(message)
             stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
             sys.exit(1)                                                                                       # just in case it didn't do that.
+        values['batt_voltage'] = bat_manager.batt_voltage
 
     # Check GPS environment
     gps_heading_accuracy_limit = conf['GPS'].getfloat('gps_heading_accuracy_limit')
