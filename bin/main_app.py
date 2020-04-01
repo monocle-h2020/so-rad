@@ -438,8 +438,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         
         message += "\nNew record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id)
 
-    last_any_commit = nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
     elif abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp()) < 60:
+        #last_any_commit = nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
         trigger_id['gps_location'] = datetime.datetime.now()
 
         # record metadata and GPS data at least every minute
