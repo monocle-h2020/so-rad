@@ -66,7 +66,8 @@ def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
             return True
         elif not radiometry_manager.check_and_restore_sensor_number():
             return False
-        elif datetime.datetime.now() - prev_sample_time > datetime.timedelta(seconds=rad_dict['sampling_interval']):
+        elif datetime.datetime.now().timestamp() - prev_sample_time.timestamp() > rad_dict['sampling_interval']):
+            print(datetime.datetime.now().timestamp(), prev_sample_time.timestamp(), rad_dict['sampling_interval'])  # debug
             return True
         else:
             return False
