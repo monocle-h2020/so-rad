@@ -322,7 +322,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     ready['gps']  = check_gps(gps_managers, gps_protocol)
     ready['heading'] = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
     # Check radiometry environment
-    ready['rad'] = check_sensors(rad, trigger_id, radiometry_manager)
+    ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
 
     if ready['gps']:
         # read latest gps info and calculate angles for motor
@@ -371,6 +371,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         ready['sun'] = check_sun(sample, values['solar_az'], ['solar_el'])
 
         # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
+        # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
         if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
                                                                                                                   and (ready['speed'])\
                                                                                                                   and (ready['heading']):
@@ -438,8 +439,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         
         message += "\nNew record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id)
 
-    elif abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp()) < 60:
-        #last_any_commit = nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
+    elif abs(datetime.datetime.now().timestamp() - nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']]).timestamp()) > 60:
         trigger_id['gps_location'] = datetime.datetime.now()
 
         # record metadata and GPS data at least every minute
