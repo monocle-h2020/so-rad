@@ -28,7 +28,7 @@ import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
-from numpy import nan, nanmax
+from numpy import nan, max
 
 
 def parse_args():
@@ -421,34 +421,15 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spec_data)
+                                      values['solar_az'], values['solar_el'], spectra_data)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
-    elif (trigger_id['ed_sensor'] not in [nan, None])\
-            and (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
-            and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>0])):
+    elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
+        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-50)):
         trigger_id['ed_sensor'] = datetime.datetime.now()
-        # trigger Ed
-        spec_data = []
-        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
-        for n in range(len(sids)):
-            spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
-        # If db is used, commit the data to it
-        if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spec_data)
-
-        log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
-
-    elif (trigger_id['all_sensors'] not in [nan, None])\
-            and (abs(datetime.datetime.now().timestamp() - nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']]).timestamp()) > 60):
-
-        trigger_id['gps_location'] = datetime.datetime.now()
-        # record metadata and GPS data at least every minute
-        values = update_gps_values(gps_managers) # collect latest GPS data
+        values = update_gps_values(gps_managers, values) # collect latest GPS data
         # TODO remove use of these dicts, pass value dict to db instead
         gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
         if len(gps_managers) == 2:
@@ -460,16 +441,47 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
                 gps2_manager_dict[key] = None
             gps2_manager_dict['used'] = False
 
+        # trigger Ed
+        spec_data = []
+        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
+        for n in range(len(sids)):
+            spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
+
+        # If db is used, commit the data to it
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['gps_location'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spec_data=None)
-            log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data)
+
+        log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
 
     else:
-        # nothing to do
-        time.sleep(0.1)
-        log.debug("No actions triggered")
+        trigger = False
+        last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
+        log.debug("last commit of any kind: {0}".format(last_any_commit))
+        seconds_elapsed_since_last_any_commit = abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp())
+        log.debug("seconds since last commit: {0}".format(seconds_elapsed_since_last_any_commit))
+        if seconds_elapsed_since_last_any_commit > 60:
+            trigger_id['gps_location'] = datetime.datetime.now()
+            # record metadata and GPS data at least every minute
+            values = update_gps_values(gps_managers, values) # collect latest GPS data
+            # TODO remove use of these dicts, pass value dict to db instead
+            gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
+            if len(gps_managers) == 2:
+                gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                gps2_manager_dict['used'] = True
+            else:
+                gps2_manager_dict = {}
+                for key in gps1_manager_dict.keys():
+                    gps2_manager_dict[key] = None
+                gps2_manager_dict['used'] = False
+
+            if db_dict['used']:
+                db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['gps_location'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data=None)
+                log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+
 
     message = format_log_message(counter, ready, values)
     log.info(message)
@@ -504,8 +516,9 @@ def run():
 
     log.info("===Initialisation complete===")
 
-    last_commit_time = datetime.datetime.now()
-    trigger_id = {'all_sensors': nan, 'ed_sensor': nan, 'gps_location': nan}  # stores when data were last recorded
+    trigger_id = {'all_sensors': datetime.datetime.now(),
+                  'ed_sensor': datetime.datetime.now(),
+                  'gps_location': datetime.datetime.now()}  # stores when data were last recorded
 
     # Repeat indefinitely until program closed
     counter = 0
