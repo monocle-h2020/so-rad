@@ -463,6 +463,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             
     else:
         # nothing to do
+        time.sleep(0.1)
+        log.debug("No actions triggered")
 
     log.info(message)
     return trigger_id
