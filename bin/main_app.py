@@ -421,12 +421,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spectra_data)
+                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
-        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-50)):
+        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-50])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
         values = update_gps_values(gps_managers, values) # collect latest GPS data
@@ -451,7 +451,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spectra_data)
+                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
 
         log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
 
