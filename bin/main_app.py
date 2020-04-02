@@ -426,7 +426,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
-        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-50])):
+        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-90])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
         values = update_gps_values(gps_managers, values) # collect latest GPS data
