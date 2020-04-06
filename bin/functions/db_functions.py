@@ -151,3 +151,21 @@ def commit_db(db_dict, verbose, gps1_dict, gps2_dict, trigger_id, ship_bearing, 
     except Exception as m:
         log.warning("Exception ignored in db commit: \n{0}".format(m))
         traceback.print_exc(file=sys.stdout)
+
+
+
+def ConnectToSOS(conf):
+
+    Auth = conf['SOS'].get('Auth').lower()
+    from sos.sos import describeSensor, CALL_DESCRIBE_SENSOR
+    sensor = "?"
+
+    returnedResult = describeSensor(sensor)
+    # Describe sensor (check if sensor is there)
+    # If sensor not there, then insert sensor - take output template (pass in unique id (procedure)) (render simple template function)
+    # Get result template (check if result template is there) (give unique name: unique string based on format of template)
+    # Insert result template if not there
+
+def SendToSOS():
+    pass
+    # Insert result
