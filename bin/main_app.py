@@ -422,31 +422,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
-            and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>0])):
+        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-90])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
-        # trigger Ed
-        rad['ed_sampling_interval']
-        rad['ed_sensor_id']
 
-        spec_data = []
-        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
-        for n in range(len(sids)):
-            spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
-
-        # If db is used, commit the data to it
-        if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spec_data)
-        
-        message += "\nNew record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id)
-
-    last_any_commit = nanmax([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
-    elif abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp()) < 60:
-        trigger_id['gps_location'] = datetime.datetime.now()
-
-        # record metadata and GPS data at least every minute
-        values = update_gps_values(gps_managers) # collect latest GPS data
+        values = update_gps_values(gps_managers, values) # collect latest GPS data
         # TODO remove use of these dicts, pass value dict to db instead
         gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
         if len(gps_managers) == 2:
@@ -458,15 +437,47 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
                 gps2_manager_dict[key] = None
             gps2_manager_dict['used'] = False
 
-        if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['gps_location'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spec_data=None)
-            message += "\nNew record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id)
-            
-    else:
-        # nothing to do
+        # trigger Ed
+        spec_data = []
+        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
+        for n in range(len(sids)):
+            spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
+        # If db is used, commit the data to it
+        if db_dict['used']:
+            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
+
+        log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
+
+    else:
+        trigger = False
+        last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
+        log.debug("last commit of any kind: {0}".format(last_any_commit))
+        seconds_elapsed_since_last_any_commit = abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp())
+        log.debug("seconds since last commit: {0}".format(seconds_elapsed_since_last_any_commit))
+        if seconds_elapsed_since_last_any_commit > 60:
+            trigger_id['gps_location'] = datetime.datetime.now()
+            # record metadata and GPS data at least every minute
+            values = update_gps_values(gps_managers, values) # collect latest GPS data
+            # TODO remove use of these dicts, pass value dict to db instead
+            gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
+            if len(gps_managers) == 2:
+                gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                gps2_manager_dict['used'] = True
+            else:
+                gps2_manager_dict = {}
+                for key in gps1_manager_dict.keys():
+                    gps2_manager_dict[key] = None
+                gps2_manager_dict['used'] = False
+
+            if db_dict['used']:
+                db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['gps_location'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data=None)
+                log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+   
     log.info(message)
     return trigger_id
 
@@ -509,172 +520,8 @@ def run():
     while True:
         counter += 1
         try:
-<<<<<<< HEAD
             run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
                           motor, battery, bat_manager, gpios, trigger_id, args.verbose)
-=======
-            # Check battery charge
-            if battery['used']:
-                if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
-                    message += "Battery low, idling. Battery info: {0}".format(bat_manager)
-                    log.info(message)
-                    time.sleep(main_check_cycle_sec)
-                    continue
-                elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
-                    message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
-                    log.info(message)
-                    stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)
-                else:
-                    message += "Bat {0}, ".format(bat_manager.batt_voltage)
-
-            # reset to default
-            speed_ready = False
-            motor_ready = False
-            sun_suitable = False
-            rad_ready = False
-            heading_ok = False
-
-            # Check if the GPS sensors have met conditions
-            gps_ready = check_gps(gps_managers, gps_protocol)
-            message += "Pos {0}, ".format(checks[gps_ready])
-            heading_ok = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
-            message += "Head {0}, ".format(checks[heading_ok])
-
-            # Check if the radiometers have met conditions
-            rad_ready = check_sensors(rad, trigger_id, radiometry_manager)
-            message += "Rad {0}, ".format(checks[rad_ready])
-
-            if gps_ready:
-                # read latest gps info and calculate angles for motor
-                speed = gps_managers[0].speed
-                nsat0 = gps_managers[0].satellite_number
-                if len(gps_managers) == 2:
-                    nsat1 = gps_managers[1].satellite_number
-                else:
-                    nsat1 = None
-                time.sleep(2)
-                speed_ready = check_speed(sample, gps_managers)
-                message += "Speed {0}, ".format(checks[speed_ready])
-
-                # Get the current motor pos to check if it's ready
-                motor_pos = motor_func.get_motor_pos(motor['serial'])
-                if motor_pos is None:
-                    message += "Motor position not read. NotReady: {0}".format(datetime.datetime.now())
-                    log.info(message)
-                    time.sleep(main_check_cycle_sec)
-                    continue
-
-                # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
-                if not bearing_fixed:
-                    heading_ok = True
-                    if len(gps_managers) == 2:
-                        ship_bearing_mean = gps_checker_manager.mean_bearing
-                    else:
-                        ship_bearing_mean = gps_managers[0].heading
-
-                lat0 = gps_managers[0].lat
-                lon0 = gps_managers[0].lon
-                alt0 = gps_managers[0].alt
-                dt = gps_managers[0].datetime
-                #dt1 = gps_managers[1].datetime
-                log.info("Heading: Mot {0} Veh {1} Acc: {2})| fix: {3} | HFlag: {4} | diffSoln: {5} | gnssFix {6}"\
-                    .format(gps_managers[0].headMot, gps_managers[0].relPosHeading,
-                            gps_managers[0].accHeading, gps_managers[0].fix,
-                            gps_managers[0].flags_headVehValid,
-                            gps_managers[0].flags_diffSoln, gps_managers[0].flags_gnssFixOK))
-                # Fetch sun variables
-                solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
-                                                                                ship_bearing_mean, motor, motor_pos)
-                log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
-                         .format(solar_az, solar_el, motor_angles['view_comp_ccw'], motor_angles['view_comp_cw'],
-                                 motor_angles['ach_mot_ccw'], motor_angles['ach_mot_cw'],
-                                 motor_angles['target_motor_pos_deg'], motor_angles['target_motor_pos_rel_az_deg'], counter))
-
-                message += "ShBe: {0:1.2f}, SuAz: {1:1.2f}, SuEl: {2:1.2f}. Speed {3:1.2f} nSat [{4}|{5}] "\
-                           .format(ship_bearing_mean, solar_az, solar_el, speed, nsat0, nsat1)
-                # Check if the sun is in a suitable position
-                sun_suitable = check_sun(sample, solar_az, solar_el)
-
-                # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
-                if (sun_suitable and (abs(motor_angles['target_motor_pos_step'] - motor_pos) > motor['step_thresh'])) and (speed_ready) and (heading_ok):
-                    log.info("Adjust motor angle ({0} --> {1})".format(motor_pos, motor_angles['target_motor_pos_step']))
-                    # Rotate the motor to the new position
-                    target_pos = motor_angles['target_motor_pos_step']
-                    motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
-                    moving = True
-                    t0 = time.clock()  # timeout reference
-                    while moving and time.clock()-t0 < 5:
-                        moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
-                        if moving is None:
-                            moving = True
-                        log.info("..moving motor.. {0} --> {1}".format(motor_pos, target_pos))
-                        time.sleep(2)
-
-            else:
-                message += "ShBe: None, SuAz: None, SuEl: None, Speed: None. "
-                sun_suitable = False
-
-
-            # If all checks are good, take radiometry measurements
-            if all([gps_ready, rad_ready, sun_suitable, speed_ready, heading_ok]):
-                # Get the current time of the computer and data from the GPS sensor managers
-                trigger_id = datetime.datetime.now()
-                gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-                if len(gps_managers) == 2:
-                    gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-                    gps2_manager_dict['used'] = True
-                else:
-                    gps2_manager_dict = {}
-                    for key in gps1_manager_dict.keys():
-                        gps2_manager_dict[key] = None
-                    gps2_manager_dict['used'] = False
-
-                # Collect radiometry data and splice together
-                spec_data = []
-                if use_rad:
-                    trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
-                    for n in range(len(sids)):
-                        spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
-
-                # If db is used, commit the data to it
-                if db_dict['used']:
-                    cpu_temp = check_pi_cpu_temperature()
-                    db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                        trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data, 
-                        bat_manager.batt_voltage, cpu_temp, 0, 0, 0, 0, 0, 0)
-                    last_commit_time = datetime.datetime.now()
-                    message += "Trig: {0} [{1}]".format(trigger_id, db_id)
-
-            # If not enough time has passed since the last measurement, wait
-            elif abs(datetime.datetime.now().timestamp() - last_commit_time.timestamp()) < 60:
-                # do not execute measurement, do not record metadata
-                message += "Not Ready"
-
-            else:
-                # record metadata and GPS data if some checks aren't passed
-                gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-                if len(gps_managers) == 2:
-                    gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-                    gps2_manager_dict['used'] = True
-                else:
-                    gps2_manager_dict = {}
-                    for key in gps1_manager_dict.keys():
-                        gps2_manager_dict[key] = None
-                    gps2_manager_dict['used'] = False
-
-                no_trigger_id = datetime.datetime.now()
-                spec_data = None
-
-                if db_dict['used']:
-                    cpu_temp = check_pi_cpu_temperature()
-                    db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict, 
-                        no_trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data, 
-                        bat_manager.batt_voltage, cpu_temp, 0, 0, 0, 0, 0, 0)
-                    last_commit_time = datetime.datetime.now()
-                    message += "NotReady | GPS Recorded: {0} [{1}]".format(last_commit_time, db_id)
-
-            log.info(message)
->>>>>>> 3cde7a68208797fba53d4fcda51870798b32f68a
             time.sleep(main_check_cycle_sec)
 
         except KeyboardInterrupt:
