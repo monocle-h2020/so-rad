@@ -338,7 +338,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         if motor_pos is None:
             ready['motor'] = False
             message = format_log_message(counter, ready, values)
-            message += "Motor position not read.")
+            message += "Motor position not read."
             log.warning(message)
             return trigger_id
 
@@ -374,7 +374,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
                                                                                                                   and (ready['speed'])\
                                                                                                                   and (ready['heading']):
-            log.info("Adjust motor angle ({0} --> {1})".format(values'motor_pos'], values['motor_angles']['target_motor_pos_step']))
+            log.info("Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step']))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
             motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
@@ -421,7 +421,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             message += "\nNew record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id)
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
-    elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > Ed Interval)\
+    elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
             and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>0])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
         # trigger Ed
