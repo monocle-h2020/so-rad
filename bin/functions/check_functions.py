@@ -7,7 +7,7 @@ Functions to see if system components are ready.
 The system components include GPS sensors, radiometers and motor controller.
 """
 import datetime
-
+from numpy import nan
 
 def check_gps(gps_managers, gps_protocol):
     "Verify that GPSes have recent and accurate data"
@@ -59,14 +59,15 @@ def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
     if radiometry_manager is None:
         return True
     else:
-
         if radiometry_manager.busy:
             return False
         elif prev_sample_time is None:
             return True
+        elif prev_sample_time is nan:
+            return True
         elif not radiometry_manager.check_and_restore_sensor_number():
             return False
-        elif datetime.datetime.now() - prev_sample_time > datetime.timedelta(seconds=rad_dict['sampling_interval']):
+        elif datetime.datetime.now().timestamp() - prev_sample_time.timestamp() > rad_dict['sampling_interval']:
             return True
         else:
             return False
