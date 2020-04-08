@@ -275,7 +275,7 @@ def rad_init(rad_config, ports):
     rad['port2'] = rad_config.get('port2')
     rad['port3'] = rad_config.get('port3')
     rad['sampling_interval'] = rad_config.getint('sampling_interval')
-    rad['ed_sampling'] = rad_config.getboolean('ed_sampling')
+    rad['ed_sampling'] = rad_config.get('ed_sampling')
     rad['ed_sampling_interval'] = rad_config.getint('ed_sampling_interval')
     rad['ed_sensor_id'] = rad_config.get('ed_sensor_id')
     rad['inttime'] = rad_config.getint('integration_time')
