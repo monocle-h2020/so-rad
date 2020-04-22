@@ -12,7 +12,7 @@ import time
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
-import initialisation
+from initialisation import motor_init
 import main_app
 
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     args = main_app.parse_args()
     conf = main_app.read_config(args.config_file)
     ports = list_ports.comports()
-    motor = initialisation.motor_init(conf['MOTOR'], ports)
+    motor = motor_init(conf['MOTOR'], ports)
 
     # Get the current motor pos and if not at HOME move it to HOME
     motor_pos = motor_func.get_motor_pos(motor['serial'])

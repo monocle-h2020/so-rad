@@ -11,18 +11,24 @@ Plymouth Marine Laboratory
 License: under development
 
 """
+import os
 import time
 import serial
 import serial.tools.list_ports as list_ports
-import RPi.GPIO as GPIO
 import logging
 from functions import gps_functions as gps_func
 from thread_managers import radiometer_manager
 from thread_managers import battery_manager
 from functions import db_functions
-
 log = logging.getLogger()   # report to root logger
-GPIO.setwarnings(False)
+
+if os.uname()[1] == 'raspberrypi':
+    import RPi.GPIO as GPIO
+    GPIO.setwarnings(False)
+else:
+    log.info("OS detected: {0}".format(os.uname()[1]))
+    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+
 
 def db_init(db_config):
     """set up and test sqlite database connection. Return dictionary with database items"""
