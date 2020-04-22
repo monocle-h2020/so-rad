@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Aug 21 09:22:46 2019
+A simple test to check GPS connectivity
+This test is specifically for a dual-GPS setup (likely obsolete soon!)
 
+Created on Wed Aug 21 09:22:46 2019
 @author: stsi
 """
+import os
+import time
+import sys
+import inspect
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 import initialisation
 import main_app
-import time
-import sys
 from thread_managers.gps_manager import GPSManager
 import RPi.GPIO as GPIO
 

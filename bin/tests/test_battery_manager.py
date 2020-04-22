@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Aug 21 09:22:46 2019
+A simple test to check connectivity to the solar charger and read current battery charge
 
+Created on Wed Aug 21 09:22:46 2019
 @author: stsi
 """
+import os
+import sys
+import time
+import inspect
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 import initialisation
 import main_app
-import time
-import sys
+
 
 if __name__ == '__main__':
     args = main_app.parse_args()
