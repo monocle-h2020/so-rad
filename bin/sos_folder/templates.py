@@ -4,7 +4,7 @@ Handler for the xml templates, both interrogating and using
 
 import re
 
-__templatePath = '../xml/templates/'
+__templatePath = 'templates/'
 
 def __getXmlAsString( template: str ) -> str:
     """ 
@@ -79,7 +79,7 @@ def getInsertSensorSoRad(values: dict ) -> str:
     if not __checkListKeys( getTemplateParams( "insertSensor.xml" ), values.keys(), True):
         return None
 
-    innerTemplate = renderSimpleTemplate( "partial/bb3-outputs.xml", values)
+    innerTemplate = renderSimpleTemplate( "partial/so-rad-outputs.xml", values)
 
     newDict = values.copy()
     newDict['xml-outputs'] = innerTemplate
@@ -90,12 +90,12 @@ def getInsertSensorSoRad(values: dict ) -> str:
 def constructTestDict( sensor: str ) -> dict:
 
     availableDicts = {
-        'bb3': {
+        'UniqueIDForTestingSOSWithSoRad': {
             'observableProperty': 'blob-of-water',
-            'offering' : 'my-bb3-sensor',
+            'offering' : 'my-sorad-sensor',
             'altitude' : '5',
             'feature'  : 'our-lake',
-            'procedure': 'our-bb3',
+            'procedure': 'our-sorad',
             'latitude' : '10',
             'longitude': '10'
         }

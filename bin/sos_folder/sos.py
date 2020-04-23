@@ -11,8 +11,8 @@ CALL_INSERT_RESULT          = 'insertResult.xml'
 DEFAULT_SEPARATOR_BLOCK = '@'
 DEFAULT_SEPARATOR_TOKEN = '#'
 
-import sos.templates as templates
-import sos.basic as basic
+import templates
+import basic
 
 def __makeCall( template: str, params: dict, useProxy: bool = False ) -> str:
 

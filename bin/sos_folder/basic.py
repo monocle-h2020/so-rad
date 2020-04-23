@@ -125,7 +125,6 @@ def makeCall( xml: str, name: str, useAuth: bool = False) -> str:
         url = sosCall
         
     response = ppSendRequest( url, xml, name )
-
     if response is not None:
 
         if not validateResponse( response ):

@@ -51,11 +51,11 @@
     <swe:Count definition="{procedure}_output_value_sun_azimuth">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}}_value_sun_elevation">
+  <sml:output name="{procedure}_value_sun_elevation">
     <swe:Count definition="{procedure}_output_sun_elevation">
     </swe:Count>
   </sml:output>
-   <sml:output name="{procedure}}_value__motor_temp">
+   <sml:output name="{procedure}_value__motor_temp">
     <swe:Count definition="{procedure}_output_motor_temp">
     </swe:Count>
   </sml:output>
@@ -99,4 +99,17 @@
     <swe:Count definition="{procedure}_output_n_rad_obs">
     </swe:Count>
   </sml:output>
+
+  <sml:output name="{procedure}_value_sensor_id">
+    <swe:Count definition="{procedure}_output_sensor_id">
+    </swe:Count>
+  </sml:output>
+  <sml:output name="{procedure}_value_integr_time">
+    <swe:Count definition="{procedure}_output_integr_time">
+    </swe:Count>
+  </sml:output>
+  <sml:output name="{procedure}_value_measurement">
+    <swe:Count definition="{procedure}_output_measurement">
+    </swe:Count>
+  </sml:output>  
 </sml:OutputList>
