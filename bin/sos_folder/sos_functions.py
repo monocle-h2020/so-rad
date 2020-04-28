@@ -1,5 +1,5 @@
 
-from sos import describeSensor, CALL_DESCRIBE_SENSOR
+from sos import describeSensor, CALL_DESCRIBE_SENSOR, getResultTemplate
 import templates, basic
 from templates import getInsertSensorSoRad
 from templates import constructTestDict
@@ -8,20 +8,31 @@ import configparser
 
 def ConnectToSOS(auth, sensor):
 
+    
     basic.authKey = auth
-    returnedResult = describeSensor(sensor, auth)
-    print(returnedResult)
-    if("InvalidParameterValue" in returnedResult):
-        
-        print("Sensor is not in SOS server.")
+
+    returnedResult = describeSensor("https://monocle-h2020.eu/SWE/Procedures/soradtest", auth)
+
+    if(returnedResult is None):
+        print("Nothing returned, potential issue with inserting sensor")
+    elif("InvalidParameterValue" in returnedResult):
+        print("Invalid procedure used, checking if sensor is in SOS server")
         print("Inserting sensor...")
-        sensorDict = constructTestDict(sensor)
+        sensorDict = constructTestDict("soradTestSensor")
         xml = getInsertSensorSoRad(sensorDict)
-        result = basic.makeCall( xml, sensorDict, auth )        
-    else:
-        print("I think sensor is in there")
-    # Describe sensor (check if sensor is there)
-    # If sensor not there, then insert sensor - take output template (pass in unique id (procedure)) (render simple template function)
+        result = basic.makeCall( xml, sensorDict, auth ) 
+        print(result)       
+    # print(result)
+    # elif(returnedResult is None):
+    #     print("Sensor is in SOS server")
+    
+    # value = getResultTemplate('my-sorad-sensor', 'blob-of-water')
+    # print(value)
+    # if("InvalidPropertyOfferingCombination" in value):
+    #     print("Result template not available.")
+    #     print("Inserting result template...")
+
+
     # Get result template (check if result template is there) (give unique name: unique string based on format of template)
     # Insert result template if not there
 

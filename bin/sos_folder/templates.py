@@ -90,12 +90,12 @@ def getInsertSensorSoRad(values: dict ) -> str:
 def constructTestDict( sensor: str ) -> dict:
 
     availableDicts = {
-        'UniqueIDForTestingSOSWithSoRad': {
+        'soradTestSensor': {
             'observableProperty': 'blob-of-water',
-            'offering' : 'my-sorad-sensor',
+            'offering' : 'the-sorad-sensor',
             'altitude' : '5',
             'feature'  : 'our-lake',
-            'procedure': 'our-sorad',
+            'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest',
             'latitude' : '10',
             'longitude': '10'
         }

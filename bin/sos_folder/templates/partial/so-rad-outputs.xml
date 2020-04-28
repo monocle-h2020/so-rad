@@ -1,114 +1,114 @@
 <sml:OutputList>
-  <sml:output name="{procedure}_value_pc_time">
+  <sml:output name="value_pc_time">
     <swe:Count definition="{procedure}_output_value_pc_time">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_gps1_time">
+  <sml:output name="value_gps1_time">
     <swe:Count definition="{procedure}_output_value_gps1_time">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_gps2_time">
+  <sml:output name="value_gps2_time">
     <swe:Count definition="{procedure}_output_value_gps2_time">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_gps1_fix">
+  <sml:output name="gps1_fix">
     <swe:Count definition="{procedure}_output_gps1_fix">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_gps2_fix">
+  <sml:output name="value_gps2_fix">
     <swe:Count definition="{procedure}_output_value_gps2_fix">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_gps1_lat">
+  <sml:output name="value_gps1_lat">
     <swe:Count definition="{procedure}_output_value_gps1_lat">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_gps1_long">
+  <sml:output name="value_gps1_long">
     <swe:Count definition="{procedure}_output_value_gps1_long">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_gps2_lat">
+  <sml:output name="gps2_lat">
     <swe:Count definition="{procedure}_output_gps2_lat">
     </swe:Count>
   </sml:output>
-    <sml:output name="{procedure}_value_gps2_long">
+    <sml:output name="value_gps2_long">
     <swe:Count definition="{procedure}_output_value_gps2_long">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_gps1_speed">
+  <sml:output name="value_gps1_speed">
     <swe:Count definition="{procedure}_output_value_gps1_speed">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_gps2_speed">
+  <sml:output name="gps2_speed">
     <swe:Count definition="{procedure}_output_gps2_speed">
     </swe:Count>
   </sml:output>
-    <sml:output name="{procedure}_value_platform_bearing">
+    <sml:output name="value_platform_bearing">
     <swe:Count definition="{procedure}_output_value_platform_bearing">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_sun_azimuth">
+  <sml:output name="value_sun_azimuth">
     <swe:Count definition="{procedure}_output_value_sun_azimuth">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_sun_elevation">
+  <sml:output name="value_sun_elevation">
     <swe:Count definition="{procedure}_output_sun_elevation">
     </swe:Count>
   </sml:output>
-   <sml:output name="{procedure}_value__motor_temp">
+   <sml:output name="value__motor_temp">
     <swe:Count definition="{procedure}_output_motor_temp">
     </swe:Count>
   </sml:output>
-    <sml:output name="{procedure}_value_driver_temp">
+    <sml:output name="value_driver_temp">
     <swe:Count definition="{procedure}_output_value_driver_temp">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_pi_cpu_temp">
+  <sml:output name="value_pi_cpu_temp">
     <swe:Count definition="{procedure}_output_value_pi_cpu_temp">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_tilt">
+  <sml:output name="value_tilt">
     <swe:Count definition="{procedure}_output_tilt">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_pitch">
+  <sml:output name="value_pitch">
     <swe:Count definition="{procedure}_output_value_pitch">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_roll">
+  <sml:output name="value_roll">
     <swe:Count definition="{procedure}_output_roll">
     </swe:Count>
   </sml:output>
-   <sml:output name="{procedure}_value_bearing_accuracy">
+   <sml:output name="value_bearing_accuracy">
     <swe:Count definition="{procedure}_output_bearing_accuracy">
     </swe:Count>
   </sml:output>
-    <sml:output name="{procedure}_value_sorad_version">
+    <sml:output name="value_sorad_version">
     <swe:Count definition="{procedure}_output_value_sorad_version">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_batt_v">
+  <sml:output name="value_batt_v">
     <swe:Count definition="{procedure}_output_value_batt_v">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_rel_hum">
+  <sml:output name="value_rel_hum">
     <swe:Count definition="{procedure}_output_rel_hum">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_n_rad_obs">
+  <sml:output name="value_n_rad_obs">
     <swe:Count definition="{procedure}_output_n_rad_obs">
     </swe:Count>
   </sml:output>
 
-  <sml:output name="{procedure}_value_sensor_id">
+  <sml:output name="value_sensor_id">
     <swe:Count definition="{procedure}_output_sensor_id">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_integr_time">
+  <sml:output name="value_integr_time">
     <swe:Count definition="{procedure}_output_integr_time">
     </swe:Count>
   </sml:output>
-  <sml:output name="{procedure}_value_measurement">
+  <sml:output name="value_measurement">
     <swe:Count definition="{procedure}_output_measurement">
     </swe:Count>
   </sml:output>  

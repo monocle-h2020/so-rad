@@ -116,7 +116,7 @@ def getSimpleCall( call ):
             ( call.startswith( 'delete' ) or call.startswith( 'insert' ))))
 
 def makeCall( xml: str, name: str, useAuth: bool = False) -> str:
-    
+    print(xml)
     if useAuth:
         # time to use the proxy
         url = proxyCall.format( authKey )
