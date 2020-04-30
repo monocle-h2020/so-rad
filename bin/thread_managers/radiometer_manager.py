@@ -101,10 +101,13 @@ class TriosManager(object):
         self.chns = [self.tc[k].TInfo.TID for k in self.sams]  # channel addressing
         self.sns = [self.tc[k].TInfo.serialn for k in self.sams]  # sensor ids
         try:
-            self.tc_ed = self.sns.index(self.config['ed_sensor_id'])  # index (in sams list) of the ed sensor
-        except:
-            log.warning("Ed sensor not found")
-            self.tc_ed = None
+            log.info(self.tc)
+            tc_ed_index = self.sns.index(self.config['ed_sensor_id'])  # index (in sams list) of the ed sensor
+            self.tk_ed = self.tk[tc_ed_index]
+        except Exception as err:
+            log.warning("Ed sensor not found (looking for {0}), got {1}".format(self.config['ed_sensor_id'], self.sns))
+            self.tk_ed = None
+            log.exception(err)
 
         if self.config['verbosity_com'] > 1:
             log.info("found SAM modules: {0}".format(list(zip(self.chns, self.sns))))
@@ -162,7 +165,10 @@ class TriosManager(object):
 
     def sample_ed(self, trigger_id):
         """this will trigger sampling only the sensor identified as the Ed sensor"""
-        edsam = self.sams[self.tc_ed]
+        edsam = self.tk_ed
+        if not isinstance(edsam, list):
+            edsam = [edsam]
+        log.info("Triggering Ed sensor = {0} ({1})".format(edsam, type(edsam)))
         return self.sample_all(trigger_id, sams_included=edsam)
 
     def sample_all(self, trigger_id, sams_included=None):

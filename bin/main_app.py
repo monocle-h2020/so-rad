@@ -6,7 +6,7 @@ Autonomous operation of hyperspectral radiometers with optional rotating measure
 
 Plymouth Marine Laboratory
 
-License: under development
+License: under development, please contact stsi at pml*ac*uk
 
 """
 import time
@@ -24,10 +24,11 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
-
+from numpy import nan, max
+# only import RPi libraries if running on a Pi (other environments can be used for unit testing)
 if not sys.platform.startswith('win'):
     if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
         import RPi.GPIO as GPIO
@@ -157,6 +158,7 @@ def init_all(conf):
     time.sleep(0.1)
 
     # # Start the GPS checker thread
+    # FIXME
     # gps_checker_manager = GPSChecker(gps_managers)
     # gps_checker_manager.start()
 
@@ -232,16 +234,275 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
     sys.exit(0)
 
 
+def update_gps_values(gps_managers, values):
+    """update the gps values to the latest available in the gps managers""" 
+    values['lat0'] = gps_managers[0].lat
+    values['lon0'] = gps_managers[0].lon
+    values['alt0'] = gps_managers[0].alt
+    values['dt'] = gps_managers[0].datetime
+    values['headMot'] = gps_managers[0].headMot
+    values['relPosHeading'] = gps_managers[0].relPosHeading
+    values['accHeading'] = gps_managers[0].accHeading
+    values['fix'] = gps_managers[0].fix
+    values['flags_headVehValid'] = gps_managers[0].flags_headVehValid
+    values['flags_diffSoln'] = gps_managers[0].flags_diffSoln
+    values['flags_gnssFixOK'] = gps_managers[0].flags_gnssFixOK
+    values['speed'] = gps_managers[0].speed
+    values['nsat0'] = gps_managers[0].satellite_number
+    if len(gps_managers) == 2:
+        values['nsat1'] = gps_managers[1].satellite_number
+        values['dt1'] = gps_managers[1].datetime
+
+    return values
+
+
+def format_log_message(counter, ready, values):
+    """construct a log message based on several system checks"""
+    checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
+    message = "[{0}] ".format(counter)
+    message += "Checks:  Bat {0} Pos {1} Head {2} Rad {3} Speed {4} ({5}) Sun {6} ({7})"\
+               .format(values['batt_voltage'], checks[ready['gps']],
+                       checks[ready['heading']], checks[ready['rad']],
+                       checks[ready['speed']], values['speed'],
+                       checks[ready['sun']], values['solar_el'])
+    message += "\n"
+    message += "[{10}] Heading: Sun {0} Mot {1} Veh {2} Acc: {3}) | fix: {4}, HeadOk: {5}, diffSolnOk: {6}, FixOk {7} | nSat [{8}|{9}] "\
+                .format(values['solar_az'], values['headMot'], values['relPosHeading'],
+                        values['accHeading'], values['fix'], values['flags_headVehValid'],
+                        values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], values['nsat1'], counter)
+
+    return message
+
+
+def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
+                  motor, battery, bat_manager, gpios, trigger_id, verbose):
+    """run one measurement cycle
+    
+    : counter               - measurement cycle number, included for logging
+    : conf                  - main configuration (parsed from file)
+    : sample                - main sampling settings configuration
+    : bat_manager           - battery manager instance
+    : gps_managers          - list of gps manager instances
+    : radiometry_manager    - radiometry manager instance
+    : rad                   - radiometry configuration
+    : battery               - battery management configuration
+    : motor                 - motor configuration
+    : pgios                 - gpio pins in use
+    
+    returns:
+    : trigger_id            - identifier of the last measurement (a datetime object)
+    """
+
+    log = logging.getLogger()
+  
+    # init dicts for all environment checks and latest sensor values
+    ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
+    values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
+              'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
+              'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'dt1': None, 'nsat0': None, 'nsat1': None,
+              'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
+              'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None}
+
+    use_rad = rad['n_sensors'] > 0
+
+    # Check whether platform bearing is fixed (set in config) or calculated from GPS
+    if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
+        ship_bearing_mean = conf['DEFAULT'].getint('fixed_bearing_deg')
+        bearing_fixed = True
+    else:
+        bearing_fixed = False
+
+    # Check battery charge - log special messages if required.
+    if battery['used']:
+        if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
+            message = format_log_message(counter, ready, values)
+            message += "Battery low, idling. Battery info: {1}".format(bat_manager)
+            log.warning(message)
+            return trigger_id  # always return last trigger id
+        elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
+            message = format_log_message(counter, ready, values)
+            message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
+            log.warning(message)
+            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            sys.exit(1)  
+        values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
+
+    # Check GPS environment
+    gps_heading_accuracy_limit = conf['GPS'].getfloat('gps_heading_accuracy_limit')
+    gps_protocol = conf['GPS'].get('protocol').lower()
+    ready['gps']  = check_gps(gps_managers, gps_protocol)
+    ready['heading'] = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
+    # Check radiometry environment
+    ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
+   
+    if ready['gps']:
+        # read latest gps info and calculate angles for motor
+        values = update_gps_values(gps_managers, values)
+        # time.sleep(2)  # not needed?
+        ready['speed'] = check_speed(sample, gps_managers)
+
+        # read motor position to see if it is ready
+        values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
+        if values['motor_pos'] is None:
+            ready['motor'] = False
+            message = format_log_message(counter, ready, values)
+            message += "Motor position not read."
+            log.warning(message)
+            return trigger_id
+
+        # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
+        if not bearing_fixed:
+            ready['heading'] = True
+            if conf['GPS'].get('n_gps') == 2:
+                from functions.compass_bearing import calculate_initial_compass_bearing
+                values['ship_bearing_mean'] = calculate_initial_compass_bearing(gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon)
+                #values['ship_bearing_mean'] = gps_checker_manager.mean_bearing
+            else:
+                values['ship_bearing_mean'] = gps_managers[0].heading
+
+        # collect latest GPS data
+        values = update_gps_values(gps_managers, values)
+
+        # Fetch sun variables
+        values['solar_az'], values['solar_el'],\
+            values['motor_angles'] = azi_func.calculate_positions(values['lat0'], values['lon0'],
+                                                                  values['alt0'], values['dt'],
+                                                                  values['ship_bearing_mean'], motor,
+                                                                  values['motor_pos'])  # TODO: just pass the values and motor dicts into this function
+
+        log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
+                 .format(values['solar_az'], values['solar_el'],
+                         values['motor_angles']['view_comp_ccw'], values['motor_angles']['view_comp_cw'],
+                         values['motor_angles']['ach_mot_ccw'], values['motor_angles']['ach_mot_cw'],
+                         values['motor_angles']['target_motor_pos_deg'],
+                         values['motor_angles']['target_motor_pos_rel_az_deg'], counter))
+
+        # Check if the sun is in a suitable position
+        ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
+
+        # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
+        # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
+        if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
+                                                                                                                  and (ready['speed'])\
+                                                                                                                  and (ready['heading']):
+            log.info("Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step']))
+            # Rotate the motor to the new position
+            target_pos = values['motor_angles']['target_motor_pos_step']
+            motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
+            moving = True
+            t0 = time.clock()  # timeout reference
+            while moving and time.clock()-t0 < 5:
+                moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
+                if moving is None:
+                    moving = True
+                log.info("..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos))
+                if time.clock()-t0 > 5:
+                    log.warning("Motor movement timed out (this is allowed)")
+                time.sleep(2)
+
+    # If all checks are good, take radiometry measurements
+    if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading']]):
+        # Get the current time of the computer as a unique trigger id
+        trigger_id['all_sensors'] = datetime.datetime.now()
+        # collect latest GPS data now that a measurement will be triggered
+        values = update_gps_values(gps_managers, values)
+
+        # TODO: the gps dicts are really not needed since we can pass the values dict into the database.
+        gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
+        if len(gps_managers) == 2:
+            gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+            gps2_manager_dict['used'] = True
+        else:
+            gps2_manager_dict = {}
+            for key in gps1_manager_dict.keys():
+                gps2_manager_dict[key] = None
+            gps2_manager_dict['used'] = False
+
+        # Collect radiometry data and splice together
+        spec_data = []
+        trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
+        for n in range(len(sids)):
+            spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
+
+        # If db is used, commit the data to it
+        if db_dict['used']:
+            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
+            log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
+   
+    # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
+    elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
+        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-90])):
+        trigger_id['ed_sensor'] = datetime.datetime.now()
+        
+        values = update_gps_values(gps_managers, values) # collect latest GPS data
+        # TODO remove use of these dicts, pass value dict to db instead
+        gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
+        if len(gps_managers) == 2:
+            gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+            gps2_manager_dict['used'] = True
+        else:
+            gps2_manager_dict = {}
+            for key in gps1_manager_dict.keys():
+                gps2_manager_dict[key] = None
+            gps2_manager_dict['used'] = False
+
+        # trigger Ed
+        spec_data = []
+        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
+        for n in range(len(sids)):
+            spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
+
+        # If db is used, commit the data to it
+        if db_dict['used']:
+            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
+
+        log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
+
+    else:
+        trigger = False
+        last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
+        log.debug("last commit of any kind: {0}".format(last_any_commit))
+        seconds_elapsed_since_last_any_commit = abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp())
+        log.debug("seconds since last commit: {0}".format(seconds_elapsed_since_last_any_commit))
+        if seconds_elapsed_since_last_any_commit > 60:
+            trigger_id['gps_location'] = datetime.datetime.now()
+            # record metadata and GPS data at least every minute
+            values = update_gps_values(gps_managers, values) # collect latest GPS data
+            # TODO remove use of these dicts, pass value dict to db instead
+            gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
+            if len(gps_managers) == 2:
+                gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
+                gps2_manager_dict['used'] = True
+            else:
+                gps2_manager_dict = {}
+                for key in gps1_manager_dict.keys():
+                    gps2_manager_dict[key] = None
+                gps2_manager_dict['used'] = False
+          
+            if db_dict['used']:
+                db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
+                                      trigger_id['gps_location'], values['ship_bearing_mean'],
+                                      values['solar_az'], values['solar_el'], spectra_data=None)
+                log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+
+  
+    message = format_log_message(counter, ready, values)
+    log.info(message)
+    return trigger_id
+
+
 def run():
     """ main program loop.
     Reads config file to set up environment then starts various threads to monitor inputs.
     Monitors for a keyboard interrupt to provide a clean exit where possible.
     """
-
     # Parse the command line arguments for the config file
     args = parse_args()
     conf = read_config(args.config_file)
-
     # start logging here
     log = init_logger(conf['LOGGING'])
     #log = logging.getLogger()
@@ -257,190 +518,22 @@ def run():
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
-    gps_heading_accuracy_limit = conf['GPS'].getfloat('gps_heading_accuracy_limit')
-    gps_protocol = conf['GPS'].get('protocol').lower()
 
     log.info("===Initialisation complete===")
 
-    last_commit_time = datetime.datetime.now()
-    trigger_id = None
-    spec_data = ""
-    ship_bearing_mean = None
-    solar_az = None
-    solar_el = None
-    use_rad = rad['n_sensors'] > 0
+    trigger_id = {'all_sensors': datetime.datetime.now(),
+                  'ed_sensor': datetime.datetime.now(),
+                  'gps_location': datetime.datetime.now()}  # stores when data were last recorded
 
-    # Check if the program is using a fixed bearing or calculated one
-    if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
-        ship_bearing_mean = conf['DEFAULT'].getint('fixed_bearing_deg')
-        bearing_fixed = True
-    else:
-        bearing_fixed = False
-
-    checks = {True: "1", False: "0"}
     # Repeat indefinitely until program closed
     counter = 0
+    # TODO: replace with some sort of scheduler for better clock synchronization
+    # TODO: periodically update config (timings/limits only)
     while True:
         counter += 1
-        message = "[{0}] ".format(counter)
         try:
-            # Check battery charge
-            if battery['used']:
-                if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
-                    message += "Battery low, idling. Battery info: {0}".format(bat_manager)
-                    log.info(message)
-                    time.sleep(main_check_cycle_sec)
-                    continue
-                elif check_battery(bat_manager, battery) == 2:  # 0 = OK, 1 = LOW, 2 = CRITICAL
-                    message += "Battery level CRITICAL, shutting down. Battery info: {0}".format(bat_manager)
-                    log.info(message)
-                    stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)
-                else:
-                    message += "Bat {0}, ".format(bat_manager.batt_voltage)
-
-            # reset to default
-            speed_ready = False
-            motor_ready = False
-            sun_suitable = False
-            rad_ready = False
-            heading_ok = False
-
-            # Check if the GPS sensors have met conditions
-            gps_ready = check_gps(gps_managers, gps_protocol)
-            message += "Pos {0}, ".format(checks[gps_ready])
-            heading_ok = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
-            message += "Head {0}, ".format(checks[heading_ok])
-
-            # Check if the radiometers have met conditions
-            rad_ready = check_sensors(rad, trigger_id, radiometry_manager)
-            message += "Rad {0}, ".format(checks[rad_ready])
-
-            if gps_ready:
-                # read latest gps info and calculate angles for motor
-                speed = gps_managers[0].speed
-                nsat0 = gps_managers[0].satellite_number
-                if len(gps_managers) == 2:
-                    nsat1 = gps_managers[1].satellite_number
-                else:
-                    nsat1 = None
-                time.sleep(2)
-                speed_ready = check_speed(sample, gps_managers)
-                message += "Speed {0}, ".format(checks[speed_ready])
-
-                # Get the current motor pos to check if it's ready
-                motor_pos = motor_func.get_motor_pos(motor['serial'])
-                if motor_pos is None:
-                    message += "Motor position not read. NotReady: {0}".format(datetime.datetime.now())
-                    log.info(message)
-                    time.sleep(main_check_cycle_sec)
-                    continue
-
-                # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
-                if not bearing_fixed:
-                    heading_ok = True
-                    if len(gps_managers) == 2:
-                        ship_bearing_mean = gps_checker_manager.mean_bearing
-                    else:
-                        ship_bearing_mean = gps_managers[0].heading
-
-                lat0 = gps_managers[0].lat
-                lon0 = gps_managers[0].lon
-                alt0 = gps_managers[0].alt
-                dt = gps_managers[0].datetime
-                #dt1 = gps_managers[1].datetime
-                log.info("Heading: Mot {0} Veh {1} Acc: {2})| fix: {3} | HFlag: {4} | diffSoln: {5} | gnssFix {6}"\
-                    .format(gps_managers[0].headMot, gps_managers[0].relPosHeading,
-                            gps_managers[0].accHeading, gps_managers[0].fix,
-                            gps_managers[0].flags_headVehValid,
-                            gps_managers[0].flags_diffSoln, gps_managers[0].flags_gnssFixOK))
-                # Fetch sun variables
-                solar_az, solar_el, motor_angles = azi_func.calculate_positions(lat0, lon0, alt0, dt,
-                                                                                ship_bearing_mean, motor, motor_pos)
-                log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
-                         .format(solar_az, solar_el, motor_angles['view_comp_ccw'], motor_angles['view_comp_cw'],
-                                 motor_angles['ach_mot_ccw'], motor_angles['ach_mot_cw'],
-                                 motor_angles['target_motor_pos_deg'], motor_angles['target_motor_pos_rel_az_deg'], counter))
-
-                message += "ShBe: {0:1.2f}, SuAz: {1:1.2f}, SuEl: {2:1.2f}. Speed {3:1.2f} nSat [{4}|{5}] "\
-                           .format(ship_bearing_mean, solar_az, solar_el, speed, nsat0, nsat1)
-                # Check if the sun is in a suitable position
-                sun_suitable = check_sun(sample, solar_az, solar_el)
-
-                # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
-                if (sun_suitable and (abs(motor_angles['target_motor_pos_step'] - motor_pos) > motor['step_thresh'])) and (speed_ready) and (heading_ok):
-                    log.info("Adjust motor angle ({0} --> {1})".format(motor_pos, motor_angles['target_motor_pos_step']))
-                    # Rotate the motor to the new position
-                    target_pos = motor_angles['target_motor_pos_step']
-                    motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
-                    moving = True
-                    t0 = time.clock()  # timeout reference
-                    while moving and time.clock()-t0 < 5:
-                        moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
-                        if moving is None:
-                            moving = True
-                        log.info("..moving motor.. {0} --> {1}".format(motor_pos, target_pos))
-                        time.sleep(2)
-
-            else:
-                message += "ShBe: None, SuAz: None, SuEl: None, Speed: None. "
-                sun_suitable = False
-
-
-            # If all checks are good, take radiometry measurements
-            if all([gps_ready, rad_ready, sun_suitable, speed_ready, heading_ok]):
-                # Get the current time of the computer and data from the GPS sensor managers
-                trigger_id = datetime.datetime.now()
-                gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-                if len(gps_managers) == 2:
-                    gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-                    gps2_manager_dict['used'] = True
-                else:
-                    gps2_manager_dict = {}
-                    for key in gps1_manager_dict.keys():
-                        gps2_manager_dict[key] = None
-                    gps2_manager_dict['used'] = False
-
-                # Collect radiometry data and splice together
-                spec_data = []
-                if use_rad:
-                    trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
-                    for n in range(len(sids)):
-                        spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
-
-                # If db is used, commit the data to it
-                if db_dict['used']:
-                    db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                                              trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data)
-                    last_commit_time = datetime.datetime.now()
-                    message += "Trig: {0} [{1}]".format(trigger_id, db_id)
-
-            # If not enough time has passed since the last measurement, wait
-            elif abs(datetime.datetime.now().timestamp() - last_commit_time.timestamp()) < 60:
-                # do not execute measurement, do not record metadata
-                message += "Not Ready"
-
-            else:
-                # record metadata and GPS data if some checks aren't passed
-                gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-                if len(gps_managers) == 2:
-                    gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-                    gps2_manager_dict['used'] = True
-                else:
-                    gps2_manager_dict = {}
-                    for key in gps1_manager_dict.keys():
-                        gps2_manager_dict[key] = None
-                    gps2_manager_dict['used'] = False
-
-                no_trigger_id = datetime.datetime.now()
-                spec_data = None
-
-                if db_dict['used']:
-                    db_id = db_func.commit_db(db_dict, args.verbose, gps1_manager_dict, gps2_manager_dict,
-                                              no_trigger_id, ship_bearing_mean, solar_az, solar_el, spec_data)
-                    last_commit_time = datetime.datetime.now()
-                    message += "NotReady | GPS Recorded: {0} [{1}]".format(last_commit_time, db_id)
-
-            log.info(message)
+            run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
+                          motor, battery, bat_manager, gpios, trigger_id, args.verbose)
             time.sleep(main_check_cycle_sec)
 
         except KeyboardInterrupt:

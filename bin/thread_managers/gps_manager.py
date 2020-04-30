@@ -203,7 +203,7 @@ class GPSParser(object):
     @staticmethod
     def parse_hchdg(hchdg_string):
         """
-        Parses a HCHDG sentance.
+        Parses a HCHDG sentence.
 
         :param hchdg_string: NMEA Sentance
         :type hchdg_string: str
@@ -247,7 +247,7 @@ class GPSParser(object):
     @staticmethod
     def parse_gpgsa(gpgsa_string):
         """
-        Parses a GPGSA sentance.
+        Parses a GPGSA sentence.
 
         :param gpgsa_string: NMEA Sentance
         :type gpgsa_string: str
@@ -449,9 +449,7 @@ def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, co
                     dataDictionary['flag_diffSolN'] = data[26][29]
                     dataDictionary['flag_gnssFixOK'] = data[26][30]
 
-
                 else:
-
                     dataDictionary['iTOW'] = data[0]
                     dataDictionary['year'] = data[1]
                     dataDictionary['month'] = data[2]
@@ -490,13 +488,11 @@ def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, co
                     dataDictionary['magDec'] = data[35]
                     dataDictionary['magAcc'] = data[36]
 
-
                 if counter > 100:
                     log.debug("After 100 passes, bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
                     counter = 0
                 else:
                     log.debug("Bytes in GPS buffer: {0}, Port open: {1}".format(serialReader.in_waiting, serialReader.isOpen()))
-
 
                 # Set up memcache if needed
                 # client = base.Client(('localhost', 11211))
@@ -708,8 +704,7 @@ class RTKUBX(object):
         self.relPosLength = None
 
         # Heading
-        self.relPosHeading = None
-        
+        self.relPosHeading = None 
         self.reserved2_1 = None
         self.reserved2_2 = None
         self.reserved2_3 = None
@@ -725,7 +720,6 @@ class RTKUBX(object):
 
         # Heading Accuracy
         self.accHeading = None
-
         self.reserved3_1 = None
         self.reserved3_2 = None
         self.reserved3_3 = None
@@ -826,8 +820,6 @@ class RTKUBX(object):
             if self.watchdog is not None:
                 self.watchdog.reset()
 
-            
-
             # data for message UBX-NAV-PVT
             self.iTOW = gps_dict['iTOW']
             self.year = gps_dict['year']
@@ -890,7 +882,6 @@ class RTKUBX(object):
             self.valid_validTime = int(gps_dict['valid'][6])
             self.valid_validDate = int(gps_dict['valid'][7])
 
-
             # relposned message data
             self.version = gps_dict['version']
             self.reserved1 = gps_dict['reserved1']
@@ -941,7 +932,7 @@ class RTKUBX(object):
             self.update_counter += 1
 
             if self.update_counter % 10 == 0:
-                log.info("GPS update: PC time: {0}, GPS time: {1}".format(self.last_update.isoformat(), self.datetime.isoformat()))
+                log.debug("GPS update: PC time: {0}, GPS time: {1}".format(self.last_update.isoformat(), self.datetime.isoformat()))
             else:
                 log.debug("GPS update: PC time: {0}, GPS time: {1}".format(self.last_update.isoformat(), self.datetime.isoformat()))
 
