@@ -11,12 +11,21 @@ Plymouth Marine Laboratory
 License: under development
 
 """
+import os
+import sys
 import time
 import datetime
 import logging
-import RPi.GPIO as GPIO
 
 log = logging.getLogger()   # report to root logger
+
+if not sys.platform.startswith('win'):
+    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
+        import RPi.GPIO as GPIO
+else:
+    log.info("OS detected: {0}".format(sys.platform))
+    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+
 
 
 class TriosManager(object):

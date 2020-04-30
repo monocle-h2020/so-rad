@@ -12,6 +12,7 @@ License: under development
 
 """
 import os
+import sys
 import time
 import serial
 import serial.tools.list_ports as list_ports
@@ -22,11 +23,12 @@ from thread_managers import battery_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
-if os.uname()[1] == 'raspberrypi':
-    import RPi.GPIO as GPIO
-    GPIO.setwarnings(False)
+if not sys.platform.startswith('win'):
+    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
+        import RPi.GPIO as GPIO
+        GPIO.setwarnings(False)
 else:
-    log.info("OS detected: {0}".format(os.uname()[1]))
+    log.info("OS detected: {0}".format(sys.platform))
     log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
 
 
@@ -72,16 +74,21 @@ def motor_init(motor_config, ports):
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.getint('steps_per_degree'))
 
-    # If port autodetect is wanted, look for what port has the identifying string also provided
+    # If port autodetect is set look for what port has the matching identification string
+    log.info("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))
+    print("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))
+
     if motor_config.getboolean('port_autodetect'):
         port_autodetect_string = motor_config.get('port_autodetect_string')
         for port, desc, hwid in sorted(ports):
+            log.info("port info: {0} {1} {2}".format(port, desc, hwid))
             if (desc == port_autodetect_string):
                 motor['port'] = port
-                log.info("Motor using port: {0}".format(port))
+                log.info("Motor auto-detected on port: {0}".format(port))
     else:
-        assert motor_config.get('port_default').lower() is not None
+        assert motor_config.get('port_default') not in [None, 'none', 'None']
         motor['port'] = motor_config.get('port_default')
+        log.info("Motor manually set to port: {0}".format(motor['port']))
 
     # Create a serial object for the motor port
     if motor['port'] is not None:

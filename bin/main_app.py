@@ -15,7 +15,6 @@ import threading
 import os
 import sys
 import datetime
-import RPi.GPIO as GPIO
 import configparser
 import argparse
 import initialisation
@@ -28,6 +27,10 @@ import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
+
+if not sys.platform.startswith('win'):
+    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
+        import RPi.GPIO as GPIO
 
 
 def parse_args():
