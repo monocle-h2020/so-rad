@@ -7,6 +7,7 @@ CALL_GET_RESULT_TEMPLATE    = 'getResultTemplate.xml'
 CALL_INSERT_SENSOR          = 'insertSensor.xml'
 CALL_INSERT_RESULT_TEMPLATE = 'insertResultTemplate.xml'
 CALL_INSERT_RESULT          = 'insertResult.xml'
+CALL_DELETE_SENSOR          = 'deleteSensor.xml'
 
 DEFAULT_SEPARATOR_BLOCK = '@'
 DEFAULT_SEPARATOR_TOKEN = '#'
@@ -66,6 +67,28 @@ def insertResult( template: str, values: list ) -> str:
         'resultValues' : resultValues }
     return __makeCall( CALL_INSERT_RESULT, params, True )
 
-def insertResultTemplate( template: str, identifier: str, offering: str, observedProperty ) -> str:
+def insertResultTemplate(identifier, offering, observedProperty, useProxy) -> str:
+#template: str, identifier: str, offering: str, observedProperty
 
-    raise NotImplementedError
+    from templates import checkDictValues, constructResultTemplateDict
+    dictValues = constructResultTemplateDict(identifier, offering, observedProperty)
+    parametersExist = checkDictValues(dictValues)
+    if(parametersExist is True):
+        body = templates.renderSimpleTemplate( CALL_INSERT_RESULT_TEMPLATE, dictValues ) 
+        #print(body)
+        response = basic.makeCall( body, CALL_INSERT_RESULT_TEMPLATE, useProxy )  
+    else:
+        print("Missing template parameters, please check you have set up the dictionary correctly.")
+        
+    return response
+
+
+def deleteSensor(procedure, useProxy) -> str:
+    """Function to delete a sensor in SOS"""
+    tempDictionary = {
+        "procedure": procedure
+    }
+    body = templates.renderSimpleTemplate(CALL_DELETE_SENSOR, tempDictionary)
+    #print(body)
+    response = basic.makeCall( body, CALL_DELETE_SENSOR, useProxy ) 
+    print(response)

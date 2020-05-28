@@ -88,16 +88,15 @@ def getInsertSensorSoRad(values: dict ) -> str:
 
 
 def constructTestDict( sensor: str ) -> dict:
-
     availableDicts = {
-        'soradTestSensor': {
-            'observableProperty': 'blob-of-water',
-            'offering' : 'the-sorad-sensor',
+        'soradTestSensor5': {
+            'observableProperty': 'Lake5',
+            'offering' : 'sorad-test-sensor5',
             'altitude' : '5',
-            'feature'  : 'our-lake',
-            'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest',
-            'latitude' : '10',
-            'longitude': '10'
+            'feature'  : 'pml-lake5',
+            'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest5',
+            'latitude' : '5',
+            'longitude': '5'
         }
     }
 
@@ -105,3 +104,19 @@ def constructTestDict( sensor: str ) -> dict:
         raise ValueError( "this sensor has not been defined" )
         
     return availableDicts[sensor]
+
+def constructResultTemplateDict(identifier, offering, observedProperty):
+    testDict = {
+        'identifier': identifier,
+        'offering': offering,
+        'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest5',
+        'observedProperty': 'Lake5'
+    }
+    return testDict
+
+def checkDictValues(values: dict):
+
+    if not __checkListKeys( getTemplateParams( "insertResultTemplate.xml" ), values.keys(), True):
+        return None
+    else:
+        return True

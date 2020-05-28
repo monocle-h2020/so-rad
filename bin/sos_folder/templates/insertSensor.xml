@@ -48,7 +48,7 @@
             <sml:inputs>
                 <sml:InputList>
                     <sml:input name="{observableProperty}">
-                        <sml:ObservableProperty definition="{observableProperty}"/>
+                        <sml:ObservableProperty definition="https://monocle-h2020.eu/SWE/observableProperty/{observableProperty}"/>
                     </sml:input>
                 </sml:InputList>
             </sml:inputs>

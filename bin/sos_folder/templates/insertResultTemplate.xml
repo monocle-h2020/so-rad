@@ -42,7 +42,7 @@
             </sos:observationTemplate>
             <sos:resultStructure>
                 <swe:DataRecord>
-                    <swe:field name="phenomenonTime">
+                    <swe:field name="Lake2">
                         <swe:TimeRange definition="http://www.opengis.net/def/property/OGC/0/PhenomenonTime">
                             <swe:uom xlink:href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"/>
                         </swe:TimeRange>
