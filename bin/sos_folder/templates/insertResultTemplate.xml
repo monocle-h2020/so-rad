@@ -42,7 +42,7 @@
             </sos:observationTemplate>
             <sos:resultStructure>
                 <swe:DataRecord>
-                    <swe:field name="Lake2">
+                     <swe:field name="Lake6">
                         <swe:TimeRange definition="http://www.opengis.net/def/property/OGC/0/PhenomenonTime">
                             <swe:uom xlink:href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"/>
                         </swe:TimeRange>
@@ -53,7 +53,7 @@
                         </swe:Time>
                     </swe:field>
                     <swe:field name="monocle-h2020-example-input-property-1">
-                        <swe:Count definition="http://monocle-h2020.eu/example/observableProperty/example/1/output/1"></swe:Count>
+                        <swe:Count definition="Lake6"></swe:Count>
                     </swe:field>
                 </swe:DataRecord>
             </sos:resultStructure>

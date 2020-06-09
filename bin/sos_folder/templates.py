@@ -89,14 +89,14 @@ def getInsertSensorSoRad(values: dict ) -> str:
 
 def constructTestDict( sensor: str ) -> dict:
     availableDicts = {
-        'soradTestSensor5': {
-            'observableProperty': 'Lake5',
-            'offering' : 'sorad-test-sensor5',
-            'altitude' : '5',
-            'feature'  : 'pml-lake5',
-            'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest5',
-            'latitude' : '5',
-            'longitude': '5'
+        'soradTestSensor6': {
+            'observableProperty': 'Lake6',
+            'offering' : 'sorad-test-sensor6',
+            'altitude' : '6',
+            'feature'  : 'pml-lake6',
+            'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest6',
+            'latitude' : '6',
+            'longitude': '6'
         }
     }
 
@@ -109,8 +109,8 @@ def constructResultTemplateDict(identifier, offering, observedProperty):
     testDict = {
         'identifier': identifier,
         'offering': offering,
-        'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest5',
-        'observedProperty': 'Lake5'
+        'procedure': 'https://monocle-h2020.eu/SWE/Procedures/soradtest6',
+        'observedProperty': 'Lake6'
     }
     return testDict
 

@@ -79,7 +79,6 @@ def insertResultTemplate(identifier, offering, observedProperty, useProxy) -> st
         response = basic.makeCall( body, CALL_INSERT_RESULT_TEMPLATE, useProxy )  
     else:
         print("Missing template parameters, please check you have set up the dictionary correctly.")
-        
     return response
 
 

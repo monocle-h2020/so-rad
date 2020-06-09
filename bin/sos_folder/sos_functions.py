@@ -6,17 +6,17 @@ from templates import constructTestDict
 import configparser
 
 
-def CheckAndInsertResultTemplate(identifier, offering, observedProperty):
+def CheckAndInsertResultTemplate(identifier, offering, observedProperty, auth):
     """
     This checks if the result template exists in SOS by calling GetResultTemplate
-    If the returned result contains invalid flags then that signals the template does not exist.
+    If the returned response contains invalid flags then that signals the template does not exist.
     An attempt will then be made to insert the result template using the provided parameters.
     """
     print("Checking if result template is uploaded.")
     print("Fetching result template...")
 
     resultTemplate = getResultTemplate(identifier, observedProperty)
-    #print(resultTemplate)
+    # print(checkResultTemplate)
 
     #resultTemplate = getResultTemplate('sorad-test-sensor5', 'https://monocle-h2020.eu/SWE/observableProperty/Lake4')
     if("InvalidParameterValue" in resultTemplate or "InvalidPropertyOfferingCombination" in resultTemplate):
@@ -24,7 +24,6 @@ def CheckAndInsertResultTemplate(identifier, offering, observedProperty):
         resultTemplate = insertResultTemplate(identifier, offering, observedProperty, auth)
     else:
         print("Result template exists:")
-    print(resultTemplate)
     return resultTemplate
 
 
@@ -33,7 +32,7 @@ def ConnectToSOS(auth, sensor):
     
     basic.authKey = auth
 
-    #deleteSensor('https://monocle-h2020.eu/SWE/Procedures/soradtest3', basic.authKey)
+    #deleteSensor('https://monocle-h2020.eu/SWE/procedures/soradtest5', basic.authKey)
     #insertResultTemplate('soradTestSensor', 'the-sorad-sensor', 'blob-of-water', auth)
     
 
@@ -47,10 +46,7 @@ def ConnectToSOS(auth, sensor):
     # print(returnedResult)
 
 
-
-
-
-    returnedResult = describeSensor("https://monocle-h2020.eu/SWE/Procedures/soradtest5", auth)
+    returnedResult = describeSensor("https://monocle-h2020.eu/SWE/Procedures/soradtest6", auth)
     if(returnedResult is None):
         print("Nothing returned, potential issue when inserting sensor step was carried out.")
     elif("InvalidParameterValue" in returnedResult):
@@ -61,21 +57,21 @@ def ConnectToSOS(auth, sensor):
         xml = getInsertSensorSoRad(sensorDict)
         #print(xml)
         result = basic.makeCall( xml, sensorDict, auth ) 
-        #print(result)
+        print(result)
 
-        returnedResult = describeSensor("https://monocle-h2020.eu/SWE/Procedures/soradtest5", auth)
-        
+        returnedResult = describeSensor("https://monocle-h2020.eu/SWE/procedures/soradtest6", auth)
+        #print(returnedResult)
         if("InvalidParameterValue" in returnedResult or returnedResult is None):
             print("Sensor insert failed, please check your template settings.")
         elif("The offering with the identifier" in result and "still exists in this service" in result and "not allowed to insert more than one procedure to an offering" in result):
             print("Sensor is already in SOS server, try checking your sensor values.")
         else:
-            returnedTemplate = CheckAndInsertResultTemplate('soradTestSensor5', 'sorad-test-sensor5', 'Lake5')
-            #print(returnedResult)
+            returnedTemplate = CheckAndInsertResultTemplate('https://monocle-h2020.eu/SWE/procedures/soradtest6', 'sorad-test-sensor6', 'https://monocle-h2020.eu/SWE/observableProperty/Lake6', auth)
+            print(returnedTemplate)
     else:
         print("Sensor is in SOS.")
-        returnedTemplate = CheckAndInsertResultTemplate('soradTestSensor5', 'sorad-test-sensor5', 'Lake5')
-        print(returnedResult)
+        returnedTemplate = CheckAndInsertResultTemplate('https://monocle-h2020.eu/SWE/procedures/soradtest6', 'sorad-test-sensor6', 'https://monocle-h2020.eu/SWE/observableProperty/Lake6', auth)
+        print(returnedTemplate)
         
 
 def SendToSOS():
