@@ -22,7 +22,7 @@
                     <om:type xlink:href="http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_CountObservation"/>
                     <om:phenomenonTime nilReason="template"/>
                     <om:resultTime     nilReason="template"/>
-                    <om:procedure xlink:href="{procedure}"/>
+                    <om:procedure xlink:href="https://monocle-h2020.eu/SWE/Procedures/{procedure}"/>
                     <om:observedProperty xlink:href="{observedProperty}"/>
                     <om:featureOfInterest>
                         <sams:SF_SpatialSamplingFeature gml:id="sf_for_example_featureOfInterest">
@@ -42,7 +42,7 @@
             </sos:observationTemplate>
             <sos:resultStructure>
                 <swe:DataRecord>
-                     <swe:field name="Lake6">
+                     <swe:field name="{observedProperty}">
                         <swe:TimeRange definition="http://www.opengis.net/def/property/OGC/0/PhenomenonTime">
                             <swe:uom xlink:href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"/>
                         </swe:TimeRange>
@@ -53,7 +53,7 @@
                         </swe:Time>
                     </swe:field>
                     <swe:field name="monocle-h2020-example-input-property-1">
-                        <swe:Count definition="Lake6"></swe:Count>
+                        <swe:Count definition="{observedProperty}"></swe:Count>
                     </swe:field>
                 </swe:DataRecord>
             </sos:resultStructure>

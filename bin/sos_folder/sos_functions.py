@@ -18,7 +18,6 @@ def CheckAndInsertResultTemplate(identifier, offering, observedProperty, auth):
     resultTemplate = getResultTemplate(identifier, observedProperty)
     # print(checkResultTemplate)
 
-    #resultTemplate = getResultTemplate('sorad-test-sensor5', 'https://monocle-h2020.eu/SWE/observableProperty/Lake4')
     if("InvalidParameterValue" in resultTemplate or "InvalidPropertyOfferingCombination" in resultTemplate):
         print("No template found, inserting template.")
         resultTemplate = insertResultTemplate(identifier, offering, observedProperty, auth)
@@ -27,52 +26,55 @@ def CheckAndInsertResultTemplate(identifier, offering, observedProperty, auth):
     return resultTemplate
 
 
-def ConnectToSOS(auth, sensor):
+def DeleteSensor(procedure, auth):
+    response = deleteSensor(procedure, auth)
+    if("the parameter 'procedure' is invalid" in response):
+        print("Procedure parameter was invalid, please check your values.")
+    else:
+        print("Sensor successfully deleted.")
 
-    
+def ConnectToSOS(auth, sensor, observableProperty, offering, altitude, feature, procedure, latitude, longitude):
+
     basic.authKey = auth
 
-    #deleteSensor('https://monocle-h2020.eu/SWE/procedures/soradtest5', basic.authKey)
-    #insertResultTemplate('soradTestSensor', 'the-sorad-sensor', 'blob-of-water', auth)
-    
+    deleteSensor(procedure, basic.authKey)    
 
-    # sensorDict = constructTestDict(sensor)
-    # xml = getInsertSensorSoRad(sensorDict)
-    # print(xml)
-    # result = basic.makeCall( xml, sensorDict, auth ) 
-    # print(result)
-
-    # returnedResult = describeSensor("https://monocle-h2020.eu/SWE/Procedures/soradtest5", auth)
-    # print(returnedResult)
-
-
-    returnedResult = describeSensor("https://monocle-h2020.eu/SWE/Procedures/soradtest6", auth)
+    returnedResult = describeSensor(procedure, auth)
     if(returnedResult is None):
         print("Nothing returned, potential issue when inserting sensor step was carried out.")
     elif("InvalidParameterValue" in returnedResult):
         print("Invalid procedure used, checking if sensor is in SOS server.")
         print("Inserting sensor...")
 
-        sensorDict = constructTestDict(sensor)
+        sensorDict = constructTestDict(sensor, observableProperty, offering, altitude, feature, procedure, latitude, longitude)
         xml = getInsertSensorSoRad(sensorDict)
         #print(xml)
         result = basic.makeCall( xml, sensorDict, auth ) 
-        print(result)
+        #print(result)
 
-        returnedResult = describeSensor("https://monocle-h2020.eu/SWE/procedures/soradtest6", auth)
+        returnedResult = describeSensor(procedure, auth)
         #print(returnedResult)
         if("InvalidParameterValue" in returnedResult or returnedResult is None):
             print("Sensor insert failed, please check your template settings.")
         elif("The offering with the identifier" in result and "still exists in this service" in result and "not allowed to insert more than one procedure to an offering" in result):
             print("Sensor is already in SOS server, try checking your sensor values.")
         else:
-            returnedTemplate = CheckAndInsertResultTemplate('https://monocle-h2020.eu/SWE/procedures/soradtest6', 'sorad-test-sensor6', 'https://monocle-h2020.eu/SWE/observableProperty/Lake6', auth)
-            print(returnedTemplate)
+            print("Insert sensor was successful.")
+            returnedTemplate = CheckAndInsertResultTemplate(procedure, offering, observableProperty, auth)
+            if("<ns0:acceptedTemplate>" in returnedTemplate):
+                print("Template successfully inserted.")
+            else:
+                print("Template not inserted successfully, please check your template parameters.")
+                print(returnedTemplate)
     else:
         print("Sensor is in SOS.")
-        returnedTemplate = CheckAndInsertResultTemplate('https://monocle-h2020.eu/SWE/procedures/soradtest6', 'sorad-test-sensor6', 'https://monocle-h2020.eu/SWE/observableProperty/Lake6', auth)
-        print(returnedTemplate)
-        
+        returnedTemplate = CheckAndInsertResultTemplate(procedure, offering, observableProperty, auth)
+        if("<ns0:acceptedTemplate>" in returnedTemplate):
+            print("Template successfully inserted.")
+        else:
+            print("Template not inserted successfully, please check your template parameters.")
+            print(returnedTemplate)
+
 
 def SendToSOS():
     pass
@@ -84,6 +86,14 @@ if __name__ == '__main__':
     config.read('../config.ini')     
 
     auth = config.get('SOS', 'Auth')
-    uniqueID = config.get('SOS', 'UniqueID')
 
-    ConnectToSOS(auth, uniqueID)
+    uniqueID = config.get('SOS', 'UniqueID')
+    observableProperty = config.get('SOS', 'observableProperty')
+    offering = config.get('SOS', 'offering')
+    altitude = config.get('SOS', 'altitude')
+    feature = config.get('SOS', 'feature')
+    procedure = config.get('SOS', 'procedure')
+    latitude = config.get('SOS', 'latitude')
+    longitude = config.get('SOS', 'longitude')
+
+    ConnectToSOS(auth, uniqueID, observableProperty, offering, altitude, feature, procedure, latitude, longitude)

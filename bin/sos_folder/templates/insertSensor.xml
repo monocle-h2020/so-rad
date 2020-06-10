@@ -14,13 +14,13 @@
     <swes:procedureDescription>
         <sml:PhysicalSystem gml:id="sensor-example">
             <!--Unique identifier -->
-            <gml:identifier codeSpace="uniqueID">{procedure}</gml:identifier>
+            <gml:identifier codeSpace="uniqueID">https://monocle-h2020.eu/SWE/Procedures/{procedure}</gml:identifier>
             <sml:identification>
                 <sml:IdentifierList>
                     <sml:identifier>
                         <sml:Term definition="urn:ogc:def:identifier:OGC:1.0:shortName">
                             <sml:label>shortName</sml:label>
-                            <sml:value>{procedure}</sml:value>
+                            <sml:value>https://monocle-h2020.eu/SWE/Procedures/{procedure}</sml:value>
                         </sml:Term>
                     </sml:identifier>
                 </sml:IdentifierList>

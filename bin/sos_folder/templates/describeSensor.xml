@@ -4,5 +4,5 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.opengis.net/sos/1.0  http://schemas.opengis.net/sos/1.0.0/sosDescribeSensor.xsd"
 	outputFormat="text/xml;subtype=&quot;sensorML/1.0.1&quot;">
-    <procedure>{procedure}</procedure>
+    <procedure>https://monocle-h2020.eu/SWE/Procedures/{procedure}</procedure>
 </DescribeSensor>
