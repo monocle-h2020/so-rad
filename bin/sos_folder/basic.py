@@ -115,14 +115,14 @@ def getSimpleCall( call ):
             call,
             ( call.startswith( 'delete' ) or call.startswith( 'insert' ))))
 
-def makeCall( xml: str, name: str, useAuth: bool = False) -> str:
+def makeCall( xml: str, name: str, useAuth: bool = True) -> str:
     if useAuth:
         # time to use the proxy
-        url = proxyCall.format( authKey )
+        url = proxyCall.format( useAuth )  
     else:
         # we can go straight to the sos server
         url = sosCall
-        
+     
     response = ppSendRequest( url, xml, name )
     if response is not None:
 

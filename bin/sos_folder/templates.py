@@ -37,7 +37,6 @@ def renderSimpleTemplate( template: str, values: dict ) -> str:
     """
     t = __getXmlAsString( template)
     output = t.format( **values)
-
     return output
 
 def getTemplateParams( template: str, ignoreInternal: bool = True ) -> list:
@@ -56,22 +55,6 @@ def getTemplateParams( template: str, ignoreInternal: bool = True ) -> list:
     
     return list( keys)
 
-    
-def getInsertSensorBB3( values: dict ) -> str:
-    """
-    render BB3 template and return it
-    """
-    if not __checkListKeys( getTemplateParams( "insertSensor.xml" ), values.keys(), True):
-        return None
-
-    innerTemplate = renderSimpleTemplate( "partial/bb3-outputs.xml", values)
-
-    newDict = values.copy()
-    newDict['xml-outputs'] = innerTemplate
-
-    return( renderSimpleTemplate( "insertSensor.xml", newDict))
-
-
 def getInsertSensorSoRad(values: dict ) -> str:
     """
     render So-Rad template and return it
@@ -86,8 +69,10 @@ def getInsertSensorSoRad(values: dict ) -> str:
 
     return( renderSimpleTemplate( "insertSensor.xml", newDict))
 
-
 def constructTestDict( sensor: str, observableProperty, offering, altitude, feature, procedure, latitude, longitude) -> dict:
+    """
+    Construct the sensor as a dictionary to be used for the xml templates.
+    """
     availableDicts = {
         sensor: {
             'observableProperty': observableProperty,
@@ -106,6 +91,9 @@ def constructTestDict( sensor: str, observableProperty, offering, altitude, feat
     return availableDicts[sensor]
 
 def constructResultTemplateDict(identifier, offering, observedProperty):
+    """
+    Construct a dictionary for the resultTemplate for the xml templates
+    """
     testDict = {
         'identifier': identifier,
         'offering': offering,
@@ -115,7 +103,9 @@ def constructResultTemplateDict(identifier, offering, observedProperty):
     return testDict
 
 def checkDictValues(values: dict):
-
+    """
+    Ensure that all the required fields are there.
+    """
     if not __checkListKeys( getTemplateParams( "insertResultTemplate.xml" ), values.keys(), True):
         return None
     else:

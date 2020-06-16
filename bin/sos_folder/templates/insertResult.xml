@@ -3,6 +3,6 @@
     xmlns:sos="http://www.opengis.net/sos/2.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/sos/2.0/sos.xsd">
-    <sos:template>{template}</sos:template>
+    <sos:template>https://monocle-h2020.eu/SWE/Procedures/{template}</sos:template>
     <sos:resultValues>{resultValues}</sos:resultValues>
 </sos:InsertResult>

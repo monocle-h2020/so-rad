@@ -1,12 +1,12 @@
 
-from sos import describeSensor, CALL_DESCRIBE_SENSOR, getResultTemplate, insertResultTemplate, deleteSensor
+from sos import describeSensor, CALL_DESCRIBE_SENSOR, getResultTemplate, insertResultTemplate, deleteSensor, insertResult
 import templates, basic
 from templates import getInsertSensorSoRad
 from templates import constructTestDict
 import configparser
 
 
-def CheckAndInsertResultTemplate(identifier, offering, observedProperty, auth):
+def CheckAndInsertResultTemplate(procedure, offering, observedProperty, auth):
     """
     This checks if the result template exists in SOS by calling GetResultTemplate
     If the returned response contains invalid flags then that signals the template does not exist.
@@ -15,14 +15,12 @@ def CheckAndInsertResultTemplate(identifier, offering, observedProperty, auth):
     print("Checking if result template is uploaded.")
     print("Fetching result template...")
 
-    resultTemplate = getResultTemplate(identifier, observedProperty)
-    # print(checkResultTemplate)
-
+    resultTemplate = getResultTemplate(offering, observedProperty)
     if("InvalidParameterValue" in resultTemplate or "InvalidPropertyOfferingCombination" in resultTemplate):
         print("No template found, inserting template.")
-        resultTemplate = insertResultTemplate(identifier, offering, observedProperty, auth)
-    else:
-        print("Result template exists:")
+        resultTemplate = insertResultTemplate(procedure, offering, observedProperty, auth)
+    # else:
+    #     print("Result template exists:")
     return resultTemplate
 
 
@@ -48,12 +46,9 @@ def ConnectToSOS(auth, sensor, observableProperty, offering, altitude, feature, 
 
         sensorDict = constructTestDict(sensor, observableProperty, offering, altitude, feature, procedure, latitude, longitude)
         xml = getInsertSensorSoRad(sensorDict)
-        #print(xml)
         result = basic.makeCall( xml, sensorDict, auth ) 
-        #print(result)
 
         returnedResult = describeSensor(procedure, auth)
-        #print(returnedResult)
         if("InvalidParameterValue" in returnedResult or returnedResult is None):
             print("Sensor insert failed, please check your template settings.")
         elif("The offering with the identifier" in result and "still exists in this service" in result and "not allowed to insert more than one procedure to an offering" in result):
@@ -63,22 +58,30 @@ def ConnectToSOS(auth, sensor, observableProperty, offering, altitude, feature, 
             returnedTemplate = CheckAndInsertResultTemplate(procedure, offering, observableProperty, auth)
             if("<ns0:acceptedTemplate>" in returnedTemplate):
                 print("Template successfully inserted.")
+            elif("<ns0:resultStructure>" in returnedTemplate):
+                print("Template was already in SOS")
             else:
                 print("Template not inserted successfully, please check your template parameters.")
                 print(returnedTemplate)
     else:
         print("Sensor is in SOS.")
         returnedTemplate = CheckAndInsertResultTemplate(procedure, offering, observableProperty, auth)
+        print(returnedTemplate)
         if("<ns0:acceptedTemplate>" in returnedTemplate):
             print("Template successfully inserted.")
+        elif("<ns0:resultStructure>" in returnedTemplate):
+            print("Template was already in SOS")
         else:
             print("Template not inserted successfully, please check your template parameters.")
-            print(returnedTemplate)
 
 
-def SendToSOS():
-    pass
-    # Insert result
+def insertResults(auth, resultTemplate):
+    resultExample = [
+        ['2013-11-19T13:30:00+02:00/2013-11-19T13:30:59+02:00', '2013-11-19T13:30:00+02:00', '1'],
+        ['2013-11-19T13:30:00+02:00/2013-11-19T13:30:59+02:00', '2013-11-19T13:30:00+02:00', '2']
+    ]
+    response = insertResult(resultExample, auth, resultTemplate)
+    print(response)
 
 if __name__ == '__main__':
 
@@ -97,3 +100,7 @@ if __name__ == '__main__':
     longitude = config.get('SOS', 'longitude')
 
     ConnectToSOS(auth, uniqueID, observableProperty, offering, altitude, feature, procedure, latitude, longitude)
+    
+    # resultTemplate = getResultTemplate(procedure, observableProperty)
+    # print(resultTemplate)
+    # insertResults(auth, resultTemplate)
