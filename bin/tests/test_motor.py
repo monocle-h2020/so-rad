@@ -22,9 +22,14 @@ if __name__ == '__main__':
     conf = read_config(args.config_file)
     ports = list_ports.comports()
     motor = motor_init(conf['MOTOR'], ports)
+    print(motor['steps_per_degree'], type(motor['steps_per_degree']))
 
     # Get the current motor pos and if not at HOME move it to HOME
     motor_pos = motor_func.get_motor_pos(motor['serial'])
+    if motor_pos is None:
+        print("No answer from motor. Exit")
+        sys.exit(1)
+
     if motor_pos != motor['home_pos']:
         t0 = time.perf_counter()
         print("Homing motor.. {0} --> {1}".format(motor_pos, motor['home_pos']))
