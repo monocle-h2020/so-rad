@@ -266,16 +266,15 @@ def gps_rtk_init(gps_config):
         # Get the known GPS ports from the config file
         log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
-   
+
     time.sleep(1)
-    
-   
 
     # Create serial objects for both the GPS sensor ports using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-   
+
     # Return the GPS dict
     return gps
+
 
 def rad_init(rad_config, ports):
     """read radiometer configuration. Any other initialisation should also be called here"""

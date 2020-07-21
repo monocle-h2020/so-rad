@@ -183,8 +183,13 @@ def init_all(conf):
     # Start the radiometry manager
     log.info("Starting radiometry manager")
     if Rad_manager is not None:
-        radiometry_manager = Rad_manager(rad)
-        time.sleep(0.1)
+        try:
+            radiometry_manager = Rad_manager(rad)
+            time.sleep(0.1)
+            rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
+        except Exception as msg:
+            log.exception(msg)
+            stop_all(db, None, gps_managers, battery, bat_manager, gpios, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -277,7 +282,7 @@ def format_log_message(counter, ready, values):
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
                   motor, battery, bat_manager, gpios, trigger_id, verbose):
     """run one measurement cycle
-    
+
     : counter               - measurement cycle number, included for logging
     : conf                  - main configuration (parsed from file)
     : sample                - main sampling settings configuration
@@ -288,13 +293,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     : battery               - battery management configuration
     : motor                 - motor configuration
     : pgios                 - gpio pins in use
-    
+
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
     """
 
     log = logging.getLogger()
-  
+
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
