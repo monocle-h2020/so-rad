@@ -10,7 +10,7 @@ def run():
     GPIO.setmode(GPIO.BOARD)
     pins = [15]  # FIXME: get from configs
     GPIO.setup(pins, GPIO.OUT)
-    GPIO.output(pins, GPIO.LOW)
+    GPIO.output(pins, GPIO.HIGH)
     GPIO.cleanup()
     print("done")
 
