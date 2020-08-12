@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<DescribeSensor version="1.0.0" service="SOS"
-    xmlns="http://www.opengis.net/sos/1.0"
+<swes:DescribeSensor
+    xmlns:swes="http://www.opengis.net/swes/2.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.opengis.net/sos/1.0  http://schemas.opengis.net/sos/1.0.0/sosDescribeSensor.xsd"
-	outputFormat="text/xml;subtype=&quot;sensorML/1.0.1&quot;">
-    <procedure>https://monocle-h2020.eu/SWE/Procedures/{procedure}</procedure>
-</DescribeSensor>
+    xmlns:gml="http://www.opengis.net/gml/3.2"
+    xmlns:swe="http://www.opengis.net/swe/2.0" service="SOS" version="2.0.0" xsi:schemaLocation="http://www.opengis.net/swes/2.0 http://schemas.opengis.net/swes/2.0/swes.xsd http://www.opengis.net/swe/2.0 http://schemas.opengis.net/sweCommon/2.0/swe.xsd">
+    <swes:procedure>https://monocle-h2020.eu/SWE/Procedures/{procedure}</swes:procedure>
+    <swes:procedureDescriptionFormat>http://www.opengis.net/sensorML/1.0.1</swes:procedureDescriptionFormat>
+    </swes:DescribeSensor>

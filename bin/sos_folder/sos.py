@@ -70,15 +70,18 @@ def getResultTemplate( offering: str, observedProperty: str ) -> str:
 #         'resultValues' : resultValues }
 #     return __makeCall( CALL_INSERT_RESULT, params, auth )
 
-def insertResultTemplate(identifier, offering, observedProperty, useProxy) -> str:
+def insertResultTemplate(resultTemplateName, identifier, offering, observedProperty, useProxy) -> str:
     """
     Inserts the result template for a specific sensor into SOS.
     """
     from templates import checkDictValues, constructResultTemplateDict
-    dictValues = constructResultTemplateDict(identifier, offering, observedProperty)
+    dictValues = constructResultTemplateDict(resultTemplateName, identifier, offering, observedProperty)
     parametersExist = checkDictValues(dictValues)
     if(parametersExist is True):
         body = templates.renderSimpleTemplate( CALL_INSERT_RESULT_TEMPLATE, dictValues ) 
+        print(body)
+        print("   ")
+        print("   ")
         response = basic.makeCall( body, CALL_INSERT_RESULT_TEMPLATE, useProxy )  
     else:
         print("Missing template parameters, please check you have set up the dictionary correctly.")
@@ -96,9 +99,10 @@ def deleteSensor(procedure, useProxy) -> str:
         print("Successfully deleted sensor.")
     else:
         print("Error when deleting sensor, please check your parameters.")
+        print(response)
 
 
-def insertResult(resultValues: list, auth, resultTemplate):
+def insertResult(resultValues: list, auth, resultTemplateName):
     """
     Insert a set of results into SOS.
     """
@@ -107,7 +111,7 @@ def insertResult(resultValues: list, auth, resultTemplate):
     b = b.replace("'","").replace("[","").replace("]","").replace(", ",DEFAULT_SEPARATOR_TOKEN)
     resultValues = "{}{}{}{}".format(arr_len,DEFAULT_SEPARATOR_BLOCK,b,DEFAULT_SEPARATOR_BLOCK)
     params = {
-        'template': resultTemplate,
+        'template': resultTemplateName,
         'resultValues' : resultValues }
     body = templates.renderSimpleTemplate( CALL_INSERT_RESULT, params )
     response = basic.makeCall( body, CALL_INSERT_RESULT, auth )

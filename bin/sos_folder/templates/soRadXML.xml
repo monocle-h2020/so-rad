@@ -1,21 +1,7 @@
-<?xml version="1.0" encoding="UTF-8"?>
+metadata_id,sensor_id, inttime, measurement
 
-<sos:InsertResultTemplate 
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-xmlns:swes="http://www.opengis.net/swes/2.0" 
-xmlns:sos="http://www.opengis.net/sos/2.0" 
-xmlns:swe="http://www.opengis.net/swe/2.0" 
-xmlns:sml="http://www.opengis.net/sensorML/1.0.1" 
-xmlns:gml="http://www.opengis.net/gml/3.2" 
-xmlns:xlink="http://www.w3.org/1999/xlink" 
-xmlns:om="http://www.opengis.net/om/2.0" 
-xmlns:sams="http://www.opengis.net/samplingSpatial/2.0" 
-xmlns:sf="http://www.opengis.net/sampling/2.0" 
-xmlns:xs="http://www.w3.org/2001/XMLSchema" 
-service="SOS" version="2.0.0" 
-xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/sos/2.0/sosInsertResultTemplate.xsd http://www.opengis.net/om/2.0 http://schemas.opengis.net/om/2.0/observation.xsd
 
-  http://www.opengis.net/samplingSpatial/2.0 http://schemas.opengis.net/samplingSpatial/2.0/spatialSamplingFeature.xsd">
+<sos:InsertResultTemplate xmlns:xsi="http://www.w3.org/2001/XMLSchema-SoRad" xmlns:swes="http://www.opengis.net/swes/2.0" xmlns:sos="http://www.opengis.net/sos/2.0" xmlns:swe="http://www.opengis.net/swe/2.0" xmlns:sml="http://www.opengis.net/sensorML/1.0.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:om="http://www.opengis.net/om/2.0" xmlns:sams="http://www.opengis.net/samplingSpatial/2.0" xmlns:sf="http://www.opengis.net/sampling/2.0" xmlns:xs="http://www.w3.org/2001/XMLSchema" service="SOS" version="2.0.0" xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/sos/2.0/sosInsertResultTemplate.xsd http://www.opengis.net/om/2.0 http://schemas.opengis.net/om/2.0/observation.xsd http://www.opengis.net/samplingSpatial/2.0 http://schemas.opengis.net/samplingSpatial/2.0/spatialSamplingFeature.xsd">
     <sos:proposedTemplate>
         <sos:ResultTemplate>
             <swes:identifier>https://monocle-h2020.eu/SWE/Procedures/{procedure}/template/{identifier}</swes:identifier>
@@ -50,6 +36,7 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                             <swe:uom xlink:href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"/>
                         </swe:Time>
                     </swe:field>
+            <!-- Use this for mobile sensors to store the location of the observation. Omit for stationary sensors (location is stored in the feature of interest) -->
                     <swe:field name="samplingGeometry">
                         <swe:Vector definition="http://www.opengis.net/def/param-name/OGC-OM/2.0/samplingGeometry" referenceFrame="http://www.opengis.net/def/crs/EPSG/0/4326">
                             <swe:coordinate name="latitude">
@@ -64,6 +51,25 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                             </swe:coordinate>
                         </swe:Vector>
                     </swe:field>
+                    <!-- <swe:field name="parameter">
+                        <swe:DataRecord definition="om:parameter">
+                            <swe:field name="chlorophyll-a">
+                                <swe:Quantity definition="chlorophyll-a">
+                                    <swe:uom code="${unit.chlorophyll}"/>
+                                </swe:Quantity>
+                            </swe:field>
+                            <swe:field name="tsm">
+                                <swe:Quantity definition="tsm">
+                                    <swe:uom code="${unit.tsm}"/>
+                                </swe:Quantity>
+                            </swe:field>
+                            <swe:field name="kd">
+                                <swe:Quantity definition="kd">
+                                    <swe:uom code="${unit.kd}"/>
+                                </swe:Quantity>
+                            </swe:field>
+                        </swe:DataRecord>
+                    </swe:field> -->
                     <swe:field name="sorad_metadata">
                         <swe:DataArray definition="sorad_metadata">
                             <swe:elementCount/>
@@ -157,8 +163,8 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                             </swe:encoding>
                         </swe:DataArray>
                     </swe:field>
-                    <swe:field name="sorad_radiometry_1">
-                        <swe:DataArray definition="sorad_radiometry_1">
+                    <swe:field name="{sorad_radiometry_1}">
+                        <swe:DataArray definition="{sorad_radiometry_1}">
                             <swe:elementCount/>
                             <swe:elementType name="defs">
                                 <swe:DataRecord>
@@ -174,6 +180,11 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                                     <swe:field name="measurement">
                                         <swe:Text definition="measurement"/>
                                     </swe:field>
+                                    <!-- <swe:field name="reflectance">
+                                        <swe:Quantity definition="reflectance">
+                                            <swe:uom code="${unit}"/>
+                                        </swe:Quantity>
+                                    </swe:field> -->
                                 </swe:DataRecord>
                             </swe:elementType>
                             <swe:encoding>
@@ -181,8 +192,8 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                             </swe:encoding>
                         </swe:DataArray>
                     </swe:field>
-                    <swe:field name="sorad_radiometry_2">
-                        <swe:DataArray definition="sorad_radiometry_2">
+                    <swe:field name="{sorad_radiometry_2}">
+                        <swe:DataArray definition="{sorad_radiometry_2}">
                             <swe:elementCount/>
                             <swe:elementType name="defs">
                                 <swe:DataRecord>
@@ -198,6 +209,11 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                                     <swe:field name="measurement">
                                         <swe:Text definition="measurement"/>
                                     </swe:field>
+                                    <!-- <swe:field name="reflectance">
+                                        <swe:Quantity definition="reflectance">
+                                            <swe:uom code="${unit}"/>
+                                        </swe:Quantity>
+                                    </swe:field> -->
                                 </swe:DataRecord>
                             </swe:elementType>
                             <swe:encoding>
@@ -205,8 +221,8 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                             </swe:encoding>
                         </swe:DataArray>
                     </swe:field>
-                    <swe:field name="sorad_radiometry_3">
-                        <swe:DataArray definition="sorad_radiometry_3">
+                    <swe:field name="{sorad_radiometry_3}">
+                        <swe:DataArray definition="{sorad_radiometry_3}">
                             <swe:elementCount/>
                             <swe:elementType name="defs">
                                 <swe:DataRecord>
@@ -222,6 +238,11 @@ xsi:schemaLocation="http://www.opengis.net/sos/2.0 http://schemas.opengis.net/so
                                     <swe:field name="measurement">
                                         <swe:Text definition="measurement"/>
                                     </swe:field>
+                                    <!-- <swe:field name="reflectance">
+                                        <swe:Quantity definition="reflectance">
+                                            <swe:uom code="${unit}"/>
+                                        </swe:Quantity>
+                                    </swe:field> -->
                                 </swe:DataRecord>
                             </swe:elementType>
                             <swe:encoding>

@@ -90,15 +90,19 @@ def constructTestDict( sensor: str, observableProperty, offering, altitude, feat
         
     return availableDicts[sensor]
 
-def constructResultTemplateDict(identifier, offering, observedProperty):
+def constructResultTemplateDict(resultTemplateName, procedure, offering, observedProperty):
     """
     Construct a dictionary for the resultTemplate for the xml templates
     """
     testDict = {
-        'identifier': identifier,
+        'identifier': resultTemplateName,
         'offering': offering,
-        'procedure': identifier,
-        'observedProperty': observedProperty
+        'procedure': procedure,
+        'observedProperty': observedProperty,
+        'sitename': "site1"
+        # 'sorad_radiometry_1': 'sorad_radiometry_1',
+        # 'sorad_radiometry_2': 'sorad_radiometry_2',
+        # 'sorad_radiometry_3': 'sorad_radiometry_3'    
     }
     return testDict
 
@@ -107,6 +111,7 @@ def checkDictValues(values: dict):
     Ensure that all the required fields are there.
     """
     if not __checkListKeys( getTemplateParams( "insertResultTemplate.xml" ), values.keys(), True):
+        print("Missing some dictionary values")
         return None
     else:
         return True

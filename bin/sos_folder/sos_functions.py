@@ -6,7 +6,7 @@ from templates import constructTestDict
 import configparser
 
 
-def CheckAndInsertResultTemplate(procedure, offering, observedProperty, auth):
+def CheckAndInsertResultTemplate(resultTemplateName, procedure, offering, observedProperty, auth):
     """
     This checks if the result template exists in SOS by calling GetResultTemplate
     If the returned response contains invalid flags then that signals the template does not exist.
@@ -18,33 +18,31 @@ def CheckAndInsertResultTemplate(procedure, offering, observedProperty, auth):
     resultTemplate = getResultTemplate(offering, observedProperty)
     if("InvalidParameterValue" in resultTemplate or "InvalidPropertyOfferingCombination" in resultTemplate):
         print("No template found, inserting template.")
-        resultTemplate = insertResultTemplate(procedure, offering, observedProperty, auth)
+        resultTemplate = insertResultTemplate(resultTemplateName, procedure, offering, observedProperty, auth)
     # else:
     #     print("Result template exists:")
     return resultTemplate
 
 
-def DeleteSensor(procedure, auth):
-    response = deleteSensor(procedure, auth)
-    if("the parameter 'procedure' is invalid" in response):
-        print("Procedure parameter was invalid, please check your values.")
-    else:
-        print("Sensor successfully deleted.")
+# def DeleteSensor(procedure, auth):
+#     response = deleteSensor(procedure, auth)
+#     if("the parameter 'procedure' is invalid" in response):
+#         print("Procedure parameter was invalid, please check your values.")
+#     else:
+#         print("Sensor successfully deleted.")
 
-def ConnectToSOS(auth, sensor, observableProperty, offering, altitude, feature, procedure, latitude, longitude):
+def SetUpSensorInSOS(auth, observableProperty, offering, altitude, feature, procedure, latitude, longitude, resultTemplateName):
 
     basic.authKey = auth
-
-    deleteSensor(procedure, basic.authKey)    
 
     returnedResult = describeSensor(procedure, auth)
     if(returnedResult is None):
         print("Nothing returned, potential issue when inserting sensor step was carried out.")
     elif("InvalidParameterValue" in returnedResult):
-        print("Invalid procedure used, checking if sensor is in SOS server.")
+        print("'Invalid procedure used' when checking if sensor is in SOS server.")
         print("Inserting sensor...")
 
-        sensorDict = constructTestDict(sensor, observableProperty, offering, altitude, feature, procedure, latitude, longitude)
+        sensorDict = constructTestDict(procedure, observableProperty, offering, altitude, feature, procedure, latitude, longitude)
         xml = getInsertSensorSoRad(sensorDict)
         result = basic.makeCall( xml, sensorDict, auth ) 
 
@@ -55,32 +53,34 @@ def ConnectToSOS(auth, sensor, observableProperty, offering, altitude, feature, 
             print("Sensor is already in SOS server, try checking your sensor values.")
         else:
             print("Insert sensor was successful.")
-            returnedTemplate = CheckAndInsertResultTemplate(procedure, offering, observableProperty, auth)
+            returnedTemplate = CheckAndInsertResultTemplate(resultTemplateName, procedure, offering, observableProperty, auth)
             if("<ns0:acceptedTemplate>" in returnedTemplate):
                 print("Template successfully inserted.")
             elif("<ns0:resultStructure>" in returnedTemplate):
                 print("Template was already in SOS")
+                #print(returnedTemplate)
             else:
                 print("Template not inserted successfully, please check your template parameters.")
                 print(returnedTemplate)
     else:
         print("Sensor is in SOS.")
-        returnedTemplate = CheckAndInsertResultTemplate(procedure, offering, observableProperty, auth)
-        print(returnedTemplate)
+        returnedTemplate = CheckAndInsertResultTemplate(resultTemplateName, procedure, offering, observableProperty, auth)
+        #print(returnedTemplate)
         if("<ns0:acceptedTemplate>" in returnedTemplate):
             print("Template successfully inserted.")
         elif("<ns0:resultStructure>" in returnedTemplate):
             print("Template was already in SOS")
+            #print(returnedTemplate)
         else:
             print("Template not inserted successfully, please check your template parameters.")
 
 
-def insertResults(auth, resultTemplate):
+def insertResults(auth, resultTemplateName):
     resultExample = [
         ['2013-11-19T13:30:00+02:00/2013-11-19T13:30:59+02:00', '2013-11-19T13:30:00+02:00', '1'],
         ['2013-11-19T13:30:00+02:00/2013-11-19T13:30:59+02:00', '2013-11-19T13:30:00+02:00', '2']
     ]
-    response = insertResult(resultExample, auth, resultTemplate)
+    response = insertResult(resultExample, auth, resultTemplateName)
     print(response)
 
 if __name__ == '__main__':
@@ -90,7 +90,6 @@ if __name__ == '__main__':
 
     auth = config.get('SOS', 'Auth')
 
-    uniqueID = config.get('SOS', 'UniqueID')
     observableProperty = config.get('SOS', 'observableProperty')
     offering = config.get('SOS', 'offering')
     altitude = config.get('SOS', 'altitude')
@@ -98,9 +97,10 @@ if __name__ == '__main__':
     procedure = config.get('SOS', 'procedure')
     latitude = config.get('SOS', 'latitude')
     longitude = config.get('SOS', 'longitude')
+    resultTemplateName = config.get('SOS', 'resultTemplate')
 
-    ConnectToSOS(auth, uniqueID, observableProperty, offering, altitude, feature, procedure, latitude, longitude)
+    deleteSensor(procedure, auth)    
+
+    SetUpSensorInSOS(auth, observableProperty, offering, altitude, feature, procedure, latitude, longitude, resultTemplateName)
     
-    # resultTemplate = getResultTemplate(procedure, observableProperty)
-    # print(resultTemplate)
-    # insertResults(auth, resultTemplate)
+    #insertResults(auth, resultTemplateName)
