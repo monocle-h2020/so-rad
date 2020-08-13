@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Test database setup
+A simple test to check connectivity to the database
 """
+import os
+import sys
+import inspect
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import initialisation
 import main_app
 from functions import db_functions

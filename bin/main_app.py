@@ -15,7 +15,6 @@ import threading
 import os
 import sys
 import datetime
-import RPi.GPIO as GPIO
 import configparser
 import argparse
 import initialisation
@@ -29,6 +28,11 @@ from functions.check_functions import check_gps, check_motor, check_sensors, che
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 from numpy import nan, max
+# only import RPi libraries if running on a Pi (other environments can be used for unit testing)
+if not sys.platform.startswith('win'):
+    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
+        import RPi.GPIO as GPIO
+
 
 def parse_args():
     """parse command line arguments"""
@@ -514,8 +518,6 @@ def run():
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
-
-
 
     log.info("===Initialisation complete===")
 

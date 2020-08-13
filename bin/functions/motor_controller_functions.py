@@ -20,7 +20,6 @@ import threading
 import datetime
 import sqlite3
 import traceback
-import RPi.GPIO as GPIO
 import logging
 from configparser import ConfigParser as cp
 #from pynput import keyboard
@@ -30,6 +29,15 @@ import functions.azimuth_functions as azi_func
 import functions.gps_functions as gps_func
 
 log = logging.getLogger() #gets the root logger
+
+if not sys.platform.startswith('win'):
+    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
+        import RPi.GPIO as GPIO
+else:
+    log.info("OS detected: {0}".format(sys.platform))
+    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+
+
 
 #Class to provide the different elements of a motor controller command and the format they have to be in
 class command_elements():
