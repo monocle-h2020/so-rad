@@ -260,15 +260,23 @@ def format_log_message(counter, ready, values):
     """construct a log message based on several system checks"""
     checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
     message = "[{0}] ".format(counter)
+    # handle string formatting where value may be None
+    strdict = {}
+    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading']:
+        if values[valkey] is not None:
+            strdict[valkey] = "{0:.2f}".format(values[valkey])
+        else:
+            strdict[valkey] = "n/a"
+
     message += "Checks:  Bat {0} Pos {1} Head {2} Rad {3} Speed {4} ({5}) Sun {6} ({7})"\
                .format(values['batt_voltage'], checks[ready['gps']],
                        checks[ready['heading']], checks[ready['rad']],
-                       checks[ready['speed']], values['speed'],
-                       checks[ready['sun']], values['solar_el'])
+                       checks[ready['speed']], strdict['speed'],
+                       checks[ready['sun']], strdict['solar_el'])
     message += "\n"
     message += "[{10}] Heading: Sun {0} Mot {1} Veh {2} Acc: {3}) | fix: {4}, HeadOk: {5}, diffSolnOk: {6}, FixOk {7} | nSat [{8}|{9}] "\
-                .format(values['solar_az'], values['headMot'], values['relPosHeading'],
-                        values['accHeading'], values['fix'], values['flags_headVehValid'],
+                .format(strdict['solar_az'], strdict['headMot'], strdict['relPosHeading'],
+                        strdict['accHeading'], values['fix'], values['flags_headVehValid'],
                         values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], values['nsat1'], counter)
 
     return message
@@ -277,7 +285,7 @@ def format_log_message(counter, ready, values):
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
                   motor, battery, bat_manager, gpios, trigger_id, verbose):
     """run one measurement cycle
-    
+
     : counter               - measurement cycle number, included for logging
     : conf                  - main configuration (parsed from file)
     : sample                - main sampling settings configuration
@@ -288,13 +296,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     : battery               - battery management configuration
     : motor                 - motor configuration
     : pgios                 - gpio pins in use
-    
+
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
     """
 
     log = logging.getLogger()
-  
+
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
@@ -324,7 +332,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
             stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
-            sys.exit(1)  
+            sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
     # Check GPS environment
@@ -334,7 +342,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     ready['heading'] = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
     # Check radiometry environment
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
-   
+
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         values = update_gps_values(gps_managers, values)
@@ -430,12 +438,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
                                       trigger_id['all_sensors'], values['ship_bearing_mean'],
                                       values['solar_az'], values['solar_el'], spectra_data=spec_data)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
-   
+
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
         and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-90])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
-        
+
         values = update_gps_values(gps_managers, values) # collect latest GPS data
         # TODO remove use of these dicts, pass value dict to db instead
         gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
@@ -482,14 +490,14 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
                 for key in gps1_manager_dict.keys():
                     gps2_manager_dict[key] = None
                 gps2_manager_dict['used'] = False
-          
+
             if db_dict['used']:
                 db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
                                       trigger_id['gps_location'], values['ship_bearing_mean'],
                                       values['solar_az'], values['solar_el'], spectra_data=None)
                 log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
 
-  
+
     message = format_log_message(counter, ready, values)
     log.info(message)
     return trigger_id
