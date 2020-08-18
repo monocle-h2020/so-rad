@@ -64,14 +64,14 @@ def motor_init(motor_config, ports):
     # Get all the motor variables from the config file
     motor['used'] = motor_config.getboolean('use_motor')
     #motor['port'] = motor_config.get('port')  # suggest to read from config first, then try to find automatically. If latter fails, we default to the config.
-    motor['step_limit'] = motor_config.getint('step_limit')
+    # motor['step_limit'] = motor_config.getint('step_limit')  # NOT USED
     motor['step_thresh'] = motor_config.getint('step_thresh_angle')
     motor['cw_limit'] = motor_config.getint('cw_limit_deg')
     motor['ccw_limit'] = motor_config.getint('ccw_limit_deg')
     motor['home_pos'] = motor_config.getint('home_pos')
     motor['step_thresh_time'] = motor_config.getint('step_thresh_time')
     motor['baud'] = motor_config.getint('baud')
-    motor['steps_per_degree'] = float(motor_config.getint('steps_per_degree'))
+    motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
 
     # If port autodetect is set look for what port has the matching identification string
     log.info("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))

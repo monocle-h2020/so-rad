@@ -25,7 +25,6 @@ import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature
-#from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 from numpy import nan, max
 
@@ -161,7 +160,7 @@ def init_all(conf):
     time.sleep(0.1)
 
     # # Start the GPS checker thread
-    # FIXME
+    # FIXME: this script is for use of two GPSes. Obsolete? Decision needed.
     # gps_checker_manager = GPSChecker(gps_managers)
     # gps_checker_manager.start()
 
@@ -384,7 +383,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             values['motor_angles'] = azi_func.calculate_positions(values['lat0'], values['lon0'],
                                                                   values['alt0'], values['dt'],
                                                                   values['ship_bearing_mean'], motor,
-                                                                  values['motor_pos'])  # TODO: just pass the values and motor dicts into this function
+                                                                  values['motor_pos'])
 
         log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
                  .format(values['solar_az'], values['solar_el'],
