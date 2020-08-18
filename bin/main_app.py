@@ -28,10 +28,13 @@ from functions.check_functions import check_gps, check_motor, check_sensors, che
 #from thread_managers.gps_manager import GPSManager
 from thread_managers.gps_checker import GPSChecker
 from numpy import nan, max
+
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
+try:
+    import RPi.GPIO as GPIO
+    GPIO.setwarnings(False)
+except Exception as msg:
+    print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
 
 def parse_args():
