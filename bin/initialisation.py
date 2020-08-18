@@ -23,13 +23,12 @@ from thread_managers import battery_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
-        GPIO.setwarnings(False)
-else:
-    log.info("OS detected: {0}".format(sys.platform))
-    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+try:
+    import RPi.GPIO as GPIO
+    GPIO.setwarnings(False)
+except Exception as msg:
+    log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
+
 
 
 def db_init(db_config):
@@ -266,16 +265,15 @@ def gps_rtk_init(gps_config):
         # Get the known GPS ports from the config file
         log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
-   
+
     time.sleep(1)
-    
-   
 
     # Create serial objects for both the GPS sensor ports using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-   
+
     # Return the GPS dict
     return gps
+
 
 def rad_init(rad_config, ports):
     """read radiometer configuration. Any other initialisation should also be called here"""

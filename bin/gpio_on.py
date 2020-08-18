@@ -31,7 +31,7 @@ def run():
 
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(gpios, GPIO.OUT)
-    GPIO.output(gpios, GPIO.LOW)
+    GPIO.output(gpios, GPIO.HIGH)
     GPIO.cleanup()
     print("done")
 
