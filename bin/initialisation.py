@@ -23,13 +23,12 @@ from thread_managers import battery_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
-        GPIO.setwarnings(False)
-else:
-    log.info("OS detected: {0}".format(sys.platform))
-    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+try:
+    import Rpi.GPIO as GPIO
+    GPIO.setwarnings(False)
+except Exception as msg:
+    log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
+
 
 
 def db_init(db_config):
