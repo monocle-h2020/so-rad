@@ -329,7 +329,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
     # Check battery charge - log special messages if required.
     if battery['used']:
-        if check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
+        if values['batt_voltage'] is None:
+            log.warning("Failed to check Battery Voltage")
+        elif check_battery(bat_manager, battery) == 1:  # 0 = OK, 1 = LOW, 2 = CRITICAL
             message = format_log_message(counter, ready, values)
             message += "Battery low, idling. Battery info: {1}".format(bat_manager)
             log.warning(message)
