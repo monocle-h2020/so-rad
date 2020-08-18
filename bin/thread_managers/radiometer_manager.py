@@ -19,12 +19,10 @@ import logging
 
 log = logging.getLogger()   # report to root logger
 
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
-else:
-    log.info("OS detected: {0}".format(sys.platform))
-    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+try:
+    import RPi.GPIO as GPIO
+except Exception as msg:
+    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests: \n{0}".format(msg))
 
 
 
