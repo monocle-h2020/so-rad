@@ -183,8 +183,13 @@ def init_all(conf):
     # Start the radiometry manager
     log.info("Starting radiometry manager")
     if Rad_manager is not None:
-        radiometry_manager = Rad_manager(rad)
-        time.sleep(0.1)
+        try:
+            radiometry_manager = Rad_manager(rad)
+            time.sleep(0.1)
+            rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
+        except Exception as msg:
+            log.exception(msg)
+            stop_all(db, None, gps_managers, battery, bat_manager, gpios, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
