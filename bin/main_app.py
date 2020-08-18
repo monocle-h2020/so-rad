@@ -31,7 +31,7 @@ from numpy import nan, max
 
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)
 try:
-    import Rpi.GPIO as GPIO
+    import RPi.GPIO as GPIO
     GPIO.setwarnings(False)
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet

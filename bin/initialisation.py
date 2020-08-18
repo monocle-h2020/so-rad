@@ -24,7 +24,7 @@ from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
 try:
-    import Rpi.GPIO as GPIO
+    import RPi.GPIO as GPIO
     GPIO.setwarnings(False)
 except Exception as msg:
     log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
