@@ -65,7 +65,7 @@ def create_tables(db_dict):
 
     sql ="""CREATE TABLE IF NOT EXISTS sorad_radiometry
             (metadata_id integer NOT NULL,
-            sensor_id text, integr_time integer,
+            sensor_id text, inttime integer,
             measurement text,
             FOREIGN KEY(metadata_id) REFERENCES sorad_metadata(id_))"""
     cur.execute(sql)
