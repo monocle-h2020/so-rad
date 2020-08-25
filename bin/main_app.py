@@ -124,6 +124,7 @@ def init_all(conf):
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
+    tpr, tpr_manager = initialisation.tpr_init(conf['TPR'])
 
     # start the battery manager
     if battery['used']:
@@ -195,11 +196,16 @@ def init_all(conf):
     else:
         radiometry_manager = None
 
+    log.info("Starting Tilt/Pitch/Roll manager")
+    if tpr_manager is not None:
+        tpr_manager.start()
+
+
     # Return all the dicts and manager objects
-    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios
+    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios, tpr, tpr_manager
 
 
-def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=0):
+def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, tpr, tpr_manager, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
@@ -222,6 +228,11 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
     if battery['used']:
         log.info("Stopping battery manager thread")
         bat_manager.stop()
+
+    # Stop the TPR manager
+    if tpr['used']:
+        log.info("Stopping TPR manager thread")
+        tpr_manager.stop()
 
     # Turn all GPIO pins off
     GPIO.output(gpios, GPIO.LOW)

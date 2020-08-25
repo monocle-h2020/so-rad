@@ -20,6 +20,7 @@ import logging
 from functions import gps_functions as gps_func
 from thread_managers import radiometer_manager
 from thread_managers import battery_manager
+from thread_managers import tpr_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
@@ -128,10 +129,38 @@ def battery_init(battery_config, ports):
     assert battery['interface'] in ['victron',]
 
     # Return the battery configuration dict and relevant manager class
-    if battery['interface'] == 'victron':
+    if battery['interface'].lower() == 'victron':
         bat_manager = battery_manager.VictronManager(battery, ports)
 
     return battery, bat_manager
+
+
+def tpr_init(tpr_config):
+    """
+    Read Tilt/Pitch/Roll monitoring config settings and initialise TPR connection and monitor
+
+    : tpr_config is the [TPR] section in the config file
+    : tpr is a dictionary containing the configuration 
+    """
+    tpr = {}
+    # Get all the TPR variables from the config file
+    tpr['used'] = tpr_config.getboolean('use_tpr')
+    tpr['interface'] = tpr_config.get('protocol')
+    tpr['sampling_time'] = tpr_config.getint('sampling_time')
+    tpr['xindex'] = tpr_config.getint('xindex')
+    tpr['yindex'] = tpr_config.getint('yindex')
+    tpr['zindex'] = tpr_config.getint('zindex')
+
+    if not tpr['used']:
+        return tpr, None
+
+    assert tpr['interface'].lower() in ['ada_adxl345', ]
+
+    # Return the battery configuration dict and initialise relevant manager class
+    if tpr['interface'].lower() == 'ada_adxl345':
+        tpr_man = tpr_manager.Ada_adxl345(tpr)
+
+    return tpr, tpr_man
 
 
 def gps_init(gps_config, ports):
@@ -230,6 +259,7 @@ def gps_init(gps_config, ports):
 
     # Return the GPS dict
     return gps
+
 
 def gps_rtk_init(gps_config):
     """read gps configuration for rtk gps. Any other initialisation should also be called here"""
