@@ -63,25 +63,30 @@ class Ada_adxl345(object):
         self.buffer_tilt =  [self.tilt]
         self.buffer_pitch = [self.pitch]
         self.buffer_roll =  [self.roll]
+        self.x_acc = None
+        self.y_acc = None
+        self.z_acc = None
 
     def update_pitch_roll_single(self):
         '''Pitch and Roll from rotation around X and Y axes'''
         x = float(self.accelerometer.acceleration[self.xindex])
         y = float(self.accelerometer.acceleration[self.yindex])
         z = float(self.accelerometer.acceleration[self.zindex])
+        self.x_acc = x
+        self.y_acc = y
+        self.z_acc = z
 
         x_axis_rotation = math.atan( y / math.sqrt(x**2 + z**2) )  # this is the roll rotation, around the x (forward) axis. positive is to the right
         y_axis_rotation = math.atan( x / math.sqrt(y**2 + z**2) )  # this is the pitch rotation, around the y (sideward) axis. positive is up.
-        if z != 0.0:
-            z_axis_rotation = math.atan( math.sqrt(x**2 + y**2) / z )  # Theta or Tilt rotation, between z (up) axis and gravity
-        else:
-            z_axis_rotation = 90.0
+        if abs(z) < 0.00001:
+            z = 0.00001
+        z_axis_rotation = math.atan( math.sqrt(x**2 + y**2) / z )  # Theta or Tilt rotation, between z (up) axis and gravity
 
         self.pitch = math.degrees(x_axis_rotation)
         self.roll  = math.degrees(y_axis_rotation)
-        self.tilt  = - math.degrees(z_axis_rotation)
+        self.tilt  = abs(math.degrees(z_axis_rotation))
         self.updated = datetime.datetime.now()
-        return self.updated, self.tilt, self.pitch, self.roll
+        return self.updated, self.tilt, self.pitch, self.roll, self.x_acc, self.y_acc, self.z_acc
 
     def __repr__(self):
         return "Tilt {0:0.2f} \tPitch {1:0.2f} \tRoll {2:0.2f} degrees".format(self.tilt, self.pitch, self.roll)
@@ -117,7 +122,7 @@ class Ada_adxl345(object):
         """
         log.info("Starting TPR monitor thread")
         while not self.stop_monitor:
-            timestamp, tilt, pitch, roll = self.update_pitch_roll_single()
+            timestamp, tilt, pitch, roll, x, y, z = self.update_pitch_roll_single()
             if len(self.buffer_time)<10:
                 self.buffer_time.append(timestamp)
                 self.buffer_tilt.append(tilt)
