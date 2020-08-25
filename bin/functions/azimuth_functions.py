@@ -72,7 +72,7 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     assert 180.0 >= view_motor_cw_deg >= -180.0
     assert 180.0 >= view_motor_ccw_deg >= -180.0
 
-    # Adjust for motor turning limits
+    # Adjust for motor turning limits, still in degrees
     cw_limit_deg = motor_dict['cw_limit']
     ccw_limit_deg = motor_dict['ccw_limit']
     if view_motor_cw_deg > cw_limit_deg:
@@ -112,10 +112,7 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     motor_pos_deg = float(motor_pos_steps) / motor_dict['steps_per_degree']
     travel_distance_cw =  abs(motor_pos_deg - achieved_view_motor_cw_deg)
     travel_distance_ccw = abs(motor_pos_deg - achieved_view_motor_ccw_deg)
-    #travel_distance_cw_limit = abs(motor_pos_deg - cw_limit_deg)
-    #travel_distance_ccw_limit = abs(motor_pos_deg - ccw_limit_deg)
 
-    #travel_distances = [travel_distance_cw, travel_distance_ccw, travel_distance_cw_limit, travel_distance_ccw_limit]
     travel_distances = [travel_distance_cw, travel_distance_ccw]
 
     #if ach_rel_angles_are_similar and (travel_distances[argsort(d135)[1]] <= travel_distances[argsort(d135)[0]]):

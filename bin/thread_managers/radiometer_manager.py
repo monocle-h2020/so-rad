@@ -19,12 +19,10 @@ import logging
 
 log = logging.getLogger()   # report to root logger
 
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
-else:
-    log.info("OS detected: {0}".format(sys.platform))
-    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+try:
+    import RPi.GPIO as GPIO
+except Exception as msg:
+    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests: \n{0}".format(msg))
 
 
 
@@ -37,6 +35,7 @@ class TriosManager(object):
         global ps
         from PyTrios import PyTrios as ps
         self.config = rad  # dictionary with radiometry settings
+        self.ed_sampling = rad['ed_sampling']
         self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
         self.coms = ps.TMonitor(self.ports, baudrate=9600)
         self.sams = []
@@ -47,7 +46,6 @@ class TriosManager(object):
         self.last_connectivity_check = datetime.datetime.now()
         self.lasttrigger = None  # don't use this to get a timestamp on measurements, just used as a delay timer
         self.busy = False  # check this value to see if sensors are ready to sample
-
 
     def __del__(self):
         ps.tchannels = {}
@@ -66,7 +64,7 @@ class TriosManager(object):
         ps.tchannels = {}
         time.sleep(5)
 
-        log.info("(re)connecting to radiometers: restarting listening threads (wait 5 sec)")
+        log.info("(re)connecting to radiometers: restarting listening threads (wait 2 sec)")
         self.coms = ps.TMonitor(self.ports, baudrate=9600)
         time.sleep(2)
 
@@ -105,12 +103,15 @@ class TriosManager(object):
             tc_ed_index = self.sns.index(self.config['ed_sensor_id'])  # index (in sams list) of the ed sensor
             self.tk_ed = self.tk[tc_ed_index]
         except Exception as err:
-            log.warning("Ed sensor not found (looking for {0}), got {1}".format(self.config['ed_sensor_id'], self.sns))
+            log.warning("Ed sensor not found (looking for {0}), got {1}. Disabling any Ed sampling schedule".format(self.config['ed_sensor_id'], self.sns))
             self.tk_ed = None
-            log.exception(err)
+            self.ed_sampling = False
+            #log.exception(err)
 
         if self.config['verbosity_com'] > 1:
             log.info("found SAM modules: {0}".format(list(zip(self.chns, self.sns))))
+        if self.config['verbosity_com'] > 2:
+            log.info("found channels: {0}".format(list(self.tk)))
 
     def power_cycle_sensors(self):
         """reboot sensors by cycling power through GPIO/relay control
