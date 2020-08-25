@@ -122,6 +122,7 @@ def init_all(conf):
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
+    tpr, tpr_manager = initialisation.tpr_init(conf['TPR'])
 
     # start the battery manager
     if battery['used']:
@@ -188,11 +189,16 @@ def init_all(conf):
     else:
         radiometry_manager = None
 
+    log.info("Starting Tilt/Pitch/Roll manager")
+    if tpr_manager is not None:
+        tpr_manager.start()
+
+
     # Return all the dicts and manager objects
-    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios
+    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios, tpr, tpr_manager
 
 
-def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=0):
+def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, tpr, tpr_manager, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
@@ -215,6 +221,11 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
     if battery['used']:
         log.info("Stopping battery manager thread")
         bat_manager.stop()
+
+    # Stop the TPR manager
+    if tpr['used']:
+        log.info("Stopping TPR manager thread")
+        tpr_manager.stop()
 
     # Turn all GPIO pins off
     GPIO.output(gpios, GPIO.LOW)
@@ -277,7 +288,7 @@ def format_log_message(counter, ready, values):
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
                   motor, battery, bat_manager, gpios, trigger_id, verbose):
     """run one measurement cycle
-    
+
     : counter               - measurement cycle number, included for logging
     : conf                  - main configuration (parsed from file)
     : sample                - main sampling settings configuration
@@ -288,13 +299,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     : battery               - battery management configuration
     : motor                 - motor configuration
     : pgios                 - gpio pins in use
-    
+
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
     """
 
     log = logging.getLogger()
-  
+
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
@@ -324,7 +335,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
             stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
-            sys.exit(1)  
+            sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
     # Check GPS environment
@@ -334,7 +345,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     ready['heading'] = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
     # Check radiometry environment
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
-   
+
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         values = update_gps_values(gps_managers, values)
