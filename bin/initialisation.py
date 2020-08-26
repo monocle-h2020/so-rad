@@ -33,7 +33,6 @@ except Exception as msg:
     log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
 
 
-
 def db_init(db_config):
     """set up and test sqlite database connection. Return dictionary with database items"""
     db = {}
@@ -147,7 +146,7 @@ def tpr_init(tpr_config):
     tpr = {}
     # Get all the TPR variables from the config file
     tpr['used'] = tpr_config.getboolean('use_tpr')
-    tpr['interface'] = tpr_config.get('protocol')
+    tpr['interface'] = tpr_config.get('protocol').lower()
     tpr['sampling_time'] = tpr_config.getint('sampling_time')
     tpr['xindex'] = tpr_config.getint('xindex')
     tpr['yindex'] = tpr_config.getint('yindex')
@@ -160,7 +159,7 @@ def tpr_init(tpr_config):
     assert tpr['interface'].lower() in ['ada_adxl345', ]
 
     # Return the battery configuration dict and initialise relevant manager class
-    if tpr['interface'].lower() == 'ada_adxl345':
+    if tpr['interface'] == 'ada_adxl345':
         tpr['manager'] = tpr_manager.Ada_adxl345(tpr)
 
     return tpr
@@ -175,6 +174,7 @@ def gps_init(gps_config, ports):
     gps['id1'] = gps_config.get('id1').lower()
     gps['heading_speed_limit'] = gps_config.getfloat('gps_heading_speed_limit')
     gps['heading_accuracy_limit'] = gps_config.getfloat('gps_heading_accuracy_limit')
+    gps['port1'] = None
 
     if gps['protocol'] in ['rtk', ]:
         # heading will be determined from distance between receivers rather than movement, so we need to know which one is nearer the front of the ship
@@ -184,19 +184,16 @@ def gps_init(gps_config, ports):
        assert gps['location2'] in ['front', 'rear']
 
     # If port autodetect is selected look for what port has the identifying string also provided
-    if gps_config.getboolean('port_autodetect'):
-        # this is the recommended situation, one gps will be detected, the second after powering the relay switch
-        port_autodetect_string = gps_config.get('port_autodetect_string')
-        ports = list_ports.comports()
-        for port, desc, hwid in sorted(ports):
-            if (desc == port_autodetect_string):
-                gps['port1'] = port
-                log.info("GPS1 using port: {0}".format(port))
-
-        else:
-            # Get the known GPS ports from the config file
-            log.info("Defaulting to GPS port settings in config file")
-            gps['port1'] = gps_config.get('port1_default')
+    port_autodetect_string = gps_config.get('port_autodetect_string')
+    ports = list_ports.comports()
+    for port, desc, hwid in sorted(ports):
+        if (desc == port_autodetect_string) and (gps_config.getboolean('port_autodetect')):
+            gps['port1'] = port
+            log.info("GPS1 using port: {0}".format(port))
+    if gps['port1'] is None:
+        # Set the port from the config file
+        log.info("Defaulting to GPS port settings in config file")
+        gps['port1'] = gps_config.get('port1_default')
 
     # Create serial objects for both the GPS sensor ports using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
@@ -253,14 +250,15 @@ def rad_init(rad_config, ports):
         rad['port1'] = rad_ports[0]
         rad['port2'] = rad_ports[1]
         rad['port3'] = rad_ports[2]
-        log.info("Sensors using ports: {0}".format(", ".join(rad_ports)))
+        log.info("Radiometers configured on ports: {0}".format(", ".join(rad_ports)))
 
-    # If GPIO control is wanted, turn on the GPIO pins for the sensors
-    # using the pins provided in the config file
+    # If GPIO control is selected turn on the GPIO pin for the radiometers
+    # using the pin info provided in the config file
     rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
         rad['gpio1'] = rad_config.getint('gpio1')
 
+        GPIO.setmode(GPIO.BCM)
         GPIO.setup(rad['gpio1'], GPIO.OUT)
         GPIO.output(rad['gpio1'], GPIO.HIGH)
         time.sleep(1) # Wait to allow sensors to boot
