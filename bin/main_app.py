@@ -35,6 +35,9 @@ except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
 
+__version__ = 20200826.0
+
+
 def parse_args():
     """parse command line arguments"""
     parser = argparse.ArgumentParser()
@@ -116,45 +119,46 @@ def init_all(conf):
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
     tpr = initialisation.tpr_init(conf['TPR'])
 
-    # start the battery manager
-    if battery['used']:
-        bat_manager.start()
-        time.sleep(0.1)
-
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
     if Rad_manager is not None and rad['use_gpio_control']:
         gpios.append(rad['gpio1'])
 
+    # start individual monitoring threads
+    if battery['used']:
+        bat_manager.start()
+        time.sleep(0.1)
+
     if gps['manager'] is not None:
         gps['manager'].add_serial_port(gps['serial1'])
         gps['manager'].start()
 
-    log.info("Starting Tilt/Pitch/Roll manager")
     if tpr['manager'] is not None:
+        log.info("Starting Tilt/Pitch/Roll manager")
         tpr['manager'].start()
 
-    # Get the current motor pos and if not at HOME move it to HOME
-    motor_pos = motor_func.get_motor_pos(motor['serial'])
-    if motor_pos != motor['home_pos']:
-        t0 = time.clock()
-        log.info("Homing motor.. {0} --> {1}".format(motor_pos, motor['home_pos']))
-        motor_func.return_home(motor['serial'])  # FIXME replace with rotate function to home pos as set in config
-        moving = True
-        while moving and (time.clock()-t0<5):
-            moving = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)[0]
-            if moving is None:
-                moving = True  # assume we are not done
-            log.info("..homing motor..")
-            time.sleep(1)
-        log.info("..done")
-    else:
-        log.info("Motor in home position")
-    time.sleep(0.1)
+    if motor['used']:
+        # Get the current motor pos and if not at HOME move it to HOME
+        motor_pos = motor_func.get_motor_pos(motor['serial'])
+        if motor_pos != motor['home_pos']:
+            t0 = time.clock()
+            log.info("Homing motor.. {0} --> {1}".format(motor_pos, motor['home_pos']))
+            motor_func.return_home(motor['serial'])  # FIXME replace with rotate function to home pos as set in config
+            moving = True
+            while moving and (time.clock()-t0<5):
+                moving = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)[0]
+                if moving is None:
+                    moving = True  # assume we are not done
+                log.info("..homing motor..")
+                time.sleep(1)
+            log.info("..done")
+        else:
+            log.info("Motor in home position")
+        time.sleep(0.1)
 
     # Start the radiometry manager
-    log.info("Starting radiometry manager")
     if Rad_manager is not None:
+        log.info("Starting radiometry manager")
         try:
             radiometry_manager = Rad_manager(rad)
             time.sleep(0.1)
@@ -185,12 +189,12 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
         time.sleep(0.5)
 
     # Stop the battery manager
-    if battery['used'] and bat_manager is not None:
+    if (battery['used']) and (bat_manager is not None):
         log.info("Stopping battery manager thread")
         bat_manager.stop()
 
     # Stop the TPR manager
-    if tpr['used'] and tpr['manager'] is not None:
+    if (tpr['used']) and (tpr['manager'] is not None):
         log.info("Stopping TPR manager thread")
         tpr['manager'].stop()
 
@@ -242,13 +246,13 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    message += "Checks:  Bat {0} Pos {1} Head {2} Rad {3} Speed {4} ({5}) Sun {6} ({7})"\
+    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7})"\
                .format(values['batt_voltage'], checks[ready['gps']],
                        checks[ready['heading']], checks[ready['rad']],
                        checks[ready['speed']], strdict['speed'],
                        checks[ready['sun']], strdict['solar_el'])
     message += "\n"
-    message += "[{10}] Heading: Sun {0} Mot {1} Veh {2} Acc: {3}) | fix: {4}, HeadOk: {5}, diffSolnOk: {6}, FixOk {7} | nSat {8} "\
+    message += "[{9}] Heading: SunAz {0} Mot {1} Veh {2} Acc: {3}) | Fix: {4}, Head: {5}, diffSoln: {6}, FixFl {7} | nSat {8} "\
                 .format(strdict['solar_az'], strdict['headMot'], strdict['relPosHeading'],
                         strdict['accHeading'], values['fix'], values['flags_headVehValid'],
                         values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], counter)
@@ -279,7 +283,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
-    values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
+    values = {'speed': None, 'nsat0': None, 'motor_pos': None, 'ship_bearing_mean': None,
               'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
@@ -311,25 +315,30 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
-    # Check GPS environment
+    # Check positioning
     ready['gps']  = check_gps(gps)
     ready['heading'] = check_heading(gps)
-    # Check radiometry environment
+    # Check radiometry / sampling conditions
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
 
     if ready['gps']:
         # read latest gps info and calculate angles for motor
+        # valid positioning data is required to do anything else
         values = update_gps_values(gps, values)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
-        values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
-        if values['motor_pos'] is None:
-            ready['motor'] = False
-            message = format_log_message(counter, ready, values)
-            message += "Motor position not read."
-            log.warning(message)
-            return trigger_id
+        if motor['used']:
+            values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
+            if values['motor_pos'] is None:
+                ready['motor'] = False
+                message = format_log_message(counter, ready, values)
+                message += "Motor position not read."
+                log.warning(message)
+                return trigger_id
+        else:
+            # if no motor is used we'll assume the sensors are pointing in the motor home position. 
+            values['motor_pos'] = motor['home_pos']
 
         # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
         if not bearing_fixed:
@@ -341,7 +350,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # collect latest GPS data
         values = update_gps_values(gps, values)
 
-        # Fetch sun variables
+        # Fetch sun variables and determine optimal motor pointing angles
         values['solar_az'], values['solar_el'],\
             values['motor_angles'] = azi_func.calculate_positions(values['lat0'], values['lon0'],
                                                                   values['alt0'], values['dt'],
@@ -362,7 +371,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
         if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
                                                                                                                   and (ready['speed'])\
-                                                                                                                  and (ready['heading']):
+                                                                                                                  and (ready['heading'])\
+                                                                                                                  and (motor['used']):
             log.info("Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step']))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
@@ -393,7 +403,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # If local database is used, commit the data
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data)
+            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data, software_version=__version__)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
@@ -411,7 +421,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # If db is used, commit the data to it
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data)
+            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data, software_version=__version__)
             log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
 
     else:
@@ -426,7 +436,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             values = update_gps_values(gps, values) # collect latest GPS data
 
             if db_dict['used']:
-                db_id = db_func.commit_db(db_dict, verbose, trigger_id['gps_location'], values, spectra_data=None)
+                db_id = db_func.commit_db(db_dict, verbose, trigger_id['gps_location'], values, spectra_data=None, software_version=__version__)
                 log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
 
     message = format_log_message(counter, ready, values)
@@ -448,8 +458,7 @@ def run():
     log.info('\n===Started logging===\n')
     try:
         # Initialise everything
-        db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr = init_all(conf)
+        db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)

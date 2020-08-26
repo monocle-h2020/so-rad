@@ -29,7 +29,7 @@ def check_heading(gps):
         return False
 
     if gps['protocol'] == "rtk":
-        if (gps['managers'].flags_headVehValid == 1) and (gps['manager'].accHeading < gps['heading_accuracy_limit']) and (gps['manager'].heading is not None):
+        if (gps['manager'].flags_headVehValid == 1) and (gps['manager'].accHeading < gps['heading_accuracy_limit']) and (gps['manager'].heading is not None):
             return True
 
     elif gps['protocol'] == 'nmea0183':

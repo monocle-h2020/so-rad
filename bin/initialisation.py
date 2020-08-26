@@ -75,6 +75,9 @@ def motor_init(motor_config, ports):
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
 
+    if not motor['used']:
+        return motor
+
     # If port autodetect is set look for what port has the matching identification string
     log.info("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))
     print("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))
@@ -228,7 +231,7 @@ def rad_init(rad_config, ports):
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
 
     if rad['n_sensors'] == 0:
-        log.info("No radiometers specified")
+        log.info("Radiometers not used. Update config file setting n_sensors to change this.")
         return rad, None
 
     assert rad['rad_interface'] in ['pytrios',]
