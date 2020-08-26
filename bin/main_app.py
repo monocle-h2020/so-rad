@@ -109,7 +109,7 @@ def init_all(conf):
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
     motor = initialisation.motor_init(conf['MOTOR'], ports)
-    gps   = initialisation.gps_init(conf['GPS'])
+    gps   = initialisation.gps_init(conf['GPS'], ports)
 
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
