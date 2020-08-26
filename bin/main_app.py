@@ -403,7 +403,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # If local database is used, commit the data
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data, software_version=__version__)
+            db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
@@ -421,7 +421,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # If db is used, commit the data to it
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data, software_version=__version__)
+            db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
             log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
 
     else:
@@ -436,7 +436,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             values = update_gps_values(gps, values) # collect latest GPS data
 
             if db_dict['used']:
-                db_id = db_func.commit_db(db_dict, verbose, trigger_id['gps_location'], values, spectra_data=None, software_version=__version__)
+                db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['gps_location'], spectra_data=None, software_version=__version__)
                 log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
 
     message = format_log_message(counter, ready, values)

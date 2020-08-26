@@ -82,7 +82,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, sos_inserted, sos_insertion_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             tilt, tilt_var, values['accHeading'], software_version,
