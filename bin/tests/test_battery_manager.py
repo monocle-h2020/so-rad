@@ -22,6 +22,10 @@ if __name__ == '__main__':
     ports = list_ports.comports()
     battery, batman = initialisation.battery_init(conf['BATTERY'], ports)
 
+    if batman is None:
+        print("No Battery manager configured")
+        sys.exit(0)
+
     batman.start()
     time.sleep(1)
     try:
@@ -34,7 +38,6 @@ if __name__ == '__main__':
             time.sleep(0.1)
     except (KeyboardInterrupt, SystemExit):
         batman.stop()
-        #batman.thread.join()
         sys.exit()
 
     batman.stop()
