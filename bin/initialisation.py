@@ -21,12 +21,14 @@ from functions import gps_functions as gps_func
 from thread_managers import radiometer_manager
 from thread_managers import battery_manager
 from thread_managers import tpr_manager
+from thread_managers import gps_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
 try:
     import RPi.GPIO as GPIO
     GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
 except Exception as msg:
     log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
 
@@ -150,158 +152,63 @@ def tpr_init(tpr_config):
     tpr['xindex'] = tpr_config.getint('xindex')
     tpr['yindex'] = tpr_config.getint('yindex')
     tpr['zindex'] = tpr_config.getint('zindex')
+    tpr['manager'] = None
 
     if not tpr['used']:
-        return tpr, None
+        return tpr
 
     assert tpr['interface'].lower() in ['ada_adxl345', ]
 
     # Return the battery configuration dict and initialise relevant manager class
     if tpr['interface'].lower() == 'ada_adxl345':
-        tpr_man = tpr_manager.Ada_adxl345(tpr)
+        tpr['manager'] = tpr_manager.Ada_adxl345(tpr)
 
-    return tpr, tpr_man
+    return tpr
 
 
 def gps_init(gps_config, ports):
     """read gps configuration. Any other initialisation should also be called here"""
     gps = {}
-
+    gps['protocol'] = gps_config.get('protocol').lower()
     # Get all the GPS variables from the config file
-    gps['n_gps'] = gps_config.getint('n_gps')
-    gps['baud1'] = gps_config.getint('baud')
-    gps['baud2'] = gps_config.getint('baud')
-    gps['set_polling_rate'] = gps_config.getboolean('set_polling_rate')  # True if polling rate can be set?
-    gps['polling_rate1'] = gps_config.getint('polling_rate')
-    gps['polling_rate2'] = gps_config.getint('polling_rate')
-    gps['location1'] = gps_config.get('location1').lower()
-    gps['location2'] = gps_config.get('location2').lower()
-    assert gps['location1'] in ['front', 'rear']
-    assert gps['location2'] in ['front', 'rear']
-    gps['id1'] = gps_config.get('id1').lower()
-    gps['id2'] = gps_config.get('id2').lower()
-    gps['heading_speed_limit'] = gps_config.getint('heading_speed_limit')
-    gps['gpio2'] = gps_config.getint('gpio2')
-    gps['gpio_control'] = gps_config.getboolean('use_gpio_control')
-
-    # If port autodetect is wanted, look for what port has the identifying string also provided
-    if gps_config.getboolean('port_autodetect') and gps['gpio_control'] and gps['n_gps'] == 2:
-        # this is the recommended situation, one gps will be detected, the second after powering the relay switch
-        port_autodetect_string = gps_config.get('port_autodetect_string')
-        gps_counter = 0
-        ports = list_ports.comports()
-        for port, desc, hwid in sorted(ports):
-            #print(port, desc, hwid)
-            if (desc == port_autodetect_string):
-                gps['port1'] = port
-                log.info("GPS1 using port: {0}".format(port))
-                gps_counter += 1
-        if gps_counter != 1:
-            if gps['gpio_control']:
-                log.info("More than 1 GPS detected, attempting to power down GPS2")
-                GPIO.setmode(GPIO.BOARD)
-                pin = gps['gpio2']
-                GPIO.setup(pin, GPIO.OUT)
-                GPIO.output(pin, GPIO.LOW)
-                time.sleep(2)
-                gps_counter = 0
-                ports = list_ports.comports()
-                for port, desc, hwid in sorted(ports):
-                    if (desc == port_autodetect_string):
-                        gps['port1'] = port
-                        log.info("GPS1 using port: {0}".format(port))
-                        gps_counter += 1
-            if gps_counter !=1:
-                err = "Error: {0} gps interfaces detected, expected 1 of {1} to be connected".format(gps_counter, gps['n_gps'])
-                raise AssertionError(err)
-
-        # switch gpio pin on for the second GPS
-        GPIO.setmode(GPIO.BOARD)
-        pin = gps['gpio2']
-        GPIO.setup(pin, GPIO.OUT)
-        GPIO.output(pin, GPIO.HIGH)
-
-        # Wait for the second GPS to start up
-        time.sleep(10)
-
-        # find second GPS using the same identifying string as before
-        ports = list_ports.comports()
-        for port, desc, hwid in sorted(ports):
-            #print(port, desc, hwid)
-            if (desc == port_autodetect_string) and port != gps['port1']:
-                gps['port2'] = port
-                log.info("GPS2 using port: {0}".format(port))
-
-    else:
-        # Get the known GPS ports from the config file
-        log.info("Defaulting to GPS port settings in config file")
-        gps['port1'] = gps_config.get('port1_default')
-        if gps['n_gps'] == 2:
-            gps['port2'] = gps_config.get('port2_default')
-        if gps['gpio_control']:
-            # switch gpio pin on for second GPS sensor
-            GPIO.setmode(GPIO.BOARD)
-            pin = gps['gpio2']
-            GPIO.setup(pin, GPIO.OUT)
-            GPIO.output(pin, GPIO.HIGH)
-            time.sleep(10)
-
-    time.sleep(1)
-    # Create serial objects for both the GPS sensor ports using variables from the config file
-    gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-    gps['serial2'] = serial.Serial(port=gps['port2'], baudrate=gps['baud2'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
-
-    time.sleep(1)
-    # If the polling rate is to be changed, send update commands to the GPS sensors
-    if gps['set_polling_rate']:
-       gps_func.update_gps_rate(gps['serial1'], int(gps['polling_rate1'])) 
-       gps_func.update_gps_rate(gps['serial2'], int(gps['polling_rate2']))
-
-    # Return the GPS dict
-    return gps
-
-
-def gps_rtk_init(gps_config):
-    """read gps configuration for rtk gps. Any other initialisation should also be called here"""
-
-    gps = {}
-
-    # Get all the GPS variables from the config file
-
     gps['baud1'] = gps_config.getint('baud1')
-    gps['set_polling_rate'] = gps_config.getboolean('set_polling_rate')  # True if polling rate can be set?
-    # gps['polling_rate1'] = gps_config.getint('polling_rate')
-    gps['location1'] = gps_config.get('location1').lower()
-    gps['location2'] = gps_config.get('location2').lower()
-    assert gps['location1'] in ['front', 'rear']
-    assert gps['location2'] in ['front', 'rear']
     gps['id1'] = gps_config.get('id1').lower()
-    gps['heading_speed_limit'] = gps_config.getint('heading_speed_limit')
-    gps['gpio2'] = gps_config.getint('gpio2')
-    gps['gpio_control'] = gps_config.getboolean('use_gpio_control')
+    gps['heading_speed_limit'] = gps_config.getfloat('gps_heading_speed_limit')
+    gps['heading_accuracy_limit'] = gps_config.getfloat('gps_heading_accuracy_limit')
 
-    # If port autodetect is wanted, look for what port has the identifying string also provided
+    if gps['protocol'] in ['rtk', ]:
+        # heading will be determined from distance between receivers rather than movement, so we need to know which one is nearer the front of the ship
+       gps['location1'] = gps_config.get('location1').lower()
+       gps['location2'] = gps_config.get('location2').lower()
+       assert gps['location1'] in ['front', 'rear']
+       assert gps['location2'] in ['front', 'rear']
+
+    # If port autodetect is selected look for what port has the identifying string also provided
     if gps_config.getboolean('port_autodetect'):
         # this is the recommended situation, one gps will be detected, the second after powering the relay switch
         port_autodetect_string = gps_config.get('port_autodetect_string')
-        gps_counter = 0
         ports = list_ports.comports()
         for port, desc, hwid in sorted(ports):
-            # print(port, desc, hwid)
             if (desc == port_autodetect_string):
                 gps['port1'] = port
                 log.info("GPS1 using port: {0}".format(port))
-    else:
-        # Get the known GPS ports from the config file
-        log.info("Defaulting to GPS port settings in config file")
-        gps['port1'] = gps_config.get('port1_default')
 
-    time.sleep(1)
+        else:
+            # Get the known GPS ports from the config file
+            log.info("Defaulting to GPS port settings in config file")
+            gps['port1'] = gps_config.get('port1_default')
 
     # Create serial objects for both the GPS sensor ports using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
 
-    # Return the GPS dict
+    # assign the relevant gps manager class
+    if gps['protocol'] == 'rtk':
+       gps['manager'] = gps_manager.RTKUBX()
+    elif gps['protocol'] == 'nmea0183':
+       gps['manager'] = gps_manager.NMEA0183()
+    else:
+       log.exception("GPS protocol '{0}' is not implemented".format(gps['protocol']))
+
     return gps
 
 
@@ -353,13 +260,9 @@ def rad_init(rad_config, ports):
     rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
         rad['gpio1'] = rad_config.getint('gpio1')
-        rad['gpio2'] = rad_config.getint('gpio2')
-        rad['gpio3'] = rad_config.getint('gpio3')
 
-        GPIO.setmode(GPIO.BOARD)
-        pins = [rad['gpio1'], rad['gpio2'], rad['gpio3']]
-        GPIO.setup(pins, GPIO.OUT)
-        GPIO.output(pins, GPIO.HIGH)
+        GPIO.setup(rad['gpio1'], GPIO.OUT)
+        GPIO.output(rad['gpio1'], GPIO.HIGH)
         time.sleep(1) # Wait to allow sensors to boot
 
     # Return the radiometry dict and relevant manager class
@@ -373,16 +276,11 @@ def init_gpio(conf, state=0):
     """set all GPIO pins identified in config file to low (0) or high (1)"""
     set_state = {0: GPIO.LOW, 1: GPIO.HIGH}
 
-    # If GPIO control is wanted, using the pins stated in the config file turn them on/off
+    # If GPIO control is requested use the pins stated in the config file
     if conf['DEFAULT'].getboolean('use_gpio_control'):
         pins = []
-        if conf['GPS'].getboolean('use_gpio_control'):
-            pins.append(conf['GPS'].getint('gpio2'))
         if conf['RADIOMETERS'].getboolean('use_gpio_control'):
             pins.append(conf['RADIOMETERS'].getint('gpio1'))
-            pins.append(conf['RADIOMETERS'].getint('gpio2'))
-            pins.append(conf['RADIOMETERS'].getint('gpio3'))
-        GPIO.setmode(GPIO.BOARD)
         GPIO.setup(pins, GPIO.OUT)
         GPIO.output(pins, set_state[state])
         GPIO.cleanup()

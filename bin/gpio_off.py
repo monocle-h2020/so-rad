@@ -17,7 +17,7 @@ def run():
     args = parse_args()
     conf = read_config(args.config_file)
 
-    # collect info on which GPIO pins are being used
+    #collect info on which GPIO pins are being used
     gpios = []
     if conf['GPS']['use_gpio_control']:
         gpios.append(conf['GPS']['gpio2'])
@@ -29,7 +29,7 @@ def run():
 
     gpios = [int(g) for g in gpios]
 
-    GPIO.setmode(GPIO.BOARD)
+    #GPIO.setmode(GPIO.BOARD)
     GPIO.setup(gpios, GPIO.OUT)
     GPIO.output(gpios, GPIO.LOW)
     GPIO.cleanup()

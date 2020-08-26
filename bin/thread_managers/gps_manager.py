@@ -354,8 +354,8 @@ def ValidateLine(currentLine):
     checkSumA, checkSumB = generateFletcherChecksum(currentByteLine[2:-2])
     return (currentByteLine, checkSumA, checkSumB)
 
-def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter):
 
+def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter):
     # Sleep so the program isn't spamming buffer with read requests
     time.sleep(timeToSleep)
 
@@ -418,7 +418,6 @@ def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, co
                     dataDictionary['relPosLength'] = data[7]
 
                     dataDictionary['relPosHeading'] = data[8]
-                    
                     dataDictionary['reserved2_1'] = data[9]
                     dataDictionary['reserved2_2'] = data[10]
                     dataDictionary['reserved2_3'] = data[11]
@@ -515,6 +514,7 @@ def readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, co
 
     return(dataDictionary, LotOfData)
 
+
 class GPSSerialReader(threading.Thread):
     """
     Thread to read from a serial port
@@ -589,9 +589,7 @@ class GPSSerialReader(threading.Thread):
 
             elif protocol == "RTKUBX":
                 try:
-
                     dataDictionary, LotOfData = readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter)
-
                     log.debug("Lines parsed: {0}".format(lineCount)) 
 
                 except Exception as error:

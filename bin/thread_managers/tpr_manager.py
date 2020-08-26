@@ -16,7 +16,6 @@ import sys
 import time
 import board
 import busio
-import adafruit_adxl34x
 import numpy as np
 import argparse
 import datetime
@@ -35,6 +34,7 @@ class Ada_adxl345(object):
         Set up
         : tpr is the [TPR] part of the config file interpreted as a dictionary in initialisation.py
         """
+        import adafruit_adxl34x
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.accelerometer = adafruit_adxl34x.ADXL345(self.i2c)
         self.tilt = None

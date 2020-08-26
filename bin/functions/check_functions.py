@@ -9,44 +9,39 @@ The system components include GPS sensors, radiometers and motor controller.
 import datetime
 from numpy import nan
 
-def check_gps(gps_managers, gps_protocol):
+def check_gps(gps):
     "Verify that GPSes have recent and accurate data"
-    if (len(gps_managers) == 2):
-        lat_lons = [gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon]
-        gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
-        if min(gps_fixes)<2:
-            return False
-    # TODO add case for 1 gps under NMEA protocol
-    elif (len(gps_managers) == 1 and gps_protocol == "rtk"):
-        lat_lons = [gps_managers[0].lat, gps_managers[0].lon]
-        gps_fixes = [gps_manager.fix for gps_manager in gps_managers]
-        if min(gps_fixes)<1:
-            return False
-    else:
+    if gps['manager'] is None:
         return False
-    if None in lat_lons:
+    lat, lon = gps['manager'].lat, gps['manager'].lon
+    gps_fix = gps['manager'].fix
+    if None in [lat, lon, gps_fix]:
+        return False
+    if gps_fix <2 :
         return False
     else:
         return True
 
 
-def check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol):
+def check_heading(gps):
     "Verify that gps derived heading is usable"
-    # TODO: extend with check for single or dual NMEA GPS
-    if (len(gps_managers) == 1) and (gps_protocol == "rtk"):
-
-        if (gps_managers[0].flags_headVehValid == 1) and (gps_managers[0].accHeading < gps_heading_accuracy_limit) and (gps_managers[0].heading is not None):
-            return True
-    else:
+    if gps['manager'] is None:
         return False
+
+    if gps['protocol'] == "rtk":
+        if (gps['managers'].flags_headVehValid == 1) and (gps['manager'].accHeading < gps['heading_accuracy_limit']) and (gps['manager'].heading is not None):
+            return True
+
+    elif gps['protocol'] == 'nmea0183':
+        if gps['manager'].speed >= gps['heading_speed_limit']:
+            return True
 
     return False
 
 
-def check_speed(sample_dict, gps_managers):
+def check_speed(sample_dict, gps):
     "Verify that speed is above set limit"
-    speeds = [gps_manager.speed for gps_manager in gps_managers]
-    return min(speeds) > float(sample_dict['sampling_speed_limit'])
+    return gps['manager'].speed >= float(sample_dict['sampling_speed_limit'])
 
 
 def check_motor(motor_manager):
@@ -76,6 +71,7 @@ def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
 def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""
     return solar_elevation >= sample_dict['solar_elevation_limit']
+
 
 def check_battery(bat_manager, battery):
     """Check whether battery voltage is OK

@@ -31,7 +31,6 @@ from numpy import nan, max
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)
 try:
     import RPi.GPIO as GPIO
-    GPIO.setwarnings(False)
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
@@ -110,16 +109,7 @@ def init_all(conf):
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
     motor = initialisation.motor_init(conf['MOTOR'], ports)
-
-
-    GPSData = conf['GPS']
-    if(GPSData.get('protocol').lower() == "rtk"):
-        from thread_managers.gps_manager import RTKUBX as GPSManager
-        gps = initialisation.gps_rtk_init(conf['GPS'])
-    else:
-        from thread_managers.gps_manager import NMEA0183 as GPSManager
-        gps = initialisation.gps_init(conf['GPS'], ports)
-
+    gps   = initialisation.gps_init(conf['GPS'])
 
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
@@ -131,39 +121,16 @@ def init_all(conf):
         bat_manager.start()
         time.sleep(0.1)
 
-    # collect info on which GPIO pins are being used
+    # collect info on which GPIO pins are being used to control peripherals
     gpios = []
-    if gps['gpio_control']:
-        gpios.append(gps['gpio2'])
-
     if Rad_manager is not None and rad['use_gpio_control']:
         gpios.append(rad['gpio1'])
-        gpios.append(rad['gpio2'])
-        gpios.append(rad['gpio3'])
 
-    # Get the GPS serial objects from the GPS dict
-    gps_ports = [port for key, port in gps.items() if 'serial' in key]
-    # Instantiate GPS monitoring threads
-    if len(gps_ports) > 0:
-        gps_managers = []
+    if gps['manager'] is not None:
+        gps['manager'].add_serial_port(gps['serial1'])
+        gps['manager'].start()
 
-        # if(len(gps_ports) == 1):
-        #     print("send to rtk")
-        # else:
-
-        for port in gps_ports:
-            gps_manager = GPSManager()
-            gps_manager.add_serial_port(port)
-            gps_manager.start()
-            gps_managers.append(gps_manager)
-    else:
-        log.info("Check GPS sensors and Motor connection settings")
     time.sleep(0.1)
-
-    # # Start the GPS checker thread
-    # FIXME: this script is for use of two GPSes. Obsolete? Decision needed.
-    # gps_checker_manager = GPSChecker(gps_managers)
-    # gps_checker_manager.start()
 
     # Get the current motor pos and if not at HOME move it to HOME
     motor_pos = motor_func.get_motor_pos(motor['serial'])
@@ -192,36 +159,32 @@ def init_all(conf):
             rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps_managers, battery, bat_manager, gpios, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps_managers, battery, bat_manager, gpios, tpr, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
     log.info("Starting Tilt/Pitch/Roll manager")
-    if tpr_manager is not None:
-        tpr_manager.start()
+    if tpr['manager'] is not None:
+        tpr['manager'].start()
 
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps_managers, radiometry_manager, motor, battery, bat_manager, gpios, tpr, tpr_manager
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr
 
 
-def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, tpr, tpr_manager, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
-
-    # Stop the GPS checker manager
-    log.info("Stopping dual-gps monitor thread")
-    #gps_checker_manager.stop()
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
     if radiometry_manager is not None:
         radiometry_manager.stop()
 
-    # Stop the GPS managers
-    for gps_manager in gps_managers:
+    # Stop the GPS manager
+    if gps['manager'] is not None:
         log.info("Stopping GPS manager thread")
-        gps_manager.stop()
+        gps['manager'].stop()
         time.sleep(0.5)
 
     # Stop the battery manager
@@ -232,7 +195,7 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
     # Stop the TPR manager
     if tpr['used']:
         log.info("Stopping TPR manager thread")
-        tpr_manager.stop()
+        tpr['manager'].stop()
 
     # Turn all GPIO pins off
     GPIO.output(gpios, GPIO.LOW)
@@ -252,25 +215,21 @@ def stop_all(db, radiometry_manager, gps_managers, battery, bat_manager, gpios, 
     sys.exit(0)
 
 
-def update_gps_values(gps_managers, values):
+def update_gps_values(gps, values):
     """update the gps values to the latest available in the gps managers""" 
-    values['lat0'] = gps_managers[0].lat
-    values['lon0'] = gps_managers[0].lon
-    values['alt0'] = gps_managers[0].alt
-    values['dt'] = gps_managers[0].datetime
-    values['headMot'] = gps_managers[0].headMot
-    values['relPosHeading'] = gps_managers[0].relPosHeading
-    values['accHeading'] = gps_managers[0].accHeading
-    values['fix'] = gps_managers[0].fix
-    values['flags_headVehValid'] = gps_managers[0].flags_headVehValid
-    values['flags_diffSoln'] = gps_managers[0].flags_diffSoln
-    values['flags_gnssFixOK'] = gps_managers[0].flags_gnssFixOK
-    values['speed'] = gps_managers[0].speed
-    values['nsat0'] = gps_managers[0].satellite_number
-    if len(gps_managers) == 2:
-        values['nsat1'] = gps_managers[1].satellite_number
-        values['dt1'] = gps_managers[1].datetime
-
+    values['lat0'] = gps['manager'].lat
+    values['lon0'] = gps['manager'].lon
+    values['alt0'] = gps['manager'].alt
+    values['dt'] = gps['manager'].datetime
+    values['headMot'] = gps['manager'].headMot
+    values['relPosHeading'] = gps['manager'].relPosHeading
+    values['accHeading'] = gps['manager'].accHeading
+    values['fix'] = gps['manager'].fix
+    values['flags_headVehValid'] = gps['manager'].flags_headVehValid
+    values['flags_diffSoln'] = gps['manager'].flags_diffSoln
+    values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
+    values['speed'] = gps['manager'].speed
+    values['nsat0'] = gps['manager'].satellite_number
     return values
 
 
@@ -292,23 +251,23 @@ def format_log_message(counter, ready, values):
                        checks[ready['speed']], strdict['speed'],
                        checks[ready['sun']], strdict['solar_el'])
     message += "\n"
-    message += "[{10}] Heading: Sun {0} Mot {1} Veh {2} Acc: {3}) | fix: {4}, HeadOk: {5}, diffSolnOk: {6}, FixOk {7} | nSat [{8}|{9}] "\
+    message += "[{10}] Heading: Sun {0} Mot {1} Veh {2} Acc: {3}) | fix: {4}, HeadOk: {5}, diffSolnOk: {6}, FixOk {7} | nSat {8} "\
                 .format(strdict['solar_az'], strdict['headMot'], strdict['relPosHeading'],
                         strdict['accHeading'], values['fix'], values['flags_headVehValid'],
-                        values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], values['nsat1'], counter)
+                        values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], counter)
 
     return message
 
 
-def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
-                  motor, battery, bat_manager, gpios, trigger_id, verbose):
+def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
+                  motor, battery, bat_manager, tpr, gpios, trigger_id, verbose):
     """run one measurement cycle
 
     : counter               - measurement cycle number, included for logging
     : conf                  - main configuration (parsed from file)
     : sample                - main sampling settings configuration
     : bat_manager           - battery manager instance
-    : gps_managers          - list of gps manager instances
+    : gps                   - gps settings dictionary including thread manager instance
     : radiometry_manager    - radiometry manager instance
     : rad                   - radiometry configuration
     : battery               - battery management configuration
@@ -325,7 +284,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'speed': None, 'nsat0': None, 'nsat1': None, 'motor_pos': None, 'ship_bearing_mean': None,
               'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
-              'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'dt1': None, 'nsat0': None, 'nsat1': None,
+              'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None}
 
@@ -356,18 +315,15 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
     # Check GPS environment
-    gps_heading_accuracy_limit = conf['GPS'].getfloat('gps_heading_accuracy_limit')
-    gps_protocol = conf['GPS'].get('protocol').lower()
-    ready['gps']  = check_gps(gps_managers, gps_protocol)
-    ready['heading'] = check_heading(gps_managers, gps_heading_accuracy_limit, gps_protocol)
+    ready['gps']  = check_gps(gps)
+    ready['heading'] = check_heading(gps)
     # Check radiometry environment
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
 
     if ready['gps']:
         # read latest gps info and calculate angles for motor
-        values = update_gps_values(gps_managers, values)
-        # time.sleep(2)  # not needed?
-        ready['speed'] = check_speed(sample, gps_managers)
+        values = update_gps_values(gps, values)
+        ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
         values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
@@ -378,18 +334,15 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
             log.warning(message)
             return trigger_id
 
-        # If bearing not fixed, fetch the calculated mean bearing using data from two GPS sensors
+        # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
         if not bearing_fixed:
-            ready['heading'] = True
-            if conf['GPS'].get('n_gps') == 2:
-                from functions.compass_bearing import calculate_initial_compass_bearing
-                values['ship_bearing_mean'] = calculate_initial_compass_bearing(gps_managers[0].lat, gps_managers[0].lon, gps_managers[1].lat, gps_managers[1].lon)
-                #values['ship_bearing_mean'] = gps_checker_manager.mean_bearing
+            if ready['heading']:
+                values['ship_bearing_mean'] = gps['manager'].heading
             else:
-                values['ship_bearing_mean'] = gps_managers[0].heading
+                values['ship_bearing_mean'] = None
 
         # collect latest GPS data
-        values = update_gps_values(gps_managers, values)
+        values = update_gps_values(gps, values)
 
         # Fetch sun variables
         values['solar_az'], values['solar_el'],\
@@ -435,28 +388,15 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         # collect latest GPS data now that a measurement will be triggered
         values = update_gps_values(gps_managers, values)
 
-        # TODO: the gps dicts are really not needed since we can pass the values dict into the database.
-        gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-        if len(gps_managers) == 2:
-            gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-            gps2_manager_dict['used'] = True
-        else:
-            gps2_manager_dict = {}
-            for key in gps1_manager_dict.keys():
-                gps2_manager_dict[key] = None
-            gps2_manager_dict['used'] = False
-
-        # Collect radiometry data and splice together
+        # Collect and combine radiometry data
         spec_data = []
         trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
-        # If db is used, commit the data to it
+        # If local database is used, commit the data
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
+            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
@@ -464,17 +404,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-90])):
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
-        values = update_gps_values(gps_managers, values) # collect latest GPS data
-        # TODO remove use of these dicts, pass value dict to db instead
-        gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-        if len(gps_managers) == 2:
-            gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-            gps2_manager_dict['used'] = True
-        else:
-            gps2_manager_dict = {}
-            for key in gps1_manager_dict.keys():
-                gps2_manager_dict[key] = None
-            gps2_manager_dict['used'] = False
+        values = update_gps_values(gps, values) # collect latest GPS data
 
         # trigger Ed
         spec_data = []
@@ -484,11 +414,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
 
         # If db is used, commit the data to it
         if db_dict['used']:
-            db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['all_sensors'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spectra_data=spec_data)
-
-        log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
+            db_id = db_func.commit_db(db_dict, verbose, gps, trigger_id['all_sensors'], values, spectra_data=spec_data)
+            log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
 
     else:
         trigger = False
@@ -499,24 +426,11 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_
         if seconds_elapsed_since_last_any_commit > 60:
             trigger_id['gps_location'] = datetime.datetime.now()
             # record metadata and GPS data at least every minute
-            values = update_gps_values(gps_managers, values) # collect latest GPS data
-            # TODO remove use of these dicts, pass value dict to db instead
-            gps1_manager_dict = gps_func.create_gps_dict(gps_managers[0])
-            if len(gps_managers) == 2:
-                gps2_manager_dict = gps_func.create_gps_dict(gps_managers[1])
-                gps2_manager_dict['used'] = True
-            else:
-                gps2_manager_dict = {}
-                for key in gps1_manager_dict.keys():
-                    gps2_manager_dict[key] = None
-                gps2_manager_dict['used'] = False
+            values = update_gps_values(gps, values) # collect latest GPS data
 
             if db_dict['used']:
-                db_id = db_func.commit_db(db_dict, verbose, gps1_manager_dict, gps2_manager_dict,
-                                      trigger_id['gps_location'], values['ship_bearing_mean'],
-                                      values['solar_az'], values['solar_el'], spectra_data=None)
+                db_id = db_func.commit_db(db_dict, verbose, trigger_id['gps_location'], values, spectra_data=None)
                 log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
-
 
     message = format_log_message(counter, ready, values)
     log.info(message)
@@ -537,12 +451,11 @@ def run():
     log.info('\n===Started logging===\n')
     try:
         # Initialise everything
-        db_dict, rad, sample, gps_managers, radiometry_manager,\
-            motor, battery, bat_manager, gpios = init_all(conf)
+        db_dict, rad, sample, gps, radiometry_manager,\
+            motor, battery, bat_manager, gpios, tpr = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps_managers,
-                battery, bat_manager, gpios)
+        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -553,23 +466,23 @@ def run():
                   'ed_sensor': datetime.datetime.now(),
                   'gps_location': datetime.datetime.now()}  # stores when data were last recorded
 
-    # Repeat indefinitely until program closed
+    # Repeat indefinitely until program is closed
     counter = 0
     # TODO: replace with some sort of scheduler for better clock synchronization
-    # TODO: periodically update config (timings/limits only)
+    # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
         counter += 1
         try:
-            run_one_cycle(counter, conf, db_dict, rad, sample, gps_managers, radiometry_manager,
-                          motor, battery, bat_manager, gpios, trigger_id, args.verbose)
+            run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
+                          motor, battery, bat_manager, gpios, tpr, trigger_id, args.verbose)
             time.sleep(main_check_cycle_sec)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)
             raise
 
 if __name__ == '__main__':
