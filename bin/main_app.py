@@ -114,7 +114,7 @@ def init_all(conf):
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
-    tpr, tpr_manager = initialisation.tpr_init(conf['TPR'])
+    tpr = initialisation.tpr_init(conf['TPR'])
 
     # start the battery manager
     if battery['used']:
@@ -130,7 +130,9 @@ def init_all(conf):
         gps['manager'].add_serial_port(gps['serial1'])
         gps['manager'].start()
 
-    time.sleep(0.1)
+    log.info("Starting Tilt/Pitch/Roll manager")
+    if tpr['manager'] is not None:
+        tpr['manager'].start()
 
     # Get the current motor pos and if not at HOME move it to HOME
     motor_pos = motor_func.get_motor_pos(motor['serial'])
@@ -159,14 +161,9 @@ def init_all(conf):
             rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps_managers, battery, bat_manager, gpios, tpr, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, gpios, tpr, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
-
-    log.info("Starting Tilt/Pitch/Roll manager")
-    if tpr['manager'] is not None:
-        tpr['manager'].start()
-
 
     # Return all the dicts and manager objects
     return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr
@@ -188,12 +185,12 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
         time.sleep(0.5)
 
     # Stop the battery manager
-    if battery['used']:
+    if battery['used'] and bat_manager is not None:
         log.info("Stopping battery manager thread")
         bat_manager.stop()
 
     # Stop the TPR manager
-    if tpr['used']:
+    if tpr['used'] and tpr['manager'] is not None:
         log.info("Stopping TPR manager thread")
         tpr['manager'].stop()
 
@@ -216,7 +213,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
 
 
 def update_gps_values(gps, values):
-    """update the gps values to the latest available in the gps managers""" 
+    """update the gps values to the latest available in the gps managers"""
     values['lat0'] = gps['manager'].lat
     values['lon0'] = gps['manager'].lon
     values['alt0'] = gps['manager'].alt
