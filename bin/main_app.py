@@ -218,6 +218,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
 
 def update_gps_values(gps, values, tpr=None):
     """update the gps values to the latest available in the gps managers"""
+    log = logging.getLogger()
     values['lat0'] = gps['manager'].lat
     values['lon0'] = gps['manager'].lon
     values['alt0'] = gps['manager'].alt
@@ -231,7 +232,8 @@ def update_gps_values(gps, values, tpr=None):
     values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
-    if tpr is not None:
+    if (tpr is not None) and (tpr['manager'] is not None):
+        log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
         values['tilt_avg'] = tpr['manager'].tilt_avg
         values['tilt_std'] = tpr['manager'].tilt_std
     return values
@@ -264,7 +266,7 @@ def format_log_message(counter, ready, values):
 
 
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
-                  motor, battery, bat_manager, tpr, gpios, trigger_id, verbose):
+                  motor, battery, bat_manager, gpios, tpr, trigger_id, verbose):
     """run one measurement cycle
 
     : counter               - measurement cycle number, included for logging
@@ -328,7 +330,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         # valid positioning data is required to do anything else
-        values = update_gps_values(gps, values)
+        values = update_gps_values(gps, values, tpr)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
@@ -397,7 +399,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
         # collect latest GPS and TPR data now that a measurement will be triggered
-        values = update_gps_values(gps_managers, values, tpr)
+        values = update_gps_values(gps, values, tpr)
 
         # Collect and combine radiometry data
         spec_data = []
