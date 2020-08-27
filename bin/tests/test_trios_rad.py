@@ -13,9 +13,15 @@ import serial.tools.list_ports as list_ports
 from initialisation import rad_init
 from main_app import parse_args, read_config
 from PyTrios import PyTrios as ps
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
+import datetime
+try:
+    import gnuplotlib as gp
+    import numpy as np
+    plot=True
+except:
+    print("To show plots install gnuplot (sudo apt-get install gnuplot) and gnuplotlib (pip3 install gnuplotlib)")
+    plot=False
 
 
 def run_test(conf):
@@ -26,46 +32,31 @@ def run_test(conf):
     config = conf['RADIOMETERS']
     rad, Rad_manager = rad_init(config, ports)
     ports = [config['port1'], config['port2'], config['port3']]
-    #ports = [config['port1']]
-
-    #ps.tchannels = {}
-    #for port in ports:
-    #    print("Checking port: {0}".format(port))
-    #    try:
-    #        c = None
-    #        c = ps.TMonitor(port, baudrate=9600)
-    #        c[0].verbosity = 3
-    #        ps.TCommandSend(c[0], commandset=None, command='query')
-    #        time.sleep(5)
-    #        c[0].threadlive.clear()   # clear to stop thread
-    #        c[0].threadactive.clear()  # clear to pause thread
-    #        time.sleep(1)
-    #        ps.TClose(c[0])
-    #    except Exception as e:
-    #        print("Could not connect to port {0}: \n{1}".format(port, e))
-    #        pass
-
-    # Start the radiometry manager
     print("Starting radiometry manager")
 
     radiometry_manager = Rad_manager(rad)
-    rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
+    time.sleep(1)
 
-    time.sleep(10)
+    print(radiometry_manager)
+
+    trig_id, specs, sids, itimes = radiometry_manager.sample_all(datetime.datetime.now())
+    for i, s in zip(sids,specs):
+        print("Received spectrum from {0}: {1}".format(i, s))
+        if plot:
+            gp.plot(np.array(s), terminal = 'dumb 80,40', unset = 'grid')
+
+    time.sleep(0.5)
 
     print("Stopping radiometry manager threads")
     if radiometry_manager is not None:
         radiometry_manager.stop()
 
     # switch off gpio
-    gpios = []
     if rad['use_gpio_control']:
         print("Switch off GPIO control")
-        gpios.append(rad['gpio1'])
-        gpios.append(rad['gpio2'])
-        gpios.append(rad['gpio3'])
-        # Turn all GPIO pins off
-        GPIO.output(gpios, GPIO.LOW)
+        pin = int(rad['gpio1'])
+        GPIO.setmode(GPIO.BCM)
+        GPIO.output(pin, GPIO.LOW)
         GPIO.cleanup()
 
     sys.exit(0)

@@ -14,5 +14,10 @@ from functions import db_functions
 if __name__ == '__main__':
     args = main_app.parse_args()
     conf = main_app.read_config(args.config_file)
-    db_dict = initialisation.db_init(conf['DATABASE'])
-    conn, cur = db_functions.connect_db(db_dict)
+    try:
+        db_dict = initialisation.db_init(conf['DATABASE'])
+        conn, cur = db_functions.connect_db(db_dict)
+    except:
+        raise
+        sys.exit(1)
+    print("Succesfully connected to database")
