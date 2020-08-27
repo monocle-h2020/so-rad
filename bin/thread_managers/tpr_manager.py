@@ -16,7 +16,6 @@ import sys
 import time
 import board
 import busio
-import adafruit_adxl34x
 import numpy as np
 import argparse
 import datetime
@@ -35,6 +34,7 @@ class Ada_adxl345(object):
         Set up
         : tpr is the [TPR] part of the config file interpreted as a dictionary in initialisation.py
         """
+        import adafruit_adxl34x
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.accelerometer = adafruit_adxl34x.ADXL345(self.i2c)
         self.tilt = None
@@ -76,12 +76,15 @@ class Ada_adxl345(object):
         self.y_acc = y
         self.z_acc = z
 
-        x_axis_rotation = math.atan( y / math.sqrt(x**2 + z**2) )  # this is the roll rotation, around the x (forward) axis. positive is to the right
-        y_axis_rotation = math.atan( x / math.sqrt(y**2 + z**2) )  # this is the pitch rotation, around the y (sideward) axis. positive is up.
+        if abs(x) < 0.00001:
+            x = 0.00001
+        if abs(y) < 0.00001:
+            y = 0.00001
         if abs(z) < 0.00001:
             z = 0.00001
+        x_axis_rotation = math.atan( y / math.sqrt(x**2 + z**2) )  # this is the roll rotation, around the x (forward) axis. positive is to the right
+        y_axis_rotation = math.atan( x / math.sqrt(y**2 + z**2) )  # this is the pitch rotation, around the y (sideward) axis. positive is up.
         z_axis_rotation = math.atan( math.sqrt(x**2 + y**2) / z )  # Theta or Tilt rotation, between z (up) axis and gravity
-
         self.pitch = math.degrees(x_axis_rotation)
         self.roll  = math.degrees(y_axis_rotation)
         self.tilt  = abs(math.degrees(z_axis_rotation))

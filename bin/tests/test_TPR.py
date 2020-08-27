@@ -14,13 +14,13 @@ from initialisation import tpr_init
 from main_app import parse_args, read_config
 
 test_duration_single_reads = 1  # seconds
-test_duration_monitor_average = 1000  # seconds
+test_duration_monitor_average = 10  # seconds
 
 
 def main(conf):
     print("Start test, initialising")
-    tpr, tpr_manager = tpr_init(conf['TPR'])
-
+    tpr = tpr_init(conf['TPR'])
+    tpr_manager = tpr['manager']
     print("Show live data for {0} second (0.01s refresh rate)".format(test_duration_single_reads))
     # get protocol from config
     t1 = time.time()
