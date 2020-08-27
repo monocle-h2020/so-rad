@@ -141,11 +141,11 @@ def init_all(conf):
         # Get the current motor pos and if not at HOME move it to HOME
         motor_pos = motor_func.get_motor_pos(motor['serial'])
         if motor_pos != motor['home_pos']:
-            t0 = time.clock()
+            t0 = time.time()
             log.info("Homing motor.. {0} --> {1}".format(motor_pos, motor['home_pos']))
             motor_func.return_home(motor['serial'])  # FIXME replace with rotate function to home pos as set in config
             moving = True
-            while moving and (time.clock()-t0<5):
+            while moving and (time.time()-t0 < 5):
                 moving = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)[0]
                 if moving is None:
                     moving = True  # assume we are not done
@@ -384,13 +384,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             target_pos = values['motor_angles']['target_motor_pos_step']
             motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
             moving = True
-            t0 = time.clock()  # timeout reference
-            while moving and time.clock()-t0 < 5:
+            t0 = time.time()  # timeout reference
+            while moving and time.time()-t0 < 5:
                 moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
                 if moving is None:
                     moving = True
                 log.info("..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos))
-                if time.clock()-t0 > 5:
+                if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(2)
 
