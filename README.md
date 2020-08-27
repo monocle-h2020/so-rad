@@ -11,6 +11,7 @@ Operation of radiometers for reflectance measurements, referenced by GPS locatio
 Developed as part of the project "Multiscale Observation Networks for Optical monitoring of Coastal waters, Lakes and Estuaries"
 This project has received funding from the European Union’s Horizon 2020 research and innovation programme under grant agreement No 776480
 
+![monocle_logo](https://avatars1.githubusercontent.com/u/36449994?s=200&v=4)
 
 
 Contact stsi-at-pml-dot-ac-dot-uk for further information
