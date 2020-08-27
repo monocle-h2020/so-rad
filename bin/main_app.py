@@ -25,7 +25,6 @@ import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature
-from thread_managers.gps_checker import GPSChecker
 from numpy import nan, max
 
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)

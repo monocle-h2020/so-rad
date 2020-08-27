@@ -117,12 +117,12 @@ class TriosManager(object):
         """reboot sensors by cycling power through GPIO/relay control
         All sensors must then be reconnected/identified"""
         self.busy = True
-        GPIO.setmode(GPIO.BOARD)
-        pins = [self.config['gpio1'], self.config['gpio2'], self.config['gpio3']]
-        GPIO.setup(pins, GPIO.OUT)
-        GPIO.output(pins, GPIO.LOW)
+        GPIO.setmode(GPIO.BCM)
+        pin = self.config['gpio1']
+        GPIO.setup(pin, GPIO.OUT)
+        GPIO.output(pin, GPIO.LOW)
         time.sleep(30)
-        GPIO.output(pins, GPIO.HIGH)
+        GPIO.output(pin, GPIO.HIGH)
         time.sleep(10)
         self.reboot_counter += 1
         self.last_cold_start = datetime.datetime.now()
