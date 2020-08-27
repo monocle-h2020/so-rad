@@ -282,6 +282,7 @@ def init_gpio(conf, state=0):
         pins = []
         if conf['RADIOMETERS'].getboolean('use_gpio_control'):
             pins.append(conf['RADIOMETERS'].getint('gpio1'))
+        GPIO.setmode(GPIO.BCM)
         GPIO.setup(pins, GPIO.OUT)
         GPIO.output(pins, set_state[state])
         GPIO.cleanup()

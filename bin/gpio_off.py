@@ -17,21 +17,15 @@ def run():
     args = parse_args()
     conf = read_config(args.config_file)
 
-    #collect info on which GPIO pins are being used
-    gpios = []
-    if conf['GPS']['use_gpio_control']:
-        gpios.append(conf['GPS']['gpio2'])
+    if conf['RADIOMETERS'].getboolean('use_gpio_control'):
+        pin = conf['RADIOMETERS'].getint('gpio1')
+    else:
+       print("GPIO control is not set")
 
-    if conf['RADIOMETERS']['use_gpio_control']:
-        gpios.append(conf['RADIOMETERS']['gpio1'])
-        gpios.append(conf['RADIOMETERS']['gpio2'])
-        gpios.append(conf['RADIOMETERS']['gpio3'])
-
-    gpios = [int(g) for g in gpios]
-
-    #GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(gpios, GPIO.OUT)
-    GPIO.output(gpios, GPIO.LOW)
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, GPIO.LOW)
+    time.sleep(1)
     GPIO.cleanup()
     print("done")
 
