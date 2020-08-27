@@ -117,7 +117,8 @@ def init_all(conf):
     rad, Rad_manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
     sample = initialisation.sample_init(conf['SAMPLING'])
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
-    tpr = initialisation.tpr_init(conf['TPR'])
+    tpr = initialisation.tpr_init(conf['TPR'])  # tilt sensor
+    rht = initialisation.rht_init(conf['RHT'])  # internal temp/rh sensor
 
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
@@ -136,6 +137,16 @@ def init_all(conf):
     if tpr['manager'] is not None:
         log.info("Starting Tilt/Pitch/Roll manager")
         tpr['manager'].start()
+
+    if rht['manager'] is not None:
+        # take a few readings to stabilize
+        for i in range(5):
+            rht_time, rht_rh, rht_temp = rht['manager'].update_rht_single()
+        try:
+            log.info("Internal Temperature and Humidity: {0:2.1f}C {1:2.1f}% ".format(rht_temp, rht_rh))
+        except:
+            log.error("Could not read RHT sensor")
+        #rht['manager'].start()  # there is no need to run an averaging thread, but it's there if we want it
 
     if motor['used']:
         # Get the current motor pos and if not at HOME move it to HOME
@@ -170,10 +181,10 @@ def init_all(conf):
         radiometry_manager = None
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
@@ -198,6 +209,11 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
         log.info("Stopping TPR manager thread")
         tpr['manager'].stop()
 
+    # Stop the RHT manager
+    if (rht['used']) and (rht['manager'] is not None) and (rht['manager'].started):
+        log.info("Stopping RHT manager thread")
+        rht['manager'].stop()
+
     # Turn all GPIO pins off
     GPIO.output(gpios, GPIO.LOW)
     GPIO.cleanup()
@@ -216,7 +232,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
     sys.exit(0)
 
 
-def update_gps_values(gps, values, tpr=None):
+def update_gps_values(gps, values, tpr=None, rht=None):
     """update the gps values to the latest available in the gps managers"""
     log = logging.getLogger()
     values['lat0'] = gps['manager'].lat
@@ -236,6 +252,11 @@ def update_gps_values(gps, values, tpr=None):
         log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
         values['tilt_avg'] = tpr['manager'].tilt_avg
         values['tilt_std'] = tpr['manager'].tilt_std
+    if (rht is not None) and (rht['manager'] is not None):
+        rh_time, rh, temp = rht['manager'].update_rht_single()
+        log.debug("Temp: {0}C RH: {1}%".format(temp, rh))
+        values['inside_temp'] = temp
+        values['inside_rh'] =   rh
     return values
 
 
@@ -266,7 +287,7 @@ def format_log_message(counter, ready, values):
 
 
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
-                  motor, battery, bat_manager, gpios, tpr, trigger_id, verbose):
+                  motor, battery, bat_manager, gpios, tpr, rht, trigger_id, verbose):
     """run one measurement cycle
 
     : counter               - measurement cycle number, included for logging
@@ -293,7 +314,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None,
-              'tilt_avg': None, 'tilt_std': None}
+              'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None}
 
     use_rad = rad['n_sensors'] > 0
 
@@ -330,7 +351,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         # valid positioning data is required to do anything else
-        values = update_gps_values(gps, values, tpr)
+        values = update_gps_values(gps, values, tpr, rht)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
@@ -399,7 +420,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
         # collect latest GPS and TPR data now that a measurement will be triggered
-        values = update_gps_values(gps, values, tpr)
+        values = update_gps_values(gps, values, tpr, rht)
 
         # Collect and combine radiometry data
         spec_data = []
@@ -464,10 +485,10 @@ def run():
     log.info('\n===Started logging===\n')
     try:
         # Initialise everything
-        db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr = init_all(conf)
+        db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)
+        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -486,15 +507,15 @@ def run():
         counter += 1
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
-                          motor, battery, bat_manager, gpios, tpr, trigger_id, args.verbose)
+                          motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
             time.sleep(main_check_cycle_sec)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
             raise
 
 if __name__ == '__main__':

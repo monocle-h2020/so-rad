@@ -22,6 +22,7 @@ from thread_managers import radiometer_manager
 from thread_managers import battery_manager
 from thread_managers import tpr_manager
 from thread_managers import gps_manager
+from thread_managers import rht_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
 
@@ -161,11 +162,37 @@ def tpr_init(tpr_config):
 
     assert tpr['interface'].lower() in ['ada_adxl345', ]
 
-    # Return the battery configuration dict and initialise relevant manager class
+    # Return the configuration dict and initialise relevant manager class
     if tpr['interface'] == 'ada_adxl345':
         tpr['manager'] = tpr_manager.Ada_adxl345(tpr)
 
     return tpr
+
+
+def rht_init(rht_config):
+    """
+    Read Relative Humidity and Temperature monitoring config settings and initialise RHT connection and monitor
+    : rht_config is the [RHT] section in the config file
+    : rht is a dictionary containing the configuration and manager
+    """
+    rht = {}
+    # Get all the TPR variables from the config file
+    rht['used'] = rht_config.getboolean('use_rht')
+    rht['interface'] = rht_config.get('protocol').lower()
+    rht['pin'] = rht_config.getint('pin')
+    rht['sampling_time'] = rht_config.getint('sampling_time')
+    rht['manager'] = None
+
+    if not rht['used']:
+        return rht
+
+    assert rht['interface'].lower() in ['ada_dht22', ]
+
+    # Return the configuration dict and initialise relevant manager class
+    if rht['interface'] == 'ada_dht22':
+        rht['manager'] = rht_manager.Ada_dht22(rht)
+
+    return rht
 
 
 def gps_init(gps_config, ports):

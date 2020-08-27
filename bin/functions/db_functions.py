@@ -86,7 +86,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                            (trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
-                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp))
+                            batt_v, values['inside_temp'], values['inside_rh'], motor_temp, driver_temp))
 
             sample_id = cur.lastrowid
             conn.commit()
@@ -105,7 +105,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
-                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp, len(spectra_data)))
+                            batt_v, values['inside_temp'], values['inside_rh'], motor_temp, driver_temp, len(spectra_data)))
 
             sample_id = cur.lastrowid
 
