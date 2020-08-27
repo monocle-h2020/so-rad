@@ -12,7 +12,7 @@ Developed as part of the project "Multiscale Observation Networks for Optical mo
 This project has received funding from the European Union’s Horizon 2020 research and innovation programme under grant agreement No 776480
 
 ![monocle_logo](https://avatars1.githubusercontent.com/u/36449994?s=200&v=4)
-
+![eu_flag](https://europa.eu/european-union/sites/europaeu/files/docs/body/flag_yellow_low.jpg)
 
 Contact stsi-at-pml-dot-ac-dot-uk for further information
 
