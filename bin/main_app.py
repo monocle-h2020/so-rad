@@ -216,7 +216,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, idle
     sys.exit(0)
 
 
-def update_gps_values(gps, values):
+def update_gps_values(gps, values, tpr=None):
     """update the gps values to the latest available in the gps managers"""
     values['lat0'] = gps['manager'].lat
     values['lon0'] = gps['manager'].lon
@@ -231,6 +231,9 @@ def update_gps_values(gps, values):
     values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
+    if tpr is not None:
+        values['tilt_avg'] = tpr['manager'].tilt_avg
+        values['tilt_std'] = tpr['manager'].tilt_std
     return values
 
 
@@ -287,7 +290,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
               'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
-              'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None}
+              'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None,
+              'tilt_avg': None, 'tilt_std': None}
 
     use_rad = rad['n_sensors'] > 0
 
@@ -392,8 +396,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading']]):
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
-        # collect latest GPS data now that a measurement will be triggered
-        values = update_gps_values(gps_managers, values)
+        # collect latest GPS and TPR data now that a measurement will be triggered
+        values = update_gps_values(gps_managers, values, tpr)
 
         # Collect and combine radiometry data
         spec_data = []

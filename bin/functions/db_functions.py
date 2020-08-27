@@ -54,7 +54,7 @@ def create_tables(db_dict):
             sun_azimuth float, sun_elevation float,
             motor_temp float, driver_temp float,
             pi_cpu_temp float,
-            tilt float, tilt_var float,
+            tilt_avg float, tilt_std float,
             bearing_accuracy float, sorad_version float,
             batt_v float, inside_temp float, inside_rel_hum float, n_rad_obs integer,
             sos_inserted bool, sos_insertion_attempts integer)"""
@@ -71,21 +71,21 @@ def create_tables(db_dict):
 
 def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
               batt_v=0, pi_cpu_temp=0, motor_temp=0, driver_temp=0,
-              tilt=0, tilt_var=0, software_version=0, inside_temp=0, inside_rel_hum=0):
+              software_version=0, inside_temp=0, inside_rel_hum=0):
     """Commit all the required values to the database object, or just gps/meta data if sensor data aren't available"""
     try:
         conn, cur = connect_db(db_dict)
         if (trigger_id is None) or (spectra_data is None):
             cur.execute("""INSERT INTO sorad_metadata(pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
                            platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
-                           tilt, tilt_var,
+                           tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, sos_inserted, sos_insertion_attempts)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
-                            tilt, tilt_var, values['accHeading'], software_version,
+                            values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
                             batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp))
 
             sample_id = cur.lastrowid
@@ -96,14 +96,14 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
         elif (trigger_id) is not None and (spectra_data is not None):
             cur.execute("""INSERT INTO sorad_metadata(pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
                            platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
-                           tilt, tilt_var,
+                           tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, sos_inserted, sos_insertion_attempts)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                            (trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
-                            tilt, tilt_var,
+                            values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
                             batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp, len(spectra_data)))
 
