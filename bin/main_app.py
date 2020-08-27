@@ -33,7 +33,6 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-
 __version__ = 20200826.0
 
 
@@ -41,8 +40,11 @@ def parse_args():
     """parse command line arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_file', required=True,
-                        help="config file providing programme settings",
+                        help="config file providing program settings",
                         default=u"config.ini")
+    parser.add_argument('-l', '--local_config_file', required=True,
+                        help="system-specific config overrides providing program settings",
+                        default=u"config-local.ini")
     parser.add_argument("--verbose", "-v", type=int, choices=[0, 1, 2, 3, 4],
                          help="set verbosity on output", default=3)
     args = parser.parse_args()
@@ -53,7 +55,7 @@ def parse_args():
     return args
 
 
-def read_config(config_file):
+def read_config(config_file, local_config_file=None):
     """Opens and reads the config file
 
     :param config_file: the config.ini file
@@ -64,6 +66,28 @@ def read_config(config_file):
     config = configparser.ConfigParser()
     config.read(config_file)
     return config
+
+
+def update_config(config, local_config_file=None):
+    """replace any default config values with local overrides"""
+    log = logging.getLogger()
+    if local_config_file is None:
+        return config
+
+    local = configparser.ConfigParser()
+    local.read(local_config_file)
+    for section in local.sections():
+        for key, val in local[section].items():
+            log.info("Local config override: {0}-{1} {2}>{3}"\
+                     .format(section, key, config[section][key], val))
+            config[section][key] = val
+    return config
+
+
+def read_remote_config(remote_config_file):
+    """read a remotely retrieved config file and override selected local settings"""
+    # WIP
+    return
 
 
 def init_logger(conf_log_dict):
@@ -480,8 +504,10 @@ def run():
     conf = read_config(args.config_file)
     # start logging here
     log = init_logger(conf['LOGGING'])
-    #log = logging.getLogger()
     log.info('\n===Started logging===\n')
+
+    conf = update_config(conf, args.local_config_file)
+
     try:
         # Initialise everything
         db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht = init_all(conf)
