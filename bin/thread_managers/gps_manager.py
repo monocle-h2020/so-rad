@@ -668,7 +668,7 @@ class RTKUBX(object):
         self.flags_carrSoln = None
         self.flags_headVehValid = None
         self.flags_psmState = None
-        self.flags_diffsolN = None
+        self.flags_diffSolN = None
         self.flags_gnssFixOK = None
 
         self.flags2_confirmedTime = None
@@ -868,7 +868,7 @@ class RTKUBX(object):
             self.flags_carrSoln = gps_dict['flags'][0:2]
             self.flags_headVehValid = int(gps_dict['flags'][2])
             self.flags_psmState = gps_dict['flags'][3:6]
-            self.flags_diffSoln = int(gps_dict['flags'][6])
+            self.flags_diffSolN = int(gps_dict['flags'][6])
             self.flags_gnssFixOK = int(gps_dict['flags'][7])
 
             self.flags2_confirmedTime = int(gps_dict['flags2'][0])
