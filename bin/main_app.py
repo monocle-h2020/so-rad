@@ -267,7 +267,7 @@ def update_gps_values(gps, values, tpr=None, rht=None):
     values['accHeading'] = gps['manager'].accHeading
     values['fix'] = gps['manager'].fix
     values['flags_headVehValid'] = gps['manager'].flags_headVehValid
-    values['flags_diffSoln'] = gps['manager'].flags_diffSoln
+    values['flags_diffSolN'] = gps['manager'].flags_diffSolN
     values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
@@ -301,10 +301,10 @@ def format_log_message(counter, ready, values):
                        checks[ready['speed']], strdict['speed'],
                        checks[ready['sun']], strdict['solar_el'])
     message += "\n"
-    message += "[{9}] Heading: SunAz {0} Mot {1} Veh {2} Acc: {3}) | Fix: {4}, Head: {5}, diffSoln: {6}, FixFl {7} | nSat {8} "\
+    message += "[{9}] Heading: SunAz {0} Mot {1} Veh {2} Acc: {3}) | Fix: {4}, Head: {5}, diffSolN: {6}, FixFl {7} | nSat {8} "\
                 .format(strdict['solar_az'], strdict['headMot'], strdict['relPosHeading'],
                         strdict['accHeading'], values['fix'], values['flags_headVehValid'],
-                        values['flags_diffSoln'], values['flags_gnssFixOK'], values['nsat0'], counter)
+                        values['flags_diffSolN'], values['flags_gnssFixOK'], values['nsat0'], counter)
 
     return message
 
@@ -336,7 +336,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
               'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
-              'flags_headVehValid': None, 'flags_diffSoln': None, 'flags_gnssFixOK': None,
+              'flags_headVehValid': None, 'flags_diffSolN': None, 'flags_gnssFixOK': None,
               'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None}
 
     use_rad = rad['n_sensors'] > 0

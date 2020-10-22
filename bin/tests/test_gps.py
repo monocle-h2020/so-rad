@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 A simple test to check GPS connectivity
-This test is specifically for a dual-GPS setup (likely obsolete soon!)
-
-Created on Wed Aug 21 09:22:46 2019
 @author: stsi
 """
+
 import os
 import time
 import sys
@@ -15,8 +13,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfi
 import serial.tools.list_ports as list_ports
 import initialisation
 import main_app
+from functions.check_functions import check_gps, check_heading
 
-test_duration = 5  # seconds
+test_duration = 3600  # seconds
 
 def run_test():
     args = main_app.parse_args()
@@ -46,10 +45,18 @@ def run_test():
     print("Showing gps manager data for {0}s, CTRL-C to stop".format(test_duration))
     print("Ports used: {0}".format(gps['manager'].serial_ports))
     t0 = time.time()
+    print("Last update \t\t\t Latitude \t Longitude \t Speed \t\t Fix \t Heading (check) \t N sat (check)")
     while time.time() - t0 < test_duration:
         try:
-            print(gps['manager'].last_update, gps['manager'].lat, gps['manager'].lon, gps['manager'].speed, gps['manager'].fix)
-            time.sleep(0.5)
+            print("""\nTime \t\t {0} \nLat \t\t {1} \t Lon \t {2} \nSpeed \t\t {3} \nFix \t\t {4} \t nSat {7} \t Checks: {8} \nheading \t {5} ({6})""".\
+                  format(gps['manager'].last_update, gps['manager'].lat, gps['manager'].lon,
+                  gps['manager'].speed, gps['manager'].fix,
+                  gps['manager'].heading, check_heading(gps), gps['manager'].satellite_number, check_gps(gps)))
+            print("""headMot \t {0} \nrelPosHead \t {1} \nAcc \t\t {2} \nVehH valid \t {3} \nRelPosH valid\t {4} \nDiff Soln\t {5}\n GNSS fix\t {6}""".\
+                  format(gps['manager'].headMot, gps['manager'].relPosHeading, gps['manager'].accHeading,
+                  gps['manager'].flags_headVehValid, gps['manager'].flag_relPosHeadingValid, gps['manager'].flags_diffSolN, gps['manager'].flags_gnssFixOK))
+
+            time.sleep(0.9)
         except (KeyboardInterrupt, SystemExit):
             print("Stopping GPS manager thread")
             gps['manager'].stop()
