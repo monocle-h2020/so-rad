@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
 
     # Wiggle right/left
-    angles = [5, -5, 15, -15, 30, -30, 90, -90, 0]
+    angles = [motor['ccw_limit']]
 
     # get default motor movement instructions and double speed
     motor_commands_dict = motor_func.commands
