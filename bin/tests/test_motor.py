@@ -29,18 +29,22 @@ if __name__ == '__main__':
     if motor_pos is None:
         print("No answer from motor. Exit")
         sys.exit(1)
+    else:
+        print("Motor position: {0}".format(motor_pos))
 
     if motor_pos != motor['home_pos']:
         t0 = time.perf_counter()
-        print("Homing motor.. {0} --> {1}".format(motor_pos, motor['home_pos']))
-        motor_func.return_home(motor['serial'])  # FIXME replace with rotate function to home pos as set in config
+        moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
+        motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
+        print("Homing motor.. {0} --> {1}".format(motor_deg_pos, motor['home_pos']))
+        motor_func.return_home(motor['serial'])
         moving = True
         while moving and (time.perf_counter()-t0<5):
             moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
             motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
             if moving is None:
                 moving = True  # assume we are not done
-            print("..homing motor..")
+            print("..homing motor.. {}".format(motor_deg_pos))
             time.sleep(1)
         print("..done")
     else:
@@ -50,7 +54,7 @@ if __name__ == '__main__':
 
     # Wiggle right/left
     angles = [5, -5, 15, -15, 30, -30, 90, -90, 0]
-    
+
     # get default motor movement instructions and double speed
     motor_commands_dict = motor_func.commands
     motor_commands_dict['speed_command'].value = hex(4000)[2:].zfill(8)  # default 2000
@@ -58,7 +62,7 @@ if __name__ == '__main__':
     motor_commands_dict['decel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
 
     for target_deg_pos in angles:
-        print("Adjust motor angle ({0} --> {1})".format(motor_pos, target_deg_pos))
+        print("Adjust motor angle ({0} --> {1})".format(motor_deg_pos, target_deg_pos))
         # Rotate the motor to the new position
         target_step_pos = int(target_deg_pos * motor['steps_per_degree'])
         motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
@@ -69,7 +73,7 @@ if __name__ == '__main__':
             motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
             if moving is None:
                 moving = True
-                log.info("..moving motor.. {0} --> {1}".format(motor_deg_pos, target_deg_pos))
+                log.info("..moving motor.. {0:3.3f} --> {1}".format(motor_deg_pos, target_deg_pos))
             time.sleep(0.2)
 
         time.sleep(0.1)
