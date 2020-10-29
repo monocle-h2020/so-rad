@@ -48,6 +48,7 @@ if __name__ == '__main__':
         response = motor_func.read_command(motor['serial'], 1, 3, 214, 2)
         length = int(response[2])
         torq = int.from_bytes(response[3:3+length], byteorder='big')
+        torq_ratio = float(100.0*torq/4294967295)
 
         # read register 222-223: Target position
         response = motor_func.read_command(motor['serial'], 1, 3, 222, 2)
@@ -55,6 +56,6 @@ if __name__ == '__main__':
         tarpos = float(int.from_bytes(response[3:3+length], byteorder='big'))
         tarpos_deg = tarpos/stpd  % 360.0
 
-        print("Alarm: {0} \t Position: {1} ({2:2.2f})\t Torque: {3} \t Target {4} ({5:2.2f})".\
-               format(alarm, detpos, detpos_deg, torq, tarpos, tarpos_deg))
+        print("Alarm: {0} \t Position: {1} ({2:2.2f})\t Torque: {3:2.2f}% \t Target {4} ({5:2.2f})".\
+               format(alarm, detpos, detpos_deg, torq_ratio, tarpos, tarpos_deg))
     sys.exit(0)

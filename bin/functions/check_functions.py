@@ -8,7 +8,8 @@ The system components include GPS sensors, radiometers and motor controller.
 """
 import datetime
 from numpy import nan
-import motor_controller_functions as motor_func
+#import motor_controller_functions as motor_func
+import functions.motor_controller_functions as motor_func
 
 
 def check_gps(gps):
