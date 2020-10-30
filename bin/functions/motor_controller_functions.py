@@ -3,10 +3,28 @@
 """
 Motor Controller Functions
 
+For Oriental Motor stepper motor controller. 
+
 Contains a class for the structure of the commands to send to the motor controller
 and instances of each type of command that are needed.
+
 As well as these, there are functions to send commands to move the motor, get its
 current position and calculate the next position it needs to move to.
+
+The general structure of a single command is
+Slave address 8 bits
+Function code 8 bits
+--03h (3) read from holding register
+--06h (6) write to a holding register
+--08h (8) diagnosis
+--10h (16) write multiple registers
+--17h (23) read/write multiple registers
+Data          nx8 bits
+Error check   16 bits
+--error checks are based on the CRC-16 method
+
+The response code follows the same pattern
+
 """
 
 import time
@@ -21,28 +39,21 @@ import datetime
 import sqlite3
 import traceback
 import logging
-from configparser import ConfigParser as cp
-#from pynput import keyboard
-from argparse import Namespace
-
 import functions.azimuth_functions as azi_func
 import functions.gps_functions as gps_func
 
 log = logging.getLogger() #gets the root logger
 
-if not sys.platform.startswith('win'):
-    if os.uname()[1] == 'raspberrypi' and os.uname()[4].startswith('arm'):
-        import RPi.GPIO as GPIO
-else:
-    log.info("OS detected: {0}".format(sys.platform))
-    log.warning("Not running on a Raspberry Pi. Functionality may be limited to system tests.")
+try:
+    import RPi.GPIO as GPIO
+except:
+    log.warning("GPIO functions not imported. Not running on a Raspberry Pi?")
 
 
 class command_elements():
     """
-    The class that contains all the components of a motor controller command
+    Contains all the components of a motor controller command
     """
-
     def __init__(self, slave_id, function_code, register_address, operation_type, no_of_registers, value, crc16_check = 0000):
         self.slave_id = hex(slave_id)[2:].zfill(2)
         self.function_code = hex(function_code)[2:].zfill(2)
@@ -51,6 +62,47 @@ class command_elements():
         self.no_of_bytes = hex(2 * no_of_registers)[2:].zfill(2)
         self.value = hex(value)[2:].zfill(8)
         self.crc16_check = hex(crc16_check).zfill(4)
+
+def read_command(motor_serial_port, slave_id, function_code, register_address, no_of_registers):
+    """
+    Read multiple registers
+    e.g. read temperature of driver and motor = read_command(1, 3, 248, 4)
+    """
+    id = hex(slave_id)[2:].zfill(2)
+    fun_code = hex(function_code)[2:].zfill(2)
+    reg_address = hex(register_address)[2:].zfill(4)
+    n_regs = hex(no_of_registers)[2:].zfill(4)
+
+    initial_command = "".join([id, fun_code, reg_address, n_regs])
+    # update crc16
+    crc16_modbus = hex(int(crc.modbus(codecs.decode(initial_command, 'hex'))))[2:].zfill(4)
+    crc16_check = ''.join([crc16_modbus[2:4], crc16_modbus[0:2]])
+
+    command = "".join([id, fun_code, reg_address, n_regs, crc16_check])
+
+    # Send the command to the controller
+    motor_serial_port.flushInput()
+    motor_serial_port.flushOutput()
+    motor_serial_port.write(codecs.decode(command, 'hex'))
+    # Read the response
+    time.sleep(0.2)
+    a = motor_serial_port.in_waiting
+
+    # read response of location
+    response = motor_serial_port.read(size=a)
+
+    # convert the response into step num
+    #motor_pos = codecs.encode(motor_pos, 'hex')
+    #motor_pos = motor_pos[6:14]
+    #if motor_pos[0:4] == b'ffff':
+    #    motor_pos = -1 * (65535 - int(motor_pos[4:], 16))
+    #else:
+    #    try:
+    #        motor_pos = int(motor_pos, 16)
+    #    except ValueError:
+    #        log.info("No response from motor")
+    #        motor_pos = None
+    return response
 
 
 # global command set for Oriental motor
@@ -122,9 +174,8 @@ def execute_commands(commands_list, motor_serial_port):
 
 def return_home(motor_serial_port):
     """
-    Sends a pre-programmed command to the motor controller to return to its HOME position. This disregards any user configuration.
+    Sends a pre-programmed command to the motor controller to return to its HOME position (FAST). This disregards any user configuration.
     """
-
     # Return to home operation (fast)
     home_command_start = "0106007D0010181E"
     home_command_stop = "0106007D000019D2"
@@ -150,10 +201,8 @@ def calc_crc16(inputcommand):
     :returns: The CRC16 bytes to append to the end of the command string
     :rtype: str
     """
-
     # Uses the libscrc.modbus function to calculate the CRC16 string for input command
     crc16_modbus = hex(int(crc.modbus(codecs.decode(inputcommand, 'hex'))))[2:].zfill(4)
-
     # Strips the hex string of the 0x and reverses the pair order
     converted_crc16_modbus = ''.join([crc16_modbus[2:4], crc16_modbus[0:2]])
 
@@ -167,7 +216,6 @@ def change_crc16_for_command(command_class):
     :param command_class: Command class to calculate the CRC16 error checking bytes for
     :type command_class: class
     """
-
     # Generate the command without CRC16 in order to calculate it
     inputcommand = "".join([command_class.slave_id,
                             command_class.function_code,
@@ -189,7 +237,6 @@ def generate_command(command_class):
     :return: The full command string for the command class
     :rtype: str
     """
-
     # Calculate an update the CRC16 value for the command
     change_crc16_for_command(command_class)
     # Splice together the elements of the command
@@ -204,57 +251,12 @@ def generate_command(command_class):
     return combined_command
 
 
-# TODO: probably not used. Commenting out to verify this. 
-#def calc_motor_heading(motor_home_pos, motor_step_limit, motor_position,
-#                       mot_pos_1, mot_pos_2, cw_limit_deg, ccw_limit_deg):
-#    """Calculates the relative heading of the motor with respect to solar azimuth
-#
-#    :return: The relative heading of the motor with respect to the sun normalised to 360 degrees
-#    :rtype: int
-#    """
-#
-#    # Convert motor_position into degrees and work out the difference in possible positions
-#    # for where the motor needs to be
-#    diff_pos_1 = abs(mot_pos_1 - (motor_position / 100)) #100 = steps per degree  TODO: get from config  #FIXME now
-#    diff_pos_2 = abs(mot_pos_2 - (motor_position / 100))
-#
-#    if mot_pos_1 >= 0:
-#        achieve_pos_1 = min([mot_pos_1, cw_limit_deg])
-#    else:
-#        achieve_pos_1 = max([mot_pos_1, ccw_limit_deg])
-#
-#    if mot_pos_2 >= 0:
-#        achieve_pos_2 = min([mot_pos_2, cw_limit_deg])
-#    else:
-#        achieve_pos_2 = max([mot_pos_2, ccw_limit_deg])
-#
-#    ach_diff_pos_1 = abs(mot_pos_1 - achieve_pos_1)
-#    ach_diff_pos_2 = abs(mot_pos_2 - achieve_pos_2)
-#
-#    if ach_diff_pos_1 <= ach_diff_pos_2:
-#
-#        final_mot_pos = achieve_pos_1
-#
-#    else:
-#
-#        final_mot_pos = achieve_pos_2
-#
-#    # Work out the motor's current actual bearing (not relative to ship).
-#    # If the motor's home position is in line with the direction the ship
-#    # is travelling, then the motor's actual bearing will be equal to the
-#    # ship's heading. 
-#
-#    relative_heading = azi_func.weird_mod(final_mot_pos - motor_home_pos)
-#    return relative_heading, achieve_pos_1, achieve_pos_2
-
-
 def rotate_motor(command_list, steps_to_rotate, motor_serial_port):
     """Rotate motor to desired _relative_ position from current position
 
     :param steps_to_rotate: The step number to rotate to
     :type steps_to_rotate: int
     """
-
     # If steps is negative, generate the correct string
     if steps_to_rotate < 0:
         negative_steps_num = 65535 - abs(steps_to_rotate)
@@ -278,12 +280,11 @@ def motor_moving(motor_serial_port, final_pos, tolerance=0):
     :param final_pos: The position the motor was given to move to
     :type final pos: int
     """
-
     # Get motor position
     motor_pos = get_motor_pos(motor_serial_port)
 
     if motor_pos is None:
-        return False, None  # FIXME: what to return when motor position is unknown? Need to return None and handle this in calling function
+        return False, None
 
     # If the difference in current pos and new pos is less than the tolerance, don't move, otherwise move
     if abs(motor_pos - final_pos) <= tolerance:
@@ -303,7 +304,7 @@ def get_motor_pos(motor_serial_port):
     :rtype: int
     """
     # Get motor position command
-    get_motor_pos_com = "010300C600022436"  # address ID is fixed here? Ok as long as it is 01
+    get_motor_pos_com = "010300C600022436"  # address ID is assumed to be 01
 
     # Send the command to the motor to fetch its current position
     motor_serial_port.flushInput()
@@ -329,18 +330,3 @@ def get_motor_pos(motor_serial_port):
             motor_pos = None
     return motor_pos
 
-
-# TODO: is this function used? Not found any reference to function. Commenting out to see if anything crashes
-#def motor_calc_and_get_sas(motor_manager, gps_managers):
-#    """Fetch values from the GPS managers and use them to calculate the ship bearing and target positions"""
-#    lat0 = gps_managers[0].lat
-#    lat1 = gps_managers[1].lat
-#    lon0 = gps_managers[0].lon
-#    lon1 = gps_managers[1].lon
-#    alt0 = gps_managers[0].alt
-#    dt = gps_managers[0].datetime
-#    ship_bearing = gps_func.calc_ship_bearing(lat0, lon0, lat1, lon1)
-#    motor_pos_1, motor_pos_2, solar_azi, solar_elev = azi_func.calc_sas_pos(lat0, lon0, alt0, dt, ship_bearing)
-#    motor_manager.get_sas_pos(motor_pos_1, motor_pos_2)  # update motor target positions in motor_manager instance
-#
-#    return ship_bearing, solar_azi, solar_elev

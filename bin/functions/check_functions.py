@@ -8,6 +8,9 @@ The system components include GPS sensors, radiometers and motor controller.
 """
 import datetime
 from numpy import nan
+#import motor_controller_functions as motor_func
+import functions.motor_controller_functions as motor_func
+
 
 def check_gps(gps):
     "Verify that GPSes have recent and accurate data"
@@ -45,8 +48,14 @@ def check_speed(sample_dict, gps):
 
 
 def check_motor(motor_manager):
-    "Verify that Motor is in optimal position"
-    return motor_manager.within_step_thresh()
+    "Verify that Motor is in optimal position and there is no alarm"
+    # read register 128: present alarm code
+    response = motor_func.read_command(motor['serial'], 1, 3, 128, 2)
+    alarm = int.from_bytes(response[3:7], byteorder='big')
+    if alarm > 0:
+        return False
+    else:
+        return motor_manager.within_step_thresh()
 
 
 def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
