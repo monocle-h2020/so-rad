@@ -199,7 +199,7 @@ def init_all(conf):
             rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, gpios, tpr, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
