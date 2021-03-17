@@ -24,7 +24,7 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling
 from numpy import nan, max
 
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)
@@ -256,7 +256,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht,
 
 
 def update_gps_values(gps, values, tpr=None, rht=None):
-    """update the gps values to the latest available in the gps managers"""
+    """update system value dict to the latest available in the sensor managers"""
     log = logging.getLogger()
     values['lat0'] = gps['manager'].lat
     values['lon0'] = gps['manager'].lon
@@ -438,6 +438,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(2)
 
+    ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
+
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading']]):
         # Get the current time of the computer as a unique trigger id
@@ -458,7 +460,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
-        and (all([use_rad, rad['ed_sampling'], ready['gps'], values['solar_el']>-90])):
+        and (ready['ed_sampling']):
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
         values = update_gps_values(gps, values) # collect latest GPS data

@@ -34,13 +34,13 @@ if __name__ == '__main__':
 
     if motor_deg_pos != motor['home_pos']:
         t0 = time.perf_counter()
-        moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
+        moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=motor['steps_per_degree'])
         motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
         print("Homing motor.. {0} --> {1}".format(motor_deg_pos, motor['home_pos']))
         motor_func.return_home(motor['serial'])
         moving = True
         while moving and (time.perf_counter()-t0<5):
-            moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
+            moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=motor['steps_per_degree'])
             motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
             if moving is None:
                 moving = True  # assume we are not done
@@ -49,7 +49,7 @@ if __name__ == '__main__':
         print("..done")
     else:
         print("Motor in home position")
-        moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
+        moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=motor['steps_per_degree'])
         motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
     time.sleep(0.1)
 
@@ -63,21 +63,36 @@ if __name__ == '__main__':
     motor_commands_dict['accel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
     motor_commands_dict['decel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
 
-    for target_deg_pos in angles:
-        print("Adjust motor angle ({0:3.3f} --> {1})".format(motor_deg_pos, target_deg_pos))
-        # Rotate the motor to the new position
-        target_step_pos = int(target_deg_pos * motor['steps_per_degree'])
-        motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
-        moving = True
-        t0 = time.perf_counter()  # timeout reference
-        while moving and time.perf_counter()-t0 < 5:
-            moving, motor_step_pos = motor_func.motor_moving(motor['serial'], target_step_pos, tolerance=int(motor['steps_per_degree']*3))
-            motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
-            if moving is None:
-                moving = True
-                log.info("..moving motor.. {0:3.3f} --> {1}".format(motor_deg_pos, target_deg_pos))
-            time.sleep(0.1)
+    continuous = True
+    while continuous == True:
+        for target_deg_pos in angles:
+            print("Adjust motor angle ({0} --> {1})".format(motor_deg_pos, target_deg_pos))
+            # Rotate the motor to the new position
+            target_step_pos = int(target_deg_pos * motor['steps_per_degree'])
+            motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
+            moving = True
+            t0 = time.perf_counter()  # timeout reference
+            while moving and time.perf_counter()-t0 < 5:
+                tries = 0
+                motor_step_pos = None
+                while tries < 4 and motor_step_pos is None:
+                    tries +=1
+                    moving, motor_step_pos = motor_func.motor_moving(motor['serial'], target_step_pos, tolerance=int(motor['steps_per_degree']))
+                    time.sleep(0.02)
+                    if tries > 1 and motor_step_pos is not None:
+                        print("..position {0:0.2f} received after {1} tries".format(motor_step_pos/motor['steps_per_degree'], tries))
 
-        time.sleep(0.5)
+                if motor_step_pos is not None:
+                    motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
+                else:
+                    print("..no motor position received")
+                    motor_deg_pos = ""
+                if (moving is None) or moving:
+                    moving = True
+                    print("..still moving motor.. {0} --> {1}".format(motor_deg_pos, target_deg_pos))
+                    motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
+                time.sleep(0.1)
+
+            time.sleep(0.5)
 
     sys.exit(0)

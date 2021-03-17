@@ -10,6 +10,7 @@ import ephem
 import math
 from numpy import argsort
 
+
 def wrap180(value):
     """
     This performs modulo operation with 180 and preserves the sign
@@ -38,6 +39,19 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     : motor_dict has limit settings
     : float motor_pos_deg is current motor positions in degrees, measured on motor plane (-180 to 180)
     """
+
+    try:
+        assert lat is not None
+        assert lon is not None
+        assert altitude is not None
+        assert datetime_ is not None
+        assert ship_bearing is not None
+        assert motor_dict is not None
+        assert motor_pos_steps is not None
+
+    except AssertionError:
+        return None, None, None
+
 
     observer = ephem.Observer()
     sun = ephem.Sun()

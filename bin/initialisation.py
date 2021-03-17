@@ -253,6 +253,7 @@ def rad_init(rad_config, ports):
     rad['ed_sampling'] = rad_config.getboolean('ed_sampling')
     rad['ed_sampling_interval'] = rad_config.getint('ed_sampling_interval')
     rad['ed_sensor_id'] = rad_config.get('ed_sensor_id')
+    rad['ed_sampling_min_solar_elevation_deg'] = rad_config.getint('ed_sampling_min_solar_elevation_deg')
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
