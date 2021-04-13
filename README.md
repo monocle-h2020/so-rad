@@ -5,7 +5,7 @@ Operation of radiometers for reflectance measurements, referenced by GPS locatio
 - SOS communication to data backend (Work-In-Progress)
 - Supports NMEA or UBlox-9 (including RTK-heading) positioning devices
 - Supports relative humidity and temperature sensors
-- Supports accelerometer for Tilt/Pith/Roll registration
+- Supports accelerometer for Tilt/Pitch/Roll registration
 
 
 Developed as part of the project "Multiscale Observation Networks for Optical monitoring of Coastal waters, Lakes and Estuaries"
