@@ -50,15 +50,15 @@ def check_speed(sample_dict, gps):
     return gps['manager'].speed >= float(sample_dict['sampling_speed_limit'])
 
 
-def check_motor(motor_manager):
-    "Verify that Motor is in optimal position and there is no alarm"
+def check_motor(motor):
+    "Verify that Motor has no alarm"
     # read register 128: present alarm code
     response = motor_func.read_command(motor['serial'], 1, 3, 128, 2)
     alarm = int.from_bytes(response[3:7], byteorder='big')
     if alarm > 0:
         return False, alarm
     else:
-        return motor_manager.within_step_thresh(), 0
+        return True, alarm
 
 
 def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
