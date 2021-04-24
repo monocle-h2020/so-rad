@@ -290,17 +290,17 @@ def format_log_message(counter, ready, values):
     message = "[{0}] ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
-    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg']:
+    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg']:
         if values[valkey] is not None:
             strdict[valkey] = "{0:.2f}".format(values[valkey])
         else:
             strdict[valkey] = "n/a"
 
-    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Motor {8} ({9})"\
+    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Tilt {8} Motor {9} ({10})"\
                .format(values['batt_voltage'], checks[ready['gps']],
                        checks[ready['heading']], checks[ready['rad']],
                        checks[ready['speed']], strdict['speed'],
-                       checks[ready['sun']], strdict['solar_el'],
+                       checks[ready['sun']], strdict['solar_el'], strdict['tilt_avg'],
                        checks[ready['motor']], values['motor_alarm'])
     message += "\n"
     message += "[{5}] Heading: SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} "\
@@ -394,6 +394,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         else:
             # if no motor is used we'll assume the sensors are pointing in the motor home position. 
             values['motor_pos'] = motor['home_pos']
+            try:
+                values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
+            except:
+                pass
 
         # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
         if not bearing_fixed:
