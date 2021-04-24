@@ -205,6 +205,7 @@ def gps_init(gps_config, ports):
     gps['heading_speed_limit'] = gps_config.getfloat('gps_heading_speed_limit')
     gps['heading_accuracy_limit'] = gps_config.getfloat('gps_heading_accuracy_limit')
     gps['port1'] = None
+    gps['gps_heading_correction'] = gps_config.getfloat('gps_heading_correction')
 
     if gps['protocol'] in ['rtk', ]:
         # heading will be determined from distance between receivers rather than movement, so we need to know which one is nearer the front of the ship

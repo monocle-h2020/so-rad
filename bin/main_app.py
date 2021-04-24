@@ -33,7 +33,7 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20200826.0
+__version__ = 20210424.0
 
 
 def parse_args():
@@ -295,11 +295,12 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7})"\
+    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Motor {8} ({9})"\
                .format(values['batt_voltage'], checks[ready['gps']],
                        checks[ready['heading']], checks[ready['rad']],
                        checks[ready['speed']], strdict['speed'],
-                       checks[ready['sun']], strdict['solar_el'])
+                       checks[ready['sun']], strdict['solar_el'],
+                       checks[ready['motor']], values['motor_alarm'])
     message += "\n"
     message += "[{9}] Heading: SunAz {0} Mot {1} Veh {2} Acc: {3}) | Fix: {4}, Head: {5}, diffSolN: {6}, FixFl {7} | nSat {8} "\
                 .format(strdict['solar_az'], strdict['headMot'], strdict['relPosHeading'],
@@ -337,7 +338,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSolN': None, 'flags_gnssFixOK': None,
-              'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None}
+              'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None, 'motor_alarm': None}
 
     use_rad = rad['n_sensors'] > 0
 
@@ -379,6 +380,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # read motor position to see if it is ready
         if motor['used']:
+            ready['motor'], values['motor_alarm'] = check_motor(motor)  # check for motor alarms
             values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
             if values['motor_pos'] is None:
                 ready['motor'] = False
@@ -393,7 +395,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
         if not bearing_fixed:
             if ready['heading']:
-                values['ship_bearing_mean'] = gps['manager'].heading
+                values['ship_bearing_mean'] = (gps['manager'].heading - gps['gps_heading_correction']) % 360.0
             else:
                 values['ship_bearing_mean'] = None
 

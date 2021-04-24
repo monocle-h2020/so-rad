@@ -32,7 +32,10 @@ def check_heading(gps):
         return False
 
     if gps['protocol'] == "rtk":
-        if (gps['manager'].flags_headVehValid == 1) and (gps['manager'].accHeading < gps['heading_accuracy_limit']) and (gps['manager'].heading is not None):
+        if (gps['manager'].flags_headVehValid == 1) and \
+           (gps['manager'].accHeading < gps['heading_accuracy_limit']) and \
+           (gps['manager'].heading is not None) and \
+           (gps['manager'].heading != 1):
             return True
 
     elif gps['protocol'] == 'nmea0183':
@@ -53,9 +56,9 @@ def check_motor(motor_manager):
     response = motor_func.read_command(motor['serial'], 1, 3, 128, 2)
     alarm = int.from_bytes(response[3:7], byteorder='big')
     if alarm > 0:
-        return False
+        return False, alarm
     else:
-        return motor_manager.within_step_thresh()
+        return motor_manager.within_step_thresh(), 0
 
 
 def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
