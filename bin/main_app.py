@@ -77,10 +77,11 @@ def update_config(config, local_config_file=None):
     local = configparser.ConfigParser()
     local.read(local_config_file)
     for section in local.sections():
-        for key, val in local[section].items():
-            log.info("Local config override: {0}-{1} {2}>{3}"\
-                     .format(section, key, config[section][key], val))
-            config[section][key] = val
+        if len(local[section].items()) > 0:
+            for key, val in local[section].items():
+                log.info("Local config override: {0}-{1} {2}>{3}"\
+                         .format(section, key, config[section][key], val))
+                config[section][key] = val
     return config
 
 
@@ -289,7 +290,7 @@ def format_log_message(counter, ready, values):
     message = "[{0}] ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
-    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading']:
+    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg']:
         if values[valkey] is not None:
             strdict[valkey] = "{0:.2f}".format(values[valkey])
         else:
@@ -302,10 +303,8 @@ def format_log_message(counter, ready, values):
                        checks[ready['sun']], strdict['solar_el'],
                        checks[ready['motor']], values['motor_alarm'])
     message += "\n"
-    message += "[{9}] Heading: SunAz {0} Mot {1} Veh {2} Acc: {3}) | Fix: {4}, Head: {5}, diffSolN: {6}, FixFl {7} | nSat {8} "\
-                .format(strdict['solar_az'], strdict['headMot'], strdict['relPosHeading'],
-                        strdict['accHeading'], values['fix'], values['flags_headVehValid'],
-                        values['flags_diffSolN'], values['flags_gnssFixOK'], values['nsat0'], counter)
+    message += "[{5}] Heading: SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} "\
+                .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'], values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'])
 
     return message
 
@@ -382,6 +381,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         if motor['used']:
             ready['motor'], values['motor_alarm'] = check_motor(motor)  # check for motor alarms
             values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
+            try:
+                values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
+            except:
+                pass
             if values['motor_pos'] is None:
                 ready['motor'] = False
                 message = format_log_message(counter, ready, values)
