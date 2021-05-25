@@ -15,7 +15,6 @@ import threading
 import os
 import sys
 import datetime
-import configparser
 import argparse
 import initialisation
 import logging
@@ -25,6 +24,7 @@ import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling
+import functions.config_functions as cf_func
 from numpy import nan, max
 
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)
@@ -53,42 +53,6 @@ def parse_args():
         raise IOError("Config file not found at {0}".format(args.config_file))
 
     return args
-
-
-def read_config(config_file, local_config_file=None):
-    """Opens and reads the config file
-
-    :param config_file: the config.ini file
-    :type config_file: file
-    :return: dictionary of the config file's contents
-    :rtype: dictionary
-    """
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    return config
-
-
-def update_config(config, local_config_file=None):
-    """replace any default config values with local overrides"""
-    log = logging.getLogger()
-    if local_config_file is None:
-        return config
-
-    local = configparser.ConfigParser()
-    local.read(local_config_file)
-    for section in local.sections():
-        if len(local[section].items()) > 0:
-            for key, val in local[section].items():
-                log.info("Local config override: {0}-{1} {2}>{3}"\
-                         .format(section, key, config[section][key], val))
-                config[section][key] = val
-    return config
-
-
-def read_remote_config(remote_config_file):
-    """read a remotely retrieved config file and override selected local settings"""
-    # WIP
-    return
 
 
 def init_logger(conf_log_dict):
@@ -512,12 +476,12 @@ def run():
     """
     # Parse the command line arguments for the config file
     args = parse_args()
-    conf = read_config(args.config_file)
+    conf = cf_func.read_config(args.config_file)
     # start logging here
     log = init_logger(conf['LOGGING'])
     log.info('\n===Started logging===\n')
 
-    conf = update_config(conf, args.local_config_file)
+    conf = cf_func.update_config(conf, args.local_config_file)
 
     try:
         # Initialise everything
