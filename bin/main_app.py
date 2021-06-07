@@ -254,9 +254,12 @@ def format_log_message(counter, ready, values):
     message = "[{0}] ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
-    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg']:
+    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg', 'lat0', 'lon0']:
         if values[valkey] is not None:
-            strdict[valkey] = "{0:.2f}".format(values[valkey])
+            if valkey in ['lat0', 'lon0']:
+                strdict[valkey] = "{0:.5f}".format(values[valkey])
+            else:
+                strdict[valkey] = "{0:.2f}".format(values[valkey])
         else:
             strdict[valkey] = "n/a"
 
@@ -267,8 +270,10 @@ def format_log_message(counter, ready, values):
                        checks[ready['sun']], strdict['solar_el'], strdict['tilt_avg'],
                        checks[ready['motor']], values['motor_alarm'])
     message += "\n"
-    message += "[{5}] Heading: SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} "\
-                .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'], values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'])
+    message += "[{5}] Heading: SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} | loc: {7}"\
+                .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'],
+                values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'],
+                strdict['lat0'] + " " + strdict['lon0'])
 
     return message
 
