@@ -4,12 +4,38 @@
 Check Functions
 
 Functions to see if system components are ready.
-The system components include GPS sensors, radiometers and motor controller.
+Checks are included to check
+
+-GPS accuracy is suffient
+-Ship heading is accurate
+-Radiometers are ready (sample interval has passed, not currently waiting for data), separate check for Ed sensor sampling interval
+-Motor has no active alarm
+-Speed is above limit set for sampling
+-Sun elevation is above limit set for sampling
+-External battery voltage is sufficient
+-CPU temperature
+-Connectivity to remote data store (for data upload)
+
 """
 import datetime
+import requests
 from numpy import nan
 #import motor_controller_functions as motor_func
 import functions.motor_controller_functions as motor_func
+
+def check_remote_data_store(conf):
+    "Check for response from remote Parse server"
+    export_config_dict = conf['EXPORT']
+    parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
+    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key
+
+    headers = {'content-type': 'application/json', 'X-Parse-Application-Id': parse_app_id}
+    data = "where={'platform_id':'adfj23jklfasdfj323'}"  #  ask for a non existing platform to get an empty but valid response (fine if it does exist)
+    response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
+    if (response.status_code >= 200) and (response.status_code) < 300:
+        return True
+    else:
+        return False
 
 
 def check_gps(gps):

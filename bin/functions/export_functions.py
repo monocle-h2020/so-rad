@@ -3,22 +3,23 @@
 """
 Data export functions
 
-For routine operation from a parent script, call the run_manual function, passing the general (parsed) config object
-Data from the local database will be inspected and any missing metadata elements will be added based on what is provided in the config(-local).ini file.
+For routine operation from a parent script call the run_export function, passing the general config object
+Data from the local database will be inspected and any missing metadata elements will be added to records based on what is provided in the config(-local).ini file.
 
-Can be called from the command line to force upload of data (scenario: So-Rad has been running offline,
-  you want to upload all data after connecting it via a phone during deployment, or after retrieving it).
+This can be called from the command line to force upload of data (scenario: So-Rad has been running offline, run to catch up after re-connecting it.
 If called from command line without the force_manual attribute (specifying how many records to upload),
   this script will run in test-mode, showing whether any records remain to be uploaded and checking connectivity to local and remote data stores.
 
-It is possible for this process to create a database lock, so it is best to run it while not also storing new records (run as part of main_app loop, or stop the main app first)
-The main app will ignore and recover from a database lock but the new record will be lost.
-We cannot open the database in read-only mode to work around this because we want to store an upload succes in the database itself to ignore such records in future attempts.
-Similarly, it is possible for the main_app to create a database lock while this process tries to store an upload result, which would also not be ideal.
+Note: it is possible for this process to create a database lock, so it should be timed not to interfere with creation of new records.
+If the main app is locked out of the databse it will ignore and recover but the new record will be lost.
+Similarly, this process will only try a few times to update the database to mark a record as uploaded.
+
 When run as part of the main_app loop, it is advisable to include a limit on the number of records to process: your ship might be approaching shore, and have a poor data connection at first.
 While uploads are still slow and possibly time out, it would be nice to continue taking measurements. There will be plenty of time to upload all the buffered data on subsequent cycles, or once the ship is in port.
 
-The config-local.ini file will provide any keys required to access the remote store.
+The recommended (and currently implemented) way to run this code is on small data batches whenever the main program loop needs to wait anyway.
+
+The config-local.ini file will provide any keys required to access the remote store. These should be kept out of system logs.
 """
 
 import os
@@ -139,8 +140,6 @@ def update_local_db(db, metadata_id, export_result, record_json):
     """
     conn, cur = db_func.connect_db(db)
     record_dict = json.loads(record_json)
-    log.debug(record_dict)
-    #attempts = record_dict[db['export_attempts_field']] += 1
     attempts = 1
     attempts_field= db['export_attempts_field']
     success_field = db['export_success_field']
@@ -195,9 +194,11 @@ def export_to_parse_server(export_config_dict, json_record):
     """attempt to upload a record to a remote Parse server"""
     parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
     parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key
-
+    parse_clientkey = export_config_dict.get('parse_clientkey')
     headers = {'content-type': 'application/json',
-               'X-Parse-Application-Id': parse_app_id}
+               'X-Parse-Application-Id': parse_app_id,
+               'X-Parse-Client-Key': parse_clientkey}
+
     response = requests.post(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
 
     return response
