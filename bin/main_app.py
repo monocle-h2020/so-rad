@@ -33,7 +33,7 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210424.0
+__version__ = 20210608.0
 
 
 def parse_args():
@@ -63,7 +63,7 @@ def init_logger(conf_log_dict):
     :return: log
     :rtype: logger
     """
-    myFormat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    myFormat = '%(asctime)s|%(name)s|%(levelname)s| %(message)s'
     formatter = logging.Formatter(myFormat)
     log_filename = conf_log_dict['log_file_location']
     if not os.path.isdir(os.path.dirname(log_filename)):
@@ -251,7 +251,7 @@ def update_gps_values(gps, values, tpr=None, rht=None):
 def format_log_message(counter, ready, values):
     """construct a log message based on several system checks"""
     checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
-    message = "[{0}] ".format(counter)
+    message = "[{0}]\n[{0}] ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
     for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg', 'lat0', 'lon0']:
