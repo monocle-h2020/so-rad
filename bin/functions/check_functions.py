@@ -15,27 +15,54 @@ Checks are included to check
 -External battery voltage is sufficient
 -CPU temperature
 -Connectivity to remote data store (for data upload)
-
+-Internet connectivity
 """
+
 import datetime
 import requests
+import json
 from numpy import nan
 #import motor_controller_functions as motor_func
 import functions.motor_controller_functions as motor_func
 
+
 def check_remote_data_store(conf):
-    "Check for response from remote Parse server"
+    "Check for response from remote Parse server. Look for last logged/updated record from this instrument. Return connection status and time of last update"
     export_config_dict = conf['EXPORT']
     parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
-    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key
+    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
+    platform_id = export_config_dict.get('platform_id')
+    parse_clientkey = export_config_dict.get('parse_clientkey')
+    headers = {'content-type': 'application/json',
+               'X-Parse-Application-Id': parse_app_id,
+               'X-Parse-Client-Key': parse_clientkey}
 
-    headers = {'content-type': 'application/json', 'X-Parse-Application-Id': parse_app_id}
-    data = "where={'platform_id':'adfj23jklfasdfj323'}"  #  ask for a non existing platform to get an empty but valid response (fine if it does exist)
+    # some tested examples
+    # data = json.dumps({"where":{"platform_id":platform_id}})  # returns all records of this platform
+    # data =   json.dumps({"where":{"platform_id":platform_id, "content":"status"}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
+    data =   json.dumps({"where":{"platform_id":platform_id}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
+
     response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
     if (response.status_code >= 200) and (response.status_code) < 300:
-        return True
+        if len(response.json()['results']) > 0:
+            # e.g. '2021-06-08T14:59:27.101Z'
+            last_update = datetime.datetime.strptime(response.json()['results'][0]['updatedAt'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            return True, last_update
+        else:
+            return True, None
     else:
-        return False
+        return False, None
+
+
+def check_internet():
+    try:
+        response = requests.get('http://one.one.one.one', verify=True, timeout=0.5)
+        if response.status_code == requests.codes.ok:
+            return True
+        else:
+            return False
+    except Exception as e:
+            return False
 
 
 def check_gps(gps):

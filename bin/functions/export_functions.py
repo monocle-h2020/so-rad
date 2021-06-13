@@ -35,6 +35,7 @@ import config_functions as cf_func
 import db_functions as db_func
 from numpy import unique
 import time
+import datetime
 
 TIMEOUT=1.5  # timeout for getting any response update from the remote server to prevent main program gettting stuck too long.
 
@@ -61,6 +62,7 @@ def db_init(db_config, dbfile):
     try:
         header_meta = column_names(conn, cur, table="sorad_metadata")
         header_rad = column_names(conn, cur, table="sorad_radiometry")
+        db['header_meta'] = header_meta
         db['header'] = header_rad + header_meta
     except Exception as err:
         msg = "Error connecting to database: \n {0}".format(err)
@@ -122,14 +124,12 @@ def run_export(conf, limit=1, test_run=True, dbfile=None):
         if test_run:
             continue
 
-        response = export_to_parse_server(export_config_dict, record_json)
-        log.debug("Remote server response was: {0}".format(response))
-        if (response.status_code >= 200) and (response.status_code < 300):
+        export_result, response_code = export_to_parse_server(export_config_dict, record_json)
+        log.debug("Remote server response was: {0}".format(response_code))
+        if export_result:
             log.info("Record {0} uploaded succesfully".format(json.loads(record_json)['id_']))
-            export_result = True
         else:
             log.debug("Export failed, try again later")
-            export_result = False
 
         update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
 
@@ -167,6 +167,7 @@ def add_metadata(export_config_dict, record, db):
     record_as_dict = dict(zip(db['header'], record))
 
     # metadata from export section of config (operator-defined)
+    meta_as_dict['content']             = "observation"
     record_as_dict['platform_id']       = export_config_dict.get('platform_id')
     record_as_dict['owner_contact']     = export_config_dict.get('owner_contact')
     record_as_dict['operator_contact']  = export_config_dict.get('operator_contact')
@@ -192,7 +193,7 @@ def add_metadata(export_config_dict, record, db):
 
 def export_to_parse_server(export_config_dict, json_record):
     """attempt to upload a record to a remote Parse server"""
-    parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
+    parse_app_url = export_config_dict.get('parse_url')  # something like https://1.2.3.4:port/parse/classes/sorad
     parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key
     parse_clientkey = export_config_dict.get('parse_clientkey')
     headers = {'content-type': 'application/json',
@@ -200,8 +201,77 @@ def export_to_parse_server(export_config_dict, json_record):
                'X-Parse-Client-Key': parse_clientkey}
 
     response = requests.post(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
+    if (result.status_code >= 200) and (result.status_code < 300):
+        return True, reponse.status_code
+    else:
+        return False, response.status_code
 
-    return response
+
+def update_status_parse_server(conf, dbfile=None):
+    "Update latest status update on Parse server. A status update has the 'content' field set to 'status' and only contains a metadata record"
+    export_config_dict = conf['EXPORT']
+    db = db_init(conf['DATABASE'], dbfile)
+
+    parse_app_url = export_config_dict.get('parse_url')  # something like https://1.2.3.4:port/parse/classes/sorad
+    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
+    platform_id = export_config_dict.get('platform_id')
+    parse_clientkey = export_config_dict.get('parse_clientkey')
+    headers = {'content-type': 'application/json',
+               'X-Parse-Application-Id': parse_app_id,
+               'X-Parse-Client-Key': parse_clientkey}
+
+    data =   json.dumps({"where":{"platform_id":platform_id, "content": "status"}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt,gps_time,pc_time"})
+    response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
+    if (response.status_code < 200) or (response.status_code) > 299:
+        # the request failed this time
+        return False, None
+
+    # collect data from local db
+    sql_meta = """SELECT * FROM sorad_metadata meta ORDER BY meta.id_ DESC LIMIT 1"""
+    conn, cur = db_func.connect_db(db)
+    cur.execute(sql_meta)
+    meta_local = cur.fetchall()  # list containing only the latest local db record, if any
+    conn.close()
+    if len(meta_local) > 0:
+        meta_local = meta_local[0] # latest local db record
+    else:
+        # no data in local database
+        return False, None
+
+    meta_as_dict = dict(zip(db['header_meta'], meta_local))
+    meta_as_dict['content']           = "status"
+    meta_as_dict['platform_id']       = export_config_dict.get('platform_id')
+    meta_as_dict['owner_contact']     = export_config_dict.get('owner_contact')
+    meta_as_dict['operator_contact']  = export_config_dict.get('operator_contact')
+    # create location object
+    if 'location' not in meta_as_dict:
+        meta_as_dict['location'] = json.dumps({'__type': 'GeoPoint',
+                                               'latitude': meta_as_dict[db['lat_field']],
+                                               'longitude': meta_as_dict[db['lon_field']]})
+    if 'time' not in meta_as_dict:
+        meta_as_dict['time'] = meta_as_dict[db['time_field']]
+
+    meta_json = json.dumps(meta_as_dict)
+
+    # inspect the remote server response
+    response = response.json()
+    if len(response['results']) == 0:
+        # request succeeded but no object was found (remote store was likely cleared, or this is a new platform ID). Attempt to upload a new status record.
+        export_result, resultcode = export_to_parse_server(export_config_dict, meta_json)
+        if export_result:
+            log.debug("Status record creation failed, try again later")
+        else:
+            log.info("New status record created at remote store")
+
+    else:
+        # get time of last update and corresponding objectID and update with latest system info
+        response = response['results'][0]
+        last_update = datetime.datetime.strptime(response['updatedAt'], '%Y-%m-%dT%H:%M:%S.%fZ')
+        objectId = response['objectId']
+        log.debug(f"Last update record on remote server ID {objectId} at {last_update} (server time)")
+        # update the status object
+        log.debug("Now attempt to update the remote object")
+        log.debug("Now work out the time difference between server time and local time..")
 
 
 def column_names(conn, cur, table="sorad_metadata"):
@@ -269,6 +339,8 @@ def parse_args():
                         help="path to a specific database file rather than the one in current use")
     parser.add_argument('-d', '--debug', required=False, action='store_true',
                         help="set log level to debug")
+    parser.add_argument('-u', '--update', required=False, action='store_true',
+                        help="Update remote status record")
 
     args = parser.parse_args()
 
@@ -309,7 +381,10 @@ if __name__ == '__main__':
         limit = 1
         test_run = True
 
-    run_export(conf, limit=limit, test_run=test_run, dbfile=args.source)
+    if not args.update:
+        run_export(conf, limit=limit, test_run=test_run, dbfile=args.source)
+    else:
+        update_status_parse_server(conf, dbfile=args.source)
 
 else:
     log = logging.getLogger('export')  # import root logger
