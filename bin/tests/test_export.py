@@ -89,6 +89,8 @@ if __name__ == '__main__':
         test_run = True
 
     if not args.update:
-        run_export(conf, db, limit=limit, test_run=test_run)
+        export_result, status_code, successes = run_export(conf, db, limit=limit, test_run=test_run)
+        log.info(f"{successes} records uploaded")
     else:
-        update_status_parse_server(conf, db)
+        export_result, status_code = update_status_parse_server(conf, db)
+        log.info(f"status upload success: {export_result}")

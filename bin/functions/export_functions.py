@@ -38,7 +38,7 @@ import datetime
 
 TIMEOUT=1.5  # timeout for getting any response update from the remote server to prevent main program gettting stuck too long.
 
-log = logging.getLogger('export')  
+log = logging.getLogger('export')
 #log.setLevel(logging.INFO)
 
 def run_export(conf, db, limit=1, test_run=True):
@@ -58,21 +58,27 @@ def run_export(conf, db, limit=1, test_run=True):
         for j, record in enumerate(records):
             records[j] = record + (sample_uuids[record[i]],)
 
+    successes = 0
     for i, record in enumerate(records):
         record_json = add_metadata(export_config_dict, record, db)  # add metadata and return json
         log.debug("{0}/{1} JSON formatted record: {2}".format(i, len(records)-1, record_json))
 
         if test_run:
+            export_result = None
+            response_code = None
             continue
 
         export_result, response_code = export_to_parse_server(export_config_dict, record_json)
         log.debug("Remote server response was: {0}".format(response_code))
         if export_result:
             log.debug("Record {0} uploaded succesfully".format(json.loads(record_json)['id_']))
+            successes += 1
         else:
             log.debug("Export failed, try again later")
 
         update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
+
+    return export_result, response_code, successes
 
 
 def update_local_db(db, metadata_id, export_result, record_json):
@@ -148,6 +154,22 @@ def export_to_parse_server(export_config_dict, json_record):
         return False, response.status_code
 
 
+def update_on_parse_server(export_config_dict, json_record, objectId):
+    """attempt to upload a record to a remote Parse server"""
+    parse_app_url = export_config_dict.get('parse_url') + f"/{objectId}"   # something like https://1.2.3.4:port/parse/classes/sorad/dfjwf3df
+    parse_app_id = export_config_dict.get('parse_app_id')                  # ask the parse server admin for this key
+    parse_clientkey = export_config_dict.get('parse_clientkey')
+    headers = {'content-type': 'application/json',
+               'X-Parse-Application-Id': parse_app_id,
+               'X-Parse-Client-Key': parse_clientkey}
+
+    response = requests.put(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
+    if (response.status_code >= 200) and (response.status_code < 300):
+        return True, response.status_code
+    else:
+        return False, response.status_code
+
+
 def update_status_parse_server(conf, db):
     "Update latest status update on Parse server. A status update has the 'content' field set to 'status' and only contains a metadata record"
     export_config_dict = conf['EXPORT']
@@ -209,9 +231,10 @@ def update_status_parse_server(conf, db):
         last_update = datetime.datetime.strptime(response['updatedAt'], '%Y-%m-%dT%H:%M:%S.%fZ')
         objectId = response['objectId']
         log.debug(f"Last update record on remote server ID {objectId} at {last_update} (server time)")
-        # TODO: update the status object
-        log.debug("Now attempt to update the remote object")
-        log.debug("Now work out the time difference between server time and local time..")
+        export_result, resultcode = update_on_parse_server(export_config_dict, meta_json, objectId)
+        #log.debug("Now work out the time difference between server time and local time..")
+
+    return export_result, resultcode
 
 
 def identify_new_local_records(db, limit=10):

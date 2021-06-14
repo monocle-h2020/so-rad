@@ -527,14 +527,14 @@ def run():
                 # while system idles, check how many samples need uploading, upload a batch and check again
                 n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
                 if n_not_inserted == 0:
-                    update_status_parse_server(conf, db_dict)
+                    export_result, resultcode = update_status_parse_server(conf, db_dict)
 
                 else:
                     n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
                     while (1.0 + time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0:
                         log.info(f"Uploading last 10 records ({n_not_inserted} pending)")
-                        run_export(conf, db_dict, limit=10, test_run=False)
-                        n_not_inserted = n_not_inserted - 10
+                        export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
+                        n_not_inserted = n_not_inserted - successes
                         time.sleep(0.05)
 
             else:
