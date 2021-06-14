@@ -13,16 +13,20 @@ import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 from initialisation import motor_init
-from main_app import parse_args, read_config
+from main_app import parse_args
 import functions.motor_controller_functions as motor_func
+import functions.config_functions as cf
 import codecs
 
 test_duration = 3600
 print("Run test for {0} seconds. Press CTRL-C to stop".format(test_duration))
 
+
 if __name__ == '__main__':
     args = parse_args()
-    conf = read_config(args.config_file)
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
+
     ports = list_ports.comports()
     motor = motor_init(conf['MOTOR'], ports)
     stpd = float(motor['steps_per_degree'])

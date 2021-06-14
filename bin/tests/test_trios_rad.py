@@ -11,7 +11,8 @@ import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 from initialisation import rad_init
-from main_app import parse_args, read_config
+from main_app import parse_args
+import functions.config_functions as cf
 from PyTrios import PyTrios as ps
 import RPi.GPIO as GPIO
 import datetime
@@ -43,7 +44,10 @@ def run_test(conf):
     for i, s in zip(sids,specs):
         print("Received spectrum from {0}: {1}".format(i, s))
         if plot:
-            gp.plot(np.array(s), terminal = 'dumb 80,40', unset = 'grid')
+            try:
+               gp.plot(np.array(s), terminal = 'dumb 80,40', unset = 'grid')
+            except:
+                print("Plotting failed for some reason. Sorry")
 
     time.sleep(0.5)
 
@@ -63,7 +67,7 @@ def run_test(conf):
 
 if __name__ == '__main__':
     args = parse_args()
-    conf = read_config(args.config_file)
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
     run_test(conf)
-
 

@@ -8,12 +8,16 @@ import sys
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import initialisation
-import main_app
+from main_app import parse_args
 from functions import db_functions
+import functions.config_functions as cf
+
 
 if __name__ == '__main__':
-    args = main_app.parse_args()
-    conf = main_app.read_config(args.config_file)
+    args = parse_args()
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
+
     try:
         db_dict = initialisation.db_init(conf['DATABASE'])
         conn, cur = db_functions.connect_db(db_dict)

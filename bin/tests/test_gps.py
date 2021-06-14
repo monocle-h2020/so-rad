@@ -12,14 +12,18 @@ import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 import initialisation
-import main_app
+from main_app import parse_args
 from functions.check_functions import check_gps, check_heading
+import functions.config_functions as cf
 
 test_duration = 3600  # seconds
 
+
 def run_test():
-    args = main_app.parse_args()
-    conf = main_app.read_config(args.config_file)
+    args = parse_args()
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
+
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
         print("port info: {0} {1} {2}".format(port, desc, hwid))
