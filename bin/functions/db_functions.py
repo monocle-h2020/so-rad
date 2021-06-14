@@ -33,6 +33,17 @@ def connect_db(db_dict):
     return conn, cur
 
 
+def column_names(conn, cur, table="sorad_metadata"):
+    """retreive column names from an sqlite3 db table"""
+    sql = """SELECT name FROM PRAGMA_TABLE_INFO(?)"""
+    cur.execute(sql, (table,))
+    columns = cur.fetchall()
+    if columns is not None:
+        columns = [c[0] for c in columns]
+    log.debug(columns)
+    return columns
+
+
 def create_tables(db_dict):
     "Create database and tables, if they don't already exist"
     if not os.path.exists(db_dict['file']):

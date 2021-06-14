@@ -23,7 +23,8 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling, check_internet, check_remote_data_store
+from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
 import functions.config_functions as cf_func
 from numpy import nan, max
 
@@ -395,7 +396,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
-        # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
+        # If the sun is in a suitable position but the motor is not at the required position, move the motor, unless speed criterion is not met
         # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
         if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
                                                                                                                   and (ready['speed'])\
@@ -416,6 +417,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(2)
 
+    # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # If all checks are good, take radiometry measurements
@@ -436,7 +438,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
             log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
 
-    # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
+    # alternatively trigger just the Ed sampling, if corresponding conditions are met
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
         and (ready['ed_sampling']):
         trigger_id['ed_sensor'] = datetime.datetime.now()
@@ -454,6 +456,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
             log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
 
+    # Alternatively check to see if just the gps location / metadata should be written
     else:
         trigger = False
         last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
@@ -513,7 +516,33 @@ def run():
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
-            time.sleep(main_check_cycle_sec)
+
+            # remote data store(s) operations go here, ideally within the time window where the system is idling
+            t0 = time.perf_counter()
+
+            if (not check_internet()) or (not conf['EXPORT']['use_export']):
+                log.debug("No internet connection")
+
+            elif check_remote_data_store(conf):
+                # while system idles, check how many samples need uploading, upload a batch and check again
+                n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
+                if n_not_inserted == 0:
+                    update_status_parse_server(conf, db_dict)
+
+                else:
+                    n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
+                    while (1.0 + time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0:
+                        log.info(f"Uploading last 10 records ({n_not_inserted} pending)")
+                        run_export(conf, db_dict, limit=10, test_run=False)
+                        n_not_inserted = n_not_inserted - 10
+                        time.sleep(0.05)
+
+            else:
+                log.info("Could not reach remote data store")
+
+            time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
+            if time_to_sleep > 0:
+                time.sleep(time_to_sleep)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
