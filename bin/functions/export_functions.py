@@ -36,10 +36,9 @@ from numpy import unique
 import time
 import datetime
 
-TIMEOUT=1.5  # timeout for getting any response update from the remote server to prevent main program gettting stuck too long.
+TIMEOUT=5  # timeout for getting any response update from the remote server to prevent main program gettting stuck too long.
 
 log = logging.getLogger('export')
-#log.setLevel(logging.INFO)
 
 def run_export(conf, db, limit=1, test_run=True):
     """
@@ -74,7 +73,9 @@ def run_export(conf, db, limit=1, test_run=True):
             log.debug("Record {0} uploaded succesfully".format(json.loads(record_json)['id_']))
             successes += 1
         else:
-            log.debug("Export failed, try again later")
+            log.debug("Data upload failed, try again later")
+            update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
+            return export_result, response_code, successes
 
         update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
 
@@ -147,11 +148,18 @@ def export_to_parse_server(export_config_dict, json_record):
                'X-Parse-Application-Id': parse_app_id,
                'X-Parse-Client-Key': parse_clientkey}
 
-    response = requests.post(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
-    if (response.status_code >= 200) and (response.status_code < 300):
-        return True, response.status_code
-    else:
-        return False, response.status_code
+    try:
+        response = requests.post(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
+        if (response.status_code >= 200) and (response.status_code < 300):
+            return True, response.status_code
+        else:
+            return False, response.status_code
+    except requests.exceptions.ReadTimeout:
+        log.warning("Timeout while uploading data to remote server")
+        return False, None
+    except:
+        log.warning("Unhandled exception while uploading data to remote server")
+        return False, None
 
 
 def update_on_parse_server(export_config_dict, json_record, objectId):
@@ -163,11 +171,18 @@ def update_on_parse_server(export_config_dict, json_record, objectId):
                'X-Parse-Application-Id': parse_app_id,
                'X-Parse-Client-Key': parse_clientkey}
 
-    response = requests.put(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
-    if (response.status_code >= 200) and (response.status_code < 300):
-        return True, response.status_code
-    else:
-        return False, response.status_code
+    try:
+        response = requests.put(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
+        if (response.status_code >= 200) and (response.status_code < 300):
+            return True, response.status_code
+        else:
+            return False, response.status_code
+    except requests.exceptions.ReadTimeout:
+        log.warning("Timeout while updating status on remote server")
+        return False, None
+    except:
+        log.warning("Unhandled exception while updating status on remote server")
+        return False, None
 
 
 def update_status_parse_server(conf, db):
@@ -183,9 +198,16 @@ def update_status_parse_server(conf, db):
                'X-Parse-Client-Key': parse_clientkey}
 
     data =   json.dumps({"where":{"platform_id":platform_id, "content": "status"}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt,gps_time,pc_time"})
-    response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
-    if (response.status_code < 200) or (response.status_code) > 299:
-        # the request failed this time
+    try:
+        response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
+        if (response.status_code < 200) or (response.status_code) > 299:
+            # the request failed this time
+            return False, None
+    except requests.exceptions.ReadTimeout:
+        log.warning("Timeout while getting status record from remote server")
+        return False, None
+    except:
+        log.warning("Unhandled exception while getting status record from remote server")
         return False, None
 
     # collect data from local db
@@ -220,7 +242,7 @@ def update_status_parse_server(conf, db):
     if len(response['results']) == 0:
         # request succeeded but no object was found (remote store was likely cleared, or this is a new platform ID). Attempt to upload a new status record.
         export_result, resultcode = export_to_parse_server(export_config_dict, meta_json)
-        if export_result:
+        if not export_result:
             log.debug("Status record creation failed, try again later")
         else:
             log.debug("New status record created at remote store")
@@ -232,7 +254,6 @@ def update_status_parse_server(conf, db):
         objectId = response['objectId']
         log.debug(f"Last update record on remote server ID {objectId} at {last_update} (server time)")
         export_result, resultcode = update_on_parse_server(export_config_dict, meta_json, objectId)
-        #log.debug("Now work out the time difference between server time and local time..")
 
     return export_result, resultcode
 

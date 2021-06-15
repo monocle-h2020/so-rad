@@ -24,6 +24,9 @@ import json
 from numpy import nan
 #import motor_controller_functions as motor_func
 import functions.motor_controller_functions as motor_func
+import logging
+
+log = logging.getLogger('checks')
 
 
 def check_remote_data_store(conf):
@@ -42,15 +45,22 @@ def check_remote_data_store(conf):
     # data =   json.dumps({"where":{"platform_id":platform_id, "content":"status"}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
     data =   json.dumps({"where":{"platform_id":platform_id}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
 
-    response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
-    if (response.status_code >= 200) and (response.status_code) < 300:
-        if len(response.json()['results']) > 0:
-            # e.g. '2021-06-08T14:59:27.101Z'
-            last_update = datetime.datetime.strptime(response.json()['results'][0]['updatedAt'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            return True, last_update
+    try:
+        response = requests.get(parse_app_url, data=data, headers=headers, timeout=1.0)  # timeout of 0.5 s prevents main program loop from getting stuck too long
+        if (response.status_code >= 200) and (response.status_code) < 300:
+            if len(response.json()['results']) > 0:
+                # e.g. '2021-06-08T14:59:27.101Z'
+                last_update = datetime.datetime.strptime(response.json()['results'][0]['updatedAt'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                return True, last_update
+            else:
+                return True, None
         else:
-            return True, None
-    else:
+            return False, None
+    except requests.exceptions.ReadTimeout:
+        log.warning("Timeout connecting to remote data store")
+        return False, None
+    except:
+        log.warning("Unhandled exception connecting to remote data store")
         return False, None
 
 

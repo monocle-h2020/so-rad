@@ -64,7 +64,7 @@ def init_logger(conf_log_dict):
     :return: log
     :rtype: logger
     """
-    myFormat = '%(asctime)s|%(name)s|%(levelname)s| %(message)s'
+    myFormat = '%(asctime)s | %(name)s | %(levelname)s | %(message)s'
     formatter = logging.Formatter(myFormat)
     log_filename = conf_log_dict['log_file_location']
     if not os.path.isdir(os.path.dirname(log_filename)):
@@ -252,7 +252,7 @@ def update_gps_values(gps, values, tpr=None, rht=None):
 def format_log_message(counter, ready, values):
     """construct a log message based on several system checks"""
     checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
-    message = "[{0}]\n[{0}] ".format(counter)
+    message = "{0} | ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
     for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg', 'lat0', 'lon0']:
@@ -264,14 +264,14 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Tilt {8} Motor {9} ({10})"\
+    message += "Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Tilt {8} Motor {9} ({10})"\
                .format(values['batt_voltage'], checks[ready['gps']],
                        checks[ready['heading']], checks[ready['rad']],
                        checks[ready['speed']], strdict['speed'],
                        checks[ready['sun']], strdict['solar_el'], strdict['tilt_avg'],
                        checks[ready['motor']], values['motor_alarm'])
-    message += "\n"
-    message += "[{5}] Heading: SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} | loc: {7}"\
+    message += "\n\t\t\t"
+    message += "{5} | SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} | loc: {7}"\
                 .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'],
                 values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'],
                 strdict['lat0'] + " " + strdict['lon0'])
@@ -523,15 +523,16 @@ def run():
             if (not check_internet()) or (not conf['EXPORT']['use_export']):
                 log.debug("No internet connection")
 
-            elif check_remote_data_store(conf):
+            elif check_remote_data_store(conf)[0]:
                 # while system idles, check how many samples need uploading, upload a batch and check again
                 n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
                 if n_not_inserted == 0:
                     export_result, resultcode = update_status_parse_server(conf, db_dict)
 
                 else:
+                    export_result = True
                     n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-                    while (1.0 + time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0:
+                    while ((1.0 + time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
                         log.info(f"Uploading last 10 records ({n_not_inserted} pending)")
                         export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
                         n_not_inserted = n_not_inserted - successes
