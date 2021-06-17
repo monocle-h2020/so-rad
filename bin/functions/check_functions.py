@@ -46,7 +46,7 @@ def check_remote_data_store(conf):
     data =   json.dumps({"where":{"platform_id":platform_id}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
 
     try:
-        response = requests.get(parse_app_url, data=data, headers=headers, timeout=1.0)  # timeout of 0.5 s prevents main program loop from getting stuck too long
+        response = requests.get(parse_app_url, data=data, headers=headers, timeout=2.0)  # timeout of 1 s prevents main program loop from getting stuck too long
         if (response.status_code >= 200) and (response.status_code) < 300:
             if len(response.json()['results']) > 0:
                 # e.g. '2021-06-08T14:59:27.101Z'

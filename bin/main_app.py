@@ -270,8 +270,8 @@ def format_log_message(counter, ready, values):
                        checks[ready['speed']], strdict['speed'],
                        checks[ready['sun']], strdict['solar_el'], strdict['tilt_avg'],
                        checks[ready['motor']], values['motor_alarm'])
-    message += "\n\t\t\t"
-    message += "{5} | SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} | loc: {7}"\
+    #message += "\n"
+    message += " | SunAz {0} Ship {1} Motor {6}| Fix: {2} ({4} sats) | loc: {7}"\
                 .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'],
                 values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'],
                 strdict['lat0'] + " " + strdict['lon0'])
@@ -302,7 +302,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
-    values = {'speed': None, 'nsat0': None, 'motor_pos': None, 'ship_bearing_mean': None,
+    values = {'counter': counter, 'speed': None, 'nsat0': None, 'motor_pos': None, 'ship_bearing_mean': None,
               'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
@@ -402,7 +402,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                                                                   and (ready['speed'])\
                                                                                                                   and (ready['heading'])\
                                                                                                                   and (motor['used']):
-            log.info("Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step']))
+            log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
             motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
@@ -412,7 +412,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
                 if moving is None:
                     moving = True
-                log.info("..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos))
+                log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos, counter))
                 if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(2)
@@ -436,7 +436,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # If local database is used, commit the data
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
-            log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
+            log.info("{2} | New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id, counter))
 
     # alternatively trigger just the Ed sampling, if corresponding conditions are met
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
@@ -454,7 +454,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # If db is used, commit the data to it
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
-            log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
+            log.info("{2} | New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id, counter))
 
     # Alternatively check to see if just the gps location / metadata should be written
     else:
@@ -470,7 +470,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
             if db_dict['used']:
                 db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['gps_location'], spectra_data=None, software_version=__version__)
-                log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+                log.info("{2} | New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id, counter))
 
     message = format_log_message(counter, ready, values)
     log.info(message)
@@ -509,6 +509,9 @@ def run():
 
     # Repeat indefinitely until program is closed
     counter = 0
+    remote_update_timer = time.perf_counter() - 290.0  # set timer to 10 seconds before next trigger
+    export_result = True
+
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
@@ -518,28 +521,44 @@ def run():
                           motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
 
             # remote data store(s) operations go here, ideally within the time window where the system is idling
-            t0 = time.perf_counter()
 
+            t0 = time.perf_counter() # start of data upload operations this cycle.
+
+            # while system idles, check how many samples need uploading, upload a batch and check again
+            n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
+            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:.2} s since last connection attempt")
             if (not check_internet()) or (not conf['EXPORT']['use_export']):
-                log.debug("No internet connection")
+                log.debug("Internet connection timed out.")
 
-            elif check_remote_data_store(conf)[0]:
-                # while system idles, check how many samples need uploading, upload a batch and check again
-                n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-                if n_not_inserted == 0:
+            elif (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
+                # update remote status at most once per minute if there are no data to upload
+                if check_remote_data_store(conf)[0]:
                     export_result, resultcode = update_status_parse_server(conf, db_dict)
-
+                    log.info("Instrument status update on remote server: {0}".format({True: 'succeeded', False:'failed'}[export_result]))
                 else:
-                    export_result = True
-                    n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-                    while ((1.0 + time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
-                        log.info(f"Uploading last 10 records ({n_not_inserted} pending)")
+                    log.info(f"No connection to remote server to update instrument status")
+
+                remote_update_timer = time.perf_counter()  # reset timer regardless of result (don't spam the server)
+
+            elif (export_result) or (time.perf_counter() - remote_update_timer > 300):
+                # if data are pending upload and connection was already good or 5 minutes have passed, try uploading data
+                export_result = True
+                if check_remote_data_store(conf)[0]:
+                    while ((time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
+                        # upload data until this check cycle is over, or no more samples remain, or an upload fails.
+                        log.info(f"Uploading latest 10 samples ({n_not_inserted} pending)")
                         export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
-                        n_not_inserted = n_not_inserted - successes
+                        log.info(f"{successes} sensor records uploaded. Request completed: {export_result}")
+                        n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
                         time.sleep(0.05)
+                    remote_update_timer = time.perf_counter()  # reset timer
+                else:
+                    log.info(f"No connection to remote server")
+                    export_result = False
+                    remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
 
             else:
-                log.info("Could not reach remote data store")
+                log.info(f"No data upload action taken for {time.perf_counter()-remote_update_timer:.2} s")
 
             time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
             if time_to_sleep > 0:

@@ -36,7 +36,8 @@ from numpy import unique
 import time
 import datetime
 
-TIMEOUT=5  # timeout for getting any response update from the remote server to prevent main program gettting stuck too long.
+TIMEOUT=5  # timeout for getting a response on data upload. 
+TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
 
 log = logging.getLogger('export')
 
@@ -172,7 +173,7 @@ def update_on_parse_server(export_config_dict, json_record, objectId):
                'X-Parse-Client-Key': parse_clientkey}
 
     try:
-        response = requests.put(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
+        response = requests.put(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)
         if (response.status_code >= 200) and (response.status_code < 300):
             return True, response.status_code
         else:
@@ -199,7 +200,7 @@ def update_status_parse_server(conf, db):
 
     data =   json.dumps({"where":{"platform_id":platform_id, "content": "status"}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt,gps_time,pc_time"})
     try:
-        response = requests.get(parse_app_url, data=data, headers=headers, timeout=0.5)  # timeout of 0.5 s prevents main program loop from getting stuck too long
+        response = requests.get(parse_app_url, data=data, headers=headers, timeout=TIMEOUT_SHORT)
         if (response.status_code < 200) or (response.status_code) > 299:
             # the request failed this time
             return False, None
