@@ -21,7 +21,7 @@ import argparse
 import datetime
 import math
 from numpy import argwhere, array, mean, std, append, nanstd, nanmean
-log = logging.getLogger()   # report to root logger
+log = logging.getLogger('tpr')
 
 
 class Ada_adxl345(object):

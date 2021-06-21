@@ -17,7 +17,7 @@ import time
 import datetime
 import logging
 
-log = logging.getLogger()   # report to root logger
+log = logging.getLogger('rad')
 
 try:
     import RPi.GPIO as GPIO

@@ -17,7 +17,8 @@ import threading
 import datetime
 import time
 import Adafruit_DHT
-log = logging.getLogger()   # report to root logger
+log = logging.getLogger('rht')
+
 
 class Ada_dht22(object):
     """
