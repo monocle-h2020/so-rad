@@ -17,7 +17,7 @@ import threading
 import codecs
 import sys
 
-log = logging.getLogger()   # report to root logger
+log = logging.getLogger('bat')
 
 
 class VictronManager(object):

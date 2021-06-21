@@ -17,7 +17,7 @@ import struct
 from numpy import min
 import math
 
-log = logging.getLogger()   # report to root logger
+log = logging.getLogger('gps')
 
 
 class GPSParser(object):
