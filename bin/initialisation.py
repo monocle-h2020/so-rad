@@ -205,6 +205,7 @@ def gps_init(gps_config, ports):
     gps['heading_speed_limit'] = gps_config.getfloat('gps_heading_speed_limit')
     gps['heading_accuracy_limit'] = gps_config.getfloat('gps_heading_accuracy_limit')
     gps['port1'] = None
+    gps['gps_heading_correction'] = gps_config.getfloat('gps_heading_correction')
 
     if gps['protocol'] in ['rtk', ]:
         # heading will be determined from distance between receivers rather than movement, so we need to know which one is nearer the front of the ship
@@ -253,6 +254,7 @@ def rad_init(rad_config, ports):
     rad['ed_sampling'] = rad_config.getboolean('ed_sampling')
     rad['ed_sampling_interval'] = rad_config.getint('ed_sampling_interval')
     rad['ed_sensor_id'] = rad_config.get('ed_sensor_id')
+    rad['ed_sampling_min_solar_elevation_deg'] = rad_config.getint('ed_sampling_min_solar_elevation_deg')
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')

@@ -13,13 +13,14 @@ import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 from initialisation import motor_init
-from main_app import parse_args, read_config
+from main_app import parse_args, read_config, update_config
 import functions.motor_controller_functions as motor_func
 
 
 if __name__ == '__main__':
     args = parse_args()
     conf = read_config(args.config_file)
+    conf = update_config(conf, args.local_config_file)
     ports = list_ports.comports()
     motor = motor_init(conf['MOTOR'], ports)
     print("Motor will turn {0} steps per degree of rotation".format(motor['steps_per_degree']))
@@ -48,14 +49,14 @@ if __name__ == '__main__':
             time.sleep(1)
         print("..done")
     else:
-        print("Motor in home position")
+        print("Motor in home position (not corrected for offset)")
         moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
         motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
     time.sleep(0.1)
 
 
     # Wiggle right/left
-    angles = [motor['ccw_limit']]
+    angles = [-motor['home_pos'], motor['ccw_limit'], -motor['home_pos'], motor['cw_limit']]
 
     # get default motor movement instructions and double speed
     motor_commands_dict = motor_func.commands
@@ -63,21 +64,23 @@ if __name__ == '__main__':
     motor_commands_dict['accel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
     motor_commands_dict['decel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
 
-    for target_deg_pos in angles:
-        print("Adjust motor angle ({0:3.3f} --> {1})".format(motor_deg_pos, target_deg_pos))
-        # Rotate the motor to the new position
-        target_step_pos = int(target_deg_pos * motor['steps_per_degree'])
-        motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
-        moving = True
-        t0 = time.perf_counter()  # timeout reference
-        while moving and time.perf_counter()-t0 < 5:
-            moving, motor_step_pos = motor_func.motor_moving(motor['serial'], target_step_pos, tolerance=int(motor['steps_per_degree']*3))
-            motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
-            if moving is None:
-                moving = True
-                log.info("..moving motor.. {0:3.3f} --> {1}".format(motor_deg_pos, target_deg_pos))
-            time.sleep(0.1)
+    continuous = True
+    while continuous == True:
+        for target_deg_pos in angles:
+            print("Adjust motor angle ({0:3.3f} --> {1})".format(motor_deg_pos, target_deg_pos))
+            # Rotate the motor to the new position
+            target_step_pos = int(target_deg_pos * motor['steps_per_degree'])
+            motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
+            moving = True
+            t0 = time.perf_counter()  # timeout reference
+            while moving and time.perf_counter()-t0 < 5:
+                moving, motor_step_pos = motor_func.motor_moving(motor['serial'], target_step_pos, tolerance=int(motor['steps_per_degree']*3))
+                motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
+                if moving is None:
+                    moving = True
+                    log.info("..moving motor.. {0:3.3f} --> {1}".format(motor_deg_pos, target_deg_pos))
+                time.sleep(0.1)
 
-        time.sleep(0.5)
+            time.sleep(0.5)
 
     sys.exit(0)

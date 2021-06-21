@@ -15,6 +15,7 @@ License: see README.md
 import logging
 import threading
 import datetime
+import time
 import Adafruit_DHT
 log = logging.getLogger()   # report to root logger
 

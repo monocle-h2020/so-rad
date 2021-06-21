@@ -32,7 +32,10 @@ def check_heading(gps):
         return False
 
     if gps['protocol'] == "rtk":
-        if (gps['manager'].flags_headVehValid == 1) and (gps['manager'].accHeading < gps['heading_accuracy_limit']) and (gps['manager'].heading is not None):
+        if (gps['manager'].flags_headVehValid == 1) and \
+           (gps['manager'].accHeading < gps['heading_accuracy_limit']) and \
+           (gps['manager'].heading is not None) and \
+           (gps['manager'].heading != 1):
             return True
 
     elif gps['protocol'] == 'nmea0183':
@@ -47,15 +50,15 @@ def check_speed(sample_dict, gps):
     return gps['manager'].speed >= float(sample_dict['sampling_speed_limit'])
 
 
-def check_motor(motor_manager):
-    "Verify that Motor is in optimal position and there is no alarm"
+def check_motor(motor):
+    "Verify that Motor has no alarm"
     # read register 128: present alarm code
     response = motor_func.read_command(motor['serial'], 1, 3, 128, 2)
     alarm = int.from_bytes(response[3:7], byteorder='big')
     if alarm > 0:
-        return False
+        return False, alarm
     else:
-        return motor_manager.within_step_thresh()
+        return True, alarm
 
 
 def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
@@ -79,7 +82,28 @@ def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
 
 def check_sun(sample_dict, solar_azimuth, solar_elevation):
     """Check that the sun is in an optimal position"""
-    return solar_elevation >= sample_dict['solar_elevation_limit']
+    result = True
+    if solar_elevation is None:
+        return False
+    if solar_azimuth is None:
+        return False
+    if solar_elevation >= sample_dict['solar_elevation_limit']:
+        return True
+    else:
+        return False
+
+
+def check_ed_sampling(use_rad, rad, ready, values):
+    "Check whether conditions for periodic Ed sampling are met"
+    try:
+        assert values['solar_el'] is not None
+        assert use_rad
+        assert rad['ed_sampling']
+        assert ready['gps']
+        assert values['solar_el'] >= rad['ed_sampling_min_solar_elevation_deg']
+    except AssertionError:
+        return False
+    return True
 
 
 def check_battery(bat_manager, battery):

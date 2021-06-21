@@ -271,22 +271,36 @@ def rotate_motor(command_list, steps_to_rotate, motor_serial_port):
     execute_commands(command_list, motor_serial_port)
 
 
-def motor_moving(motor_serial_port, final_pos, tolerance=0):
-    """Checks the motor's position until it has reached its destination
+def motor_moving(motor_serial_port, final_pos, tolerance=0, timeout=1.0):
+    """Checks the motor position until it has reached its destination
 
     :param motor_serial_port: Serial port that the motor is connected to
     :type motor_serial_port: str
 
     :param final_pos: The position the motor was given to move to
     :type final pos: int
+
+    :param tolerance: Tolerance in motor step units to determine that destination was reached
+    :type tolerance: int
+
+    :param timeout: Timeout in seconds before giving up retrieving motor position
+    :type float
     """
-    # Get motor position
-    motor_pos = get_motor_pos(motor_serial_port)
 
-    if motor_pos is None:
-        return False, None
+    moving = True
+    t0 = time.perf_counter()  # timeout reference
+    while moving and time.perf_counter()-t0 < timeout:
+        # Get motor position
+        motor_pos = None
+        motor_pos = get_motor_pos(motor_serial_port)
+        while motor_pos is None and time.perf_counter()-t0 < timeout:
+            motor_pos = get_motor_pos(motor_serial_port)
+            time.sleep(0.05)
 
-    # If the difference in current pos and new pos is less than the tolerance, don't move, otherwise move
+        if motor_pos is None:
+            return False, None
+
+    # If the difference in current pos and new pos is less than the tolerance moving is done.
     if abs(motor_pos - final_pos) <= tolerance:
         is_moving = False
     else:
