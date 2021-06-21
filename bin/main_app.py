@@ -15,7 +15,6 @@ import threading
 import os
 import sys
 import datetime
-import configparser
 import argparse
 import initialisation
 import logging
@@ -24,7 +23,9 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling
+from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling, check_internet, check_remote_data_store
+from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
+import functions.config_functions as cf_func
 from numpy import nan, max
 
 # only import RPi libraries if running on a Pi (other environments can be used for unit testing)
@@ -33,7 +34,7 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210424.0
+__version__ = 20210608.0
 
 
 def parse_args():
@@ -55,42 +56,6 @@ def parse_args():
     return args
 
 
-def read_config(config_file, local_config_file=None):
-    """Opens and reads the config file
-
-    :param config_file: the config.ini file
-    :type config_file: file
-    :return: dictionary of the config file's contents
-    :rtype: dictionary
-    """
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    return config
-
-
-def update_config(config, local_config_file=None):
-    """replace any default config values with local overrides"""
-    log = logging.getLogger()
-    if local_config_file is None:
-        return config
-
-    local = configparser.ConfigParser()
-    local.read(local_config_file)
-    for section in local.sections():
-        if len(local[section].items()) > 0:
-            for key, val in local[section].items():
-                log.info("Local config override: {0}-{1} {2}>{3}"\
-                         .format(section, key, config[section][key], val))
-                config[section][key] = val
-    return config
-
-
-def read_remote_config(remote_config_file):
-    """read a remotely retrieved config file and override selected local settings"""
-    # WIP
-    return
-
-
 def init_logger(conf_log_dict):
     """Initialises the root logger for the program
 
@@ -99,7 +64,7 @@ def init_logger(conf_log_dict):
     :return: log
     :rtype: logger
     """
-    myFormat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    myFormat = '%(asctime)s | %(name)s | %(levelname)s | %(message)s'
     formatter = logging.Formatter(myFormat)
     log_filename = conf_log_dict['log_file_location']
     if not os.path.isdir(os.path.dirname(log_filename)):
@@ -287,24 +252,29 @@ def update_gps_values(gps, values, tpr=None, rht=None):
 def format_log_message(counter, ready, values):
     """construct a log message based on several system checks"""
     checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
-    message = "[{0}] ".format(counter)
+    message = "{0} | ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
-    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg']:
+    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg', 'lat0', 'lon0']:
         if values[valkey] is not None:
-            strdict[valkey] = "{0:.2f}".format(values[valkey])
+            if valkey in ['lat0', 'lon0']:
+                strdict[valkey] = "{0:.5f}".format(values[valkey])
+            else:
+                strdict[valkey] = "{0:.2f}".format(values[valkey])
         else:
             strdict[valkey] = "n/a"
 
-    message += "Checks:  Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Tilt {8} Motor {9} ({10})"\
+    message += "Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Tilt {8} Motor {9} ({10})"\
                .format(values['batt_voltage'], checks[ready['gps']],
                        checks[ready['heading']], checks[ready['rad']],
                        checks[ready['speed']], strdict['speed'],
                        checks[ready['sun']], strdict['solar_el'], strdict['tilt_avg'],
                        checks[ready['motor']], values['motor_alarm'])
-    message += "\n"
-    message += "[{5}] Heading: SunAz {0} Ship {1} Motor {6}| Fix: {2}, FixFl {3} | nSat {4} "\
-                .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'], values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'])
+    #message += "\n"
+    message += " | SunAz {0} Ship {1} Motor {6}| Fix: {2} ({4} sats) | loc: {7}"\
+                .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'],
+                values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'],
+                strdict['lat0'] + " " + strdict['lon0'])
 
     return message
 
@@ -332,7 +302,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
-    values = {'speed': None, 'nsat0': None, 'motor_pos': None, 'ship_bearing_mean': None,
+    values = {'counter': counter, 'speed': None, 'nsat0': None, 'motor_pos': None, 'ship_bearing_mean': None,
               'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
@@ -426,13 +396,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
-        # If the sun is in a suitable position and the motor is not at the required position, move the motor, unless speed criterion is not met
+        # If the sun is in a suitable position but the motor is not at the required position, move the motor, unless speed criterion is not met
         # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
         if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
                                                                                                                   and (ready['speed'])\
                                                                                                                   and (ready['heading'])\
                                                                                                                   and (motor['used']):
-            log.info("Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step']))
+            log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
             motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
@@ -442,11 +412,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
                 if moving is None:
                     moving = True
-                log.info("..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos))
+                log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos, counter))
                 if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(2)
 
+    # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # If all checks are good, take radiometry measurements
@@ -465,9 +436,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # If local database is used, commit the data
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
-            log.info("New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id))
+            log.info("{2} | New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id, counter))
 
-    # If not enough time has passed since the last measurement (rad not ready) and minimum interval to record GPS has not passed, skip to next cycle
+    # alternatively trigger just the Ed sampling, if corresponding conditions are met
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
         and (ready['ed_sampling']):
         trigger_id['ed_sensor'] = datetime.datetime.now()
@@ -483,8 +454,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # If db is used, commit the data to it
         if db_dict['used']:
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
-            log.info("New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id))
+            log.info("{2} | New record (Ed sensor): {0} [{1}]".format(trigger_id['ed_sensor'], db_id, counter))
 
+    # Alternatively check to see if just the gps location / metadata should be written
     else:
         trigger = False
         last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
@@ -498,7 +470,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
             if db_dict['used']:
                 db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['gps_location'], spectra_data=None, software_version=__version__)
-                log.info("New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id))
+                log.info("{2} | New record (gps location): {0} [{1}]".format(trigger_id['gps_location'], db_id, counter))
 
     message = format_log_message(counter, ready, values)
     log.info(message)
@@ -512,12 +484,12 @@ def run():
     """
     # Parse the command line arguments for the config file
     args = parse_args()
-    conf = read_config(args.config_file)
+    conf = cf_func.read_config(args.config_file)
     # start logging here
     log = init_logger(conf['LOGGING'])
     log.info('\n===Started logging===\n')
 
-    conf = update_config(conf, args.local_config_file)
+    conf = cf_func.update_config(conf, args.local_config_file)
 
     try:
         # Initialise everything
@@ -537,6 +509,9 @@ def run():
 
     # Repeat indefinitely until program is closed
     counter = 0
+    remote_update_timer = time.perf_counter() - 290.0  # set timer to 10 seconds before next trigger
+    export_result = True
+
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
@@ -544,7 +519,50 @@ def run():
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
-            time.sleep(main_check_cycle_sec)
+
+            # remote data store(s) operations go here, ideally within the time window where the system is idling
+
+            t0 = time.perf_counter() # start of data upload operations this cycle.
+
+            # while system idles, check how many samples need uploading, upload a batch and check again
+            n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
+            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:.2} s since last connection attempt")
+            if (not check_internet()) or (not conf['EXPORT']['use_export']):
+                log.debug("Internet connection timed out.")
+
+            elif (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
+                # update remote status at most once per minute if there are no data to upload
+                if check_remote_data_store(conf)[0]:
+                    export_result, resultcode = update_status_parse_server(conf, db_dict)
+                    log.info("Instrument status update on remote server: {0}".format({True: 'succeeded', False:'failed'}[export_result]))
+                else:
+                    log.info(f"No connection to remote server to update instrument status")
+
+                remote_update_timer = time.perf_counter()  # reset timer regardless of result (don't spam the server)
+
+            elif (export_result) or (time.perf_counter() - remote_update_timer > 300):
+                # if data are pending upload and connection was already good or 5 minutes have passed, try uploading data
+                export_result = True
+                if check_remote_data_store(conf)[0]:
+                    while ((time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
+                        # upload data until this check cycle is over, or no more samples remain, or an upload fails.
+                        log.info(f"Uploading latest 10 samples ({n_not_inserted} pending)")
+                        export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
+                        log.info(f"{successes} sensor records uploaded. Request completed: {export_result}")
+                        n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
+                        time.sleep(0.05)
+                    remote_update_timer = time.perf_counter()  # reset timer
+                else:
+                    log.info(f"No connection to remote server")
+                    export_result = False
+                    remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
+
+            else:
+                log.info(f"No data upload action taken for {time.perf_counter()-remote_update_timer:.2} s")
+
+            time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
+            if time_to_sleep > 0:
+                time.sleep(time_to_sleep)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")

@@ -4,12 +4,75 @@
 Check Functions
 
 Functions to see if system components are ready.
-The system components include GPS sensors, radiometers and motor controller.
+Checks are included to check
+
+-GPS accuracy is suffient
+-Ship heading is accurate
+-Radiometers are ready (sample interval has passed, not currently waiting for data), separate check for Ed sensor sampling interval
+-Motor has no active alarm
+-Speed is above limit set for sampling
+-Sun elevation is above limit set for sampling
+-External battery voltage is sufficient
+-CPU temperature
+-Connectivity to remote data store (for data upload)
+-Internet connectivity
 """
+
 import datetime
+import requests
+import json
 from numpy import nan
 #import motor_controller_functions as motor_func
 import functions.motor_controller_functions as motor_func
+import logging
+
+log = logging.getLogger('checks')
+
+
+def check_remote_data_store(conf):
+    "Check for response from remote Parse server. Look for last logged/updated record from this instrument. Return connection status and time of last update"
+    export_config_dict = conf['EXPORT']
+    parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
+    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
+    platform_id = export_config_dict.get('platform_id')
+    parse_clientkey = export_config_dict.get('parse_clientkey')
+    headers = {'content-type': 'application/json',
+               'X-Parse-Application-Id': parse_app_id,
+               'X-Parse-Client-Key': parse_clientkey}
+
+    # some tested examples
+    # data = json.dumps({"where":{"platform_id":platform_id}})  # returns all records of this platform
+    # data =   json.dumps({"where":{"platform_id":platform_id, "content":"status"}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
+    data =   json.dumps({"where":{"platform_id":platform_id}, "order": "-updatedAt", "limit": 1, "keys": "updatedAt"})
+
+    try:
+        response = requests.get(parse_app_url, data=data, headers=headers, timeout=2.0)  # timeout of 1 s prevents main program loop from getting stuck too long
+        if (response.status_code >= 200) and (response.status_code) < 300:
+            if len(response.json()['results']) > 0:
+                # e.g. '2021-06-08T14:59:27.101Z'
+                last_update = datetime.datetime.strptime(response.json()['results'][0]['updatedAt'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                return True, last_update
+            else:
+                return True, None
+        else:
+            return False, None
+    except requests.exceptions.ReadTimeout:
+        log.warning("Timeout connecting to remote data store")
+        return False, None
+    except:
+        log.warning("Unhandled exception connecting to remote data store")
+        return False, None
+
+
+def check_internet():
+    try:
+        response = requests.get('http://one.one.one.one', verify=True, timeout=0.5)
+        if response.status_code == requests.codes.ok:
+            return True
+        else:
+            return False
+    except Exception as e:
+            return False
 
 
 def check_gps(gps):
