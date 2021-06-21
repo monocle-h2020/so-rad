@@ -41,7 +41,9 @@ def db_init(db_config):
     db['used'] = db_config.getboolean('use_database')
 
     # If it is used, check the type of db
-    if db['used']:
+    if not db['used']:
+        return db
+    else:
         try:
             assert db_config.get('database_type') == "sqlite3"
         except AssertionError:
@@ -49,14 +51,47 @@ def db_init(db_config):
             log.critical(msg)
             raise AssertionError(msg)
 
-        # Create tables (only if necessary)
-        db['file'] = db_config.get('database_path')
-        try:
-            db_functions.create_tables(db)  # won't harm existing tables
-        except Exception as err:
-            msg = "Error connecting to database: \n {0}".format(err)
-            log.critical(msg)
-            raise Exception(msg)
+    # Create tables (only if necessary)
+    db['file'] = db_config.get('database_path')
+    try:
+        db_functions.create_tables(db)  # won't harm existing tables
+
+        conn, cur = db_functions.connect_db(db)
+        header_meta = db_functions.column_names(conn, cur, table="sorad_metadata")
+        header_rad = db_functions.column_names(conn, cur, table="sorad_radiometry")
+        db['header_meta'] = header_meta
+        db['header'] = header_rad + header_meta
+        conn.close()
+    except Exception as err:
+        msg = "Error connecting to database: \n {0}".format(err)
+        log.critical(msg)
+        conn.close()
+        raise Exception(msg)
+
+    # cater for a few older database styles
+    if 'sos_inserted' in header_meta:
+        log.debug("Database format < June 2021")
+        db['export_success_field']  = 'sos_inserted'
+        db['export_attempts_field'] = 'sos_insertion_attempts'
+    else:
+        log.debug("Database format > June 2021")
+        db['export_success_field']  = 'export_success'
+        db['export_attempts_field'] = 'export_attempts'
+
+    # location info may also have changed with different versions
+    if 'location' not in header_meta:
+       if 'gps_lat' in header_meta:
+           db['lat_field'] = 'gps_lat'
+           db['lon_field'] = 'gps_long'
+       else:
+           log.critical("Lat/lon fields not recognised in database")
+
+    if 'time' not in header_meta:
+       if 'gps_time' in header_meta:
+           db['time_field'] = 'gps_time'
+       else:
+           log.critical("time field not recognised in database")
+
     return db
 
 

@@ -11,8 +11,8 @@ import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import serial.tools.list_ports as list_ports
 from initialisation import tpr_init
-from main_app import parse_args, read_config
-
+from main_app import parse_args
+import functions.config_functions as cf
 test_duration_single_reads = 1  # seconds
 test_duration_monitor_average = 10  # seconds
 
@@ -50,11 +50,10 @@ def main(conf):
     print("finished test, stopping monitor")
     tpr_manager.stop()
 
+
 if __name__ == '__main__':
     args = parse_args()
-    conf = read_config(args.config_file)
-    # read TPR usage and protocol from config file
-    # use the initialisation module to get the right TPR class
-
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
     main(conf)
 
