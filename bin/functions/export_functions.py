@@ -35,6 +35,7 @@ from . import db_functions as db_func
 from numpy import unique
 import time
 import datetime
+from requests_toolbelt.utils import dump
 
 TIMEOUT=5  # timeout for getting a response on data upload. 
 TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
@@ -59,6 +60,9 @@ def run_export(conf, db, limit=1, test_run=True):
             records[j] = record + (sample_uuids[record[i]],)
 
     successes = 0
+    export_result = None
+    response_code = None
+
     for i, record in enumerate(records):
         record_json = add_metadata(export_config_dict, record, db)  # add metadata and return json
         log.debug("{0}/{1} JSON formatted record: {2}".format(i, len(records)-1, record_json))
@@ -68,8 +72,12 @@ def run_export(conf, db, limit=1, test_run=True):
             response_code = None
             continue
 
-        export_result, response_code = export_to_parse_server(export_config_dict, record_json)
+        export_result, response_code, response = export_to_parse_server(export_config_dict, record_json)
         log.debug("Remote server response was: {0}".format(response_code))
+
+        #respdata = dump.dump_all(response)
+        #log.debug(respdata.decode('utf-8'))  # dump the http request (super-debug!)
+
         if export_result:
             log.debug("Record {0} uploaded succesfully".format(json.loads(record_json)['id_']))
             successes += 1
@@ -152,15 +160,16 @@ def export_to_parse_server(export_config_dict, json_record):
     try:
         response = requests.post(parse_app_url, data=json_record, headers=headers, timeout=TIMEOUT)  # timeout of 1.5 seconds prevents main program loop from getting stuck too long
         if (response.status_code >= 200) and (response.status_code < 300):
-            return True, response.status_code
+            return True, response.status_code, response
         else:
-            return False, response.status_code
+            return False, response.status_code, response
+
     except requests.exceptions.ReadTimeout:
         log.warning("Timeout while uploading data to remote server")
-        return False, None
+        return False, None, None
     except:
         log.warning("Unhandled exception while uploading data to remote server")
-        return False, None
+        return False, None, None
 
 
 def update_on_parse_server(export_config_dict, json_record, objectId):
@@ -295,7 +304,6 @@ def identify_new_local_records(db, limit=10):
     cur.execute(sql_last_not_inserted, (limit,))
 
     all_not_inserted = cur.fetchall()
-    last_not_inserted = all_not_inserted[0]
 
     conn.close()
 

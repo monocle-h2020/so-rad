@@ -520,14 +520,19 @@ def run():
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
 
-            # remote data store(s) operations go here, ideally within the time window where the system is idling
+            use_export = conf['EXPORT'].getboolean('use_export')
+            if not use_export:
+                log.info("No data export configured")
+                time.sleep(main_check_cycle_sec)
+                continue
 
+            # remote data store(s) operations go here, ideally within the time window where the system is idling
             t0 = time.perf_counter() # start of data upload operations this cycle.
 
             # while system idles, check how many samples need uploading, upload a batch and check again
             n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:.2} s since last connection attempt")
-            if (not check_internet()) or (not conf['EXPORT']['use_export']):
+            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:3.2} s since last connection attempt")
+            if not check_internet():
                 log.debug("Internet connection timed out.")
 
             elif (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
@@ -558,7 +563,7 @@ def run():
                     remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
 
             else:
-                log.info(f"No data upload action taken for {time.perf_counter()-remote_update_timer:.2} s")
+                log.info(f"No data upload action taken for {time.perf_counter()-remote_update_timer:3.2} s")
 
             time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
             if time_to_sleep > 0:

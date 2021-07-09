@@ -70,7 +70,7 @@ if __name__ == '__main__':
         log.setLevel(logging.INFO)
         handler.setLevel(logging.INFO)
 
-    formatter = logging.Formatter('%(asctime)s|%(levelname)s| %(message)s')
+    formatter = logging.Formatter('%(asctime)s| %(levelname)s | %(name)s | %(message)s')
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
