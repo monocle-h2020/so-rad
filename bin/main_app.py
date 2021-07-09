@@ -421,7 +421,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # If all checks are good, take radiometry measurements
-    if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading']]):
+    if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
         # collect latest GPS and TPR data now that a measurement will be triggered
