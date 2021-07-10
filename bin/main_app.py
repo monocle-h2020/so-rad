@@ -531,7 +531,7 @@ def run():
 
             # while system idles, check how many samples need uploading, upload a batch and check again
             n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1} s since last connection attempt")
+            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1f} s since last connection attempt")
             if not check_internet():
                 log.debug("Internet connection timed out.")
 
@@ -563,7 +563,7 @@ def run():
                     remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
 
             else:
-                log.debug(f"No data upload action taken for {time.perf_counter()-remote_update_timer:4.1} s")
+                log.debug(f"No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
 
             time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
             if time_to_sleep > 0:
