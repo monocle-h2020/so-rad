@@ -531,7 +531,7 @@ def run():
 
             # while system idles, check how many samples need uploading, upload a batch and check again
             n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:3.2} s since last connection attempt")
+            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1} s since last connection attempt")
             if not check_internet():
                 log.debug("Internet connection timed out.")
 
@@ -541,29 +541,29 @@ def run():
                     export_result, resultcode = update_status_parse_server(conf, db_dict)
                     log.info("Instrument status update on remote server: {0}".format({True: 'succeeded', False:'failed'}[export_result]))
                 else:
-                    log.info(f"No connection to remote server to update instrument status")
+                    log.debug(f"No connection to remote server to update instrument status")
 
                 remote_update_timer = time.perf_counter()  # reset timer regardless of result (don't spam the server)
 
-            elif (export_result) or (time.perf_counter() - remote_update_timer > 300):
+            elif (n_not_inserted > 0) and ((export_result) or (time.perf_counter() - remote_update_timer > 300)):
                 # if data are pending upload and connection was already good or 5 minutes have passed, try uploading data
                 export_result = True
                 if check_remote_data_store(conf)[0]:
                     while ((time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
                         # upload data until this check cycle is over, or no more samples remain, or an upload fails.
-                        log.info(f"Uploading latest 10 samples ({n_not_inserted} pending)")
+                        log.debug(f"Uploading latest 10 samples ({n_not_inserted} pending)")
                         export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
                         log.info(f"{successes} sensor records uploaded. Request completed: {export_result}")
                         n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
                         time.sleep(0.05)
                     remote_update_timer = time.perf_counter()  # reset timer
                 else:
-                    log.info(f"No connection to remote server")
+                    log.debug(f"No connection to remote server")
                     export_result = False
                     remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
 
             else:
-                log.info(f"No data upload action taken for {time.perf_counter()-remote_update_timer:3.2} s")
+                log.debug(f"No data upload action taken for {time.perf_counter()-remote_update_timer:4.1} s")
 
             time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
             if time_to_sleep > 0:
