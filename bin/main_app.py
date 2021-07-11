@@ -34,7 +34,7 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210608.0
+__version__ = 20210711.0
 
 
 def parse_args():
@@ -522,7 +522,7 @@ def run():
 
             use_export = conf['EXPORT'].getboolean('use_export')
             if not use_export:
-                log.info("No data export configured")
+                log.info("{counter} | No data export configured")
                 time.sleep(main_check_cycle_sec)
                 continue
 
@@ -531,17 +531,17 @@ def run():
 
             # while system idles, check how many samples need uploading, upload a batch and check again
             n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-            log.info(f"{n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1f} s since last connection attempt")
+            log.info(f"{counter} | {n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1f} s since last connection attempt")
             if not check_internet():
-                log.debug("Internet connection timed out.")
+                log.debug(f"{counter} | Internet connection timed out.")
 
             elif (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
                 # update remote status at most once per minute if there are no data to upload
                 if check_remote_data_store(conf)[0]:
                     export_result, resultcode = update_status_parse_server(conf, db_dict)
-                    log.info("Instrument status update on remote server: {0}".format({True: 'succeeded', False:'failed'}[export_result]))
+                    log.info(f"{counter} | Instrument status update on remote server: {0}".format({True: 'succeeded', False:'failed'}[export_result]))
                 else:
-                    log.debug(f"No connection to remote server to update instrument status")
+                    log.debug(f"{counter} | No connection to remote server to update instrument status")
 
                 remote_update_timer = time.perf_counter()  # reset timer regardless of result (don't spam the server)
 
@@ -551,19 +551,19 @@ def run():
                 if check_remote_data_store(conf)[0]:
                     while ((time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
                         # upload data until this check cycle is over, or no more samples remain, or an upload fails.
-                        log.debug(f"Uploading latest 10 samples ({n_not_inserted} pending)")
+                        log.debug(f"{counter} | Uploading latest 10 samples ({n_not_inserted} pending)")
                         export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
-                        log.info(f"{successes} sensor records uploaded. Request completed: {export_result}")
+                        log.info(f"{counter} | {successes} sensor records uploaded. Request completed: {export_result}")
                         n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
                         time.sleep(0.05)
                     remote_update_timer = time.perf_counter()  # reset timer
                 else:
-                    log.debug(f"No connection to remote server")
+                    log.debug(f"{counter} | No connection to remote server")
                     export_result = False
                     remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
 
             else:
-                log.debug(f"No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
+                log.debug(f"{counter} | No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
 
             time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
             if time_to_sleep > 0:
