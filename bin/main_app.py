@@ -539,7 +539,8 @@ def run():
                 # update remote status at most once per minute if there are no data to upload
                 if check_remote_data_store(conf)[0]:
                     export_result, resultcode = update_status_parse_server(conf, db_dict)
-                    log.info(f"{counter} | Instrument status update on remote server: {0}".format({True: 'succeeded', False:'failed'}[export_result]))
+                    sucorfail = {True: 'succeeded', False:'failed'}[export_result]
+                    log.info(f"{counter} | Instrument status update on remote server {sucorfail}")
                 else:
                     log.debug(f"{counter} | No connection to remote server to update instrument status")
 
