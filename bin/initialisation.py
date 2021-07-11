@@ -92,6 +92,9 @@ def db_init(db_config):
        else:
            log.critical("time field not recognised in database")
 
+    # if the sample_uuid is not stored on data collection, set switch to add it on upload
+    db['add_sample_uuid'] = 'sample_uuid' not in db['header']
+
     return db
 
 

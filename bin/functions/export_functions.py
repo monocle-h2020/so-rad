@@ -50,7 +50,8 @@ def run_export(conf, db, limit=1, test_run=True):
     n_total, n_new, records = identify_new_local_records(db, limit=limit)
     log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
-    if 'sample_uuid' not in db['header']:
+    if db['add_sample_uuid']:
+        log.debug("Adding sample_uuid")
         # match records to add a single sample_uuid to records with identical metadata_id
         i = db['header'].index('metadata_id')
         meta_ids = unique([record[i] for record in records])
