@@ -35,7 +35,7 @@ from . import db_functions as db_func
 from numpy import unique
 import time
 import datetime
-from requests_toolbelt.utils import dump
+#from requests_toolbelt.utils import dump
 
 TIMEOUT=5  # timeout for getting a response on data upload. 
 TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
