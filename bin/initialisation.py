@@ -189,7 +189,7 @@ def tpr_init(tpr_config):
     # Get all the TPR variables from the config file
     tpr['used'] = tpr_config.getboolean('use_tpr')
     tpr['interface'] = tpr_config.get('protocol').lower()
-    tpr['sampling_time'] = tpr_config.getint('sampling_time')
+    tpr['sampling_time'] = tpr_config.getfloat('sampling_time')
     tpr['xindex'] = tpr_config.getint('xindex')
     tpr['yindex'] = tpr_config.getint('yindex')
     tpr['zindex'] = tpr_config.getint('zindex')
