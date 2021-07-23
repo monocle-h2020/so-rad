@@ -84,8 +84,7 @@ def create_tables(db_dict):
 
 
 def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
-              batt_v=0, pi_cpu_temp=0, motor_temp=0, driver_temp=0,
-              software_version=0):
+              batt_v=0, pi_cpu_temp=0, software_version=0):
     """Commit all the required values to the database object, or just gps/meta data if sensor data aren't available"""
     try:
         conn, cur = connect_db(db_dict)
@@ -103,7 +102,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
-                            batt_v, values['inside_temp'], values['inside_rh'], motor_temp, driver_temp))
+                            batt_v, values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp']))
 
             sample_id = cur.lastrowid
             conn.commit()
@@ -122,7 +121,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
-                            batt_v, values['inside_temp'], values['inside_rh'], motor_temp, driver_temp, len(spectra_data)))
+                            batt_v, values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'], len(spectra_data)))
 
             sample_id = cur.lastrowid
 

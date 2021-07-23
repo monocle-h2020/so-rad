@@ -221,7 +221,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht,
     sys.exit(0)
 
 
-def update_gps_values(gps, values, tpr=None, rht=None):
+def update_gps_values(gps, values, tpr=None, rht=None, motor=None):
     """update system value dict to the latest available in the sensor managers"""
     log = logging.getLogger()
     values['lat0'] = gps['manager'].lat
@@ -246,6 +246,8 @@ def update_gps_values(gps, values, tpr=None, rht=None):
         log.debug("Temp: {0}C RH: {1}%".format(temp, rh))
         values['inside_temp'] = temp
         values['inside_rh'] =   rh
+    if (motor is not None) and (motor['used']):
+        values['driver_temp'], values['motor_temp'] =  motor_func.motor_temp_read(motor)
     return values
 
 
@@ -307,7 +309,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSolN': None, 'flags_gnssFixOK': None,
-              'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None, 'motor_alarm': None}
+              'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None,
+              'motor_alarm': None, 'driver_temp': None, 'motor_temp': None}
 
     use_rad = rad['n_sensors'] > 0
 
@@ -344,7 +347,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         # valid positioning data is required to do anything else
-        values = update_gps_values(gps, values, tpr, rht)
+        values = update_gps_values(gps, values, tpr, rht, motor)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
@@ -425,7 +428,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
         # collect latest GPS and TPR data now that a measurement will be triggered
-        values = update_gps_values(gps, values, tpr, rht)
+        values = update_gps_values(gps, values, tpr, rht, motor)
 
         # Collect and combine radiometry data
         spec_data = []
@@ -443,7 +446,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         and (ready['ed_sampling']):
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
-        values = update_gps_values(gps, values) # collect latest GPS data
+        values = update_gps_values(gps, values, tpr, rht, motor) # collect latest GPS data
 
         # trigger Ed
         spec_data = []
@@ -466,7 +469,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         if seconds_elapsed_since_last_any_commit > 60:
             trigger_id['gps_location'] = datetime.datetime.now()
             # record metadata and GPS data at least every minute
-            values = update_gps_values(gps, values) # collect latest GPS data
+            values = update_gps_values(gps, values, tpr, rht, motor) # collect latest GPS data
 
             if db_dict['used']:
                 db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['gps_location'], spectra_data=None, software_version=__version__)
