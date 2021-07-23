@@ -29,15 +29,6 @@ if __name__ == '__main__':
 
     # read temperature of motor driver and motor
     num_reg = 4
-    response = motor_func.read_command(motor['serial'], 1, 3, 248, num_reg)
-    print(response, len(response))  # 13 hex values
-    #response = codecs.encode(response, 'hex')  # 26 bytes
-    #print(response, len(response))
-    slave_id = int(response[0])
-    function_code = int(response[1])
-    length = int(response[2])
-    driver_temp = int.from_bytes(response[3:7], byteorder='big')/10.0
-    motor_temp = int.from_bytes(response[7:11], byteorder='big')/10.0
+    driver_temp, motor_temp =  motor_func.motor_temp_read(motor)
     print("Driver: {0}C \t Motor: {1}C".format(driver_temp, motor_temp))
 
-    sys.exit(0)

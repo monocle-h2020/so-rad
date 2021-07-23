@@ -85,7 +85,7 @@ def create_tables(db_dict):
 
 def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
               batt_v=0, pi_cpu_temp=0, motor_temp=0, driver_temp=0,
-              software_version=0, inside_temp=0, inside_rel_hum=0):
+              software_version=0):
     """Commit all the required values to the database object, or just gps/meta data if sensor data aren't available"""
     try:
         conn, cur = connect_db(db_dict)

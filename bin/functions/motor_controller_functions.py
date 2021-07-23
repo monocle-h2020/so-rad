@@ -344,3 +344,20 @@ def get_motor_pos(motor_serial_port):
             motor_pos = None
     return motor_pos
 
+def motor_temp_read(motor_conf):
+    """
+    Read driver and motor temperature
+    :motor_conf: the MOTOR part of the config dictionary
+    """
+    # read temperature of motor driver and motor
+    num_reg = 4
+    try:
+        response = read_command(motor_conf['serial'], 1, 3, 248, num_reg)
+        slave_id = int(response[0])
+        function_code = int(response[1])
+        length = int(response[2])
+        driver_temp = int.from_bytes(response[3:7], byteorder='big')/10.0
+        motor_temp = int.from_bytes(response[7:11], byteorder='big')/10.0
+    except:
+        return None, None
+    return driver_temp, motor_temp
