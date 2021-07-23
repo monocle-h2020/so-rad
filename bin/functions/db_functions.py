@@ -10,6 +10,7 @@ import sys
 import traceback
 import logging
 import sqlite3
+import uuid
 
 log = logging.getLogger() #import root logger
 
@@ -59,6 +60,7 @@ def create_tables(db_dict):
     # test whether table exists
     sql ="""CREATE TABLE IF NOT EXISTS sorad_metadata
             (id_ integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            sample_uuid text,
             pc_time datetime, gps_time datetime, gps_fix integer,
             gps_lat float, gps_long float, gps_speed float,
             platform_bearing float,
@@ -68,7 +70,8 @@ def create_tables(db_dict):
             tilt_avg float, tilt_std float,
             bearing_accuracy float, sorad_version float,
             batt_v float, inside_temp float, inside_rel_hum float, n_rad_obs integer,
-            sos_inserted bool, sos_insertion_attempts integer)"""
+            export_success bool, export_attempts integer)"""
+
     cur.execute(sql)
 
     sql ="""CREATE TABLE IF NOT EXISTS sorad_radiometry
@@ -86,15 +89,18 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
     """Commit all the required values to the database object, or just gps/meta data if sensor data aren't available"""
     try:
         conn, cur = connect_db(db_dict)
+
+        sample_uuid = str(uuid.uuid1())
+
         if (trigger_id is None) or (spectra_data is None):
-            cur.execute("""INSERT INTO sorad_metadata(pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
+            cur.execute("""INSERT INTO sorad_metadata(sample_uuid, pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
                            platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
-                           n_rad_obs, sos_inserted, sos_insertion_attempts)
+                           n_rad_obs, export_success, export_attempts)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
-                           (trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
+                           (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
                             batt_v, values['inside_temp'], values['inside_rh'], motor_temp, driver_temp))
@@ -105,14 +111,14 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
             return sample_id
 
         elif (trigger_id) is not None and (spectra_data is not None):
-            cur.execute("""INSERT INTO sorad_metadata(pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
+            cur.execute("""INSERT INTO sorad_metadata(sample_uuid, pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
                            platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
-                           n_rad_obs, sos_inserted, sos_insertion_attempts)
+                           n_rad_obs, export_success, export_attempts)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
-                           (trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
+                           (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
