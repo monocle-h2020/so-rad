@@ -34,7 +34,7 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210723.0
+__version__ = 20210723.1
 
 
 def parse_args():
@@ -266,17 +266,13 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    message += "Bat {0} GPS {1} Head {2} Rad {3} Spd {4} ({5}) Sun {6} ({7}) Tilt {8} Motor {9} ({10})"\
-               .format(values['batt_voltage'], checks[ready['gps']],
-                       checks[ready['heading']], checks[ready['rad']],
-                       checks[ready['speed']], strdict['speed'],
-                       checks[ready['sun']], strdict['solar_el'], strdict['tilt_avg'],
-                       checks[ready['motor']], values['motor_alarm'])
-    #message += "\n"
-    message += " | SunAz {0} Ship {1} Motor {6}| Fix: {2} ({4} sats) | loc: {7}"\
-                .format(strdict['solar_az'], strdict['ship_bearing_mean'], values['fix'],
-                values['flags_gnssFixOK'], values['nsat0'], counter, strdict['motor_deg'],
-                strdict['lat0'] + " " + strdict['lon0'])
+    if values['motor_angles']['target_motor_pos_rel_az_deg'] is None:
+        strdict['RelViewAz'] = "n/a"
+    else:
+        strdict['RelViewAz'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
+
+    message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
+    message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['RelViewAz']} | loc: {strdict['lat0']} {strdict['lon0']}"
 
     return message
 

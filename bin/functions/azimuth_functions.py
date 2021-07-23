@@ -115,11 +115,8 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     # how well do these achievable angles correspond to the optimum positions?
     angle_options_diff = [abs(achieved_view_motor_cw_deg - view_motor_cw_deg),
                           abs(achieved_view_motor_ccw_deg - view_motor_ccw_deg)]
-    #rel_angle_options = [ach_rel_cw, ach_rel_ccw, ach_at_cw_limit, ach_at_ccw_limit]
-    #d135 = [abs(135.0-a) for a in rel_angle_options]
     best_ach_angle_index = argsort(angle_options_diff)[0]
 
-    #ach_rel_angles_are_similar = abs(argsort(d135)[0]-argsort(d135)[1]) <= 5.0  # if similar also consider the travel distance
     ach_rel_angles_are_similar = abs(angle_options_diff[0]- angle_options_diff[1]) <= 5.0  # if similar also consider the travel distance
 
     # compare to current motor position
@@ -132,10 +129,8 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     #if ach_rel_angles_are_similar and (travel_distances[argsort(d135)[1]] <= travel_distances[argsort(d135)[0]]):
     if ach_rel_angles_are_similar and (travel_distances[argsort(angle_options_diff)[1]] <= travel_distances[argsort(angle_options_diff)[0]]):
         # stay with second-best for now
-        # target_motor_pos_deg = angle_options[argsort(d135)[1]]
         target_motor_pos_deg = angle_options[argsort(angle_options_diff)[1]]
     else:
-        #target_motor_pos_deg = angle_options[argsort(d135)[0]]  # move to optimal position
         target_motor_pos_deg = angle_options[argsort(angle_options_diff)[0]]  # move to optimal position
 
     target_motor_pos_step = int(round(target_motor_pos_deg * motor_dict['steps_per_degree']))

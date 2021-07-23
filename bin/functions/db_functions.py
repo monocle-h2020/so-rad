@@ -65,6 +65,7 @@ def create_tables(db_dict):
             gps_lat float, gps_long float, gps_speed float,
             platform_bearing float,
             sun_azimuth float, sun_elevation float,
+            rel_view_az float,
             motor_temp float, driver_temp float,
             pi_cpu_temp float,
             tilt_avg float, tilt_std float,
@@ -93,14 +94,15 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
 
         if (trigger_id is None) or (spectra_data is None):
             cur.execute("""INSERT INTO sorad_metadata(sample_uuid, pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
-                           platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
+                           platform_bearing, sun_azimuth, sun_elevation, rel_view_az, pi_cpu_temp,
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
-                            values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
+                            values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
+                            values['motor_angles']['target_motor_pos_rel_az_deg'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
                             batt_v, values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp']))
 
@@ -111,14 +113,15 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
 
         elif (trigger_id) is not None and (spectra_data is not None):
             cur.execute("""INSERT INTO sorad_metadata(sample_uuid, pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
-                           platform_bearing, sun_azimuth, sun_elevation, pi_cpu_temp,
+                           platform_bearing, sun_azimuth, sun_elevation, rel_view_az, pi_cpu_temp,
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
-                            values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
+                            values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
+                            values['motor_angles']['target_motor_pos_rel_az_deg'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
                             batt_v, values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'], len(spectra_data)))
