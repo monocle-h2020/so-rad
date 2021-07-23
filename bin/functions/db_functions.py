@@ -99,7 +99,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
@@ -117,7 +117,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'], pi_cpu_temp,
                             values['tilt_avg'], values['tilt_std'],
