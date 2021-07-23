@@ -237,6 +237,7 @@ def update_gps_values(gps, values, tpr=None, rht=None, motor=None):
     values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
+    values['pi_temp'] = check_pi_cpu_temperature()
     if (tpr is not None) and (tpr['manager'] is not None):
         log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
         values['tilt_avg'] = tpr['manager'].tilt_avg
@@ -306,7 +307,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSolN': None, 'flags_gnssFixOK': None,
               'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None,
-              'motor_alarm': None, 'driver_temp': None, 'motor_temp': None}
+              'motor_alarm': None, 'driver_temp': None, 'motor_temp': None, 'pi_temp': None}
 
     use_rad = rad['n_sensors'] > 0
 

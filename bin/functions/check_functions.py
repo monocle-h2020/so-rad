@@ -189,9 +189,6 @@ def check_battery(bat_manager, battery):
 
 def check_pi_cpu_temperature():
     """Get the temperature of the cpu"""
-    import os
-    import time
-    temp = os.popen("vcgencmd measure_temp").readline()
-    temp = temp.replace("temp=","")
-    temp = temp.replace("'C","")
-    return temp
+    f = open("/sys/class/thermal/thermal_zone0/temp", "r")
+    t = float(f.readline().strip())/1000.0
+    return t
