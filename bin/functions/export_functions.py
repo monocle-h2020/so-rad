@@ -131,6 +131,7 @@ def add_metadata(export_config_dict, record, db):
     record_as_dict['operator_contact']  = export_config_dict.get('operator_contact')
     record_as_dict['license']           = export_config_dict.get('license')
     record_as_dict['license_reference'] = export_config_dict.get('license_reference')
+    record_as_dict['platform_uuid']     = export_config_dict.get('platform_uuid')
 
     # add the following if not already present
     if 'processing_level' not in record_as_dict:
@@ -143,6 +144,9 @@ def add_metadata(export_config_dict, record, db):
                                                  'longitude': record_as_dict[db['lon_field']]})
     if 'time' not in record_as_dict:
         record_as_dict['time'] = record_as_dict[db['time_field']]
+
+    if 'time_source' not in record_as_dict:
+        record_as_dict['time_source'] = 'GNSS'  # So-Rad always takes time/pos from a GNSS device.
 
     json_record = json.dumps(record_as_dict)
 

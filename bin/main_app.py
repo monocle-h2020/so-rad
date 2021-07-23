@@ -34,7 +34,7 @@ try:
 except Exception as msg:
     print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210711.0
+__version__ = 20210723.0
 
 
 def parse_args():
