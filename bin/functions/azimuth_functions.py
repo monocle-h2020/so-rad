@@ -37,7 +37,7 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     : floats lat, lon, altitude, datetime_ from gps
     : float ship_bearing from dual gps comparison
     : motor_dict has limit settings
-    : float motor_pos_deg is current motor positions in degrees, measured on motor plane (-180 to 180)
+    : float motor_pos_steps is current motor position in steps
     """
 
     try:
@@ -72,7 +72,7 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     view_comp_cw = (solar_az_deg + 135.0) % 360.0
     view_comp_ccw = (solar_az_deg - 135.0) % 360.0
 
-    # positions relative to motor position (0 = motor home)
+    # positions relative to motor home (offset corrected)  position (0 = motor home)
     motor_home_offset = motor_dict['home_pos']
     sol_az_motor_deg = (solar_az_deg - ship_bearing) - motor_home_offset
     view_motor_cw =  (sol_az_motor_deg + 135.0) % 360.0
@@ -143,6 +143,10 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
                     'ach_rel_ccw': ach_rel_ccw,
                     'ach_mot_cw': achieved_view_motor_cw_deg,
                     'ach_mot_ccw': achieved_view_motor_ccw_deg,
+                    'sol_az_to_motor_deg_abs': abs(sol_az_motor_deg),
                     'target_motor_pos_rel_az_deg': wrap180(abs(target_motor_pos_deg - sol_az_motor_deg))}
+
+    # 1 - sol_az_to_motor_deg_abs is the current angle (before adjustments are made) between motor home and sun
+    # 2 - target_motor_pos_rel_az_deg is the achievable angle, which will be true after motor has moved (respecting angle limits)
 
     return solar_az_deg, solar_el_deg, motor_angles

@@ -409,10 +409,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             moving = True
             t0 = time.time()  # timeout reference
             while moving and time.time()-t0 < 5:
-                moving, motor_pos = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
+                moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
                 if moving is None:
                     moving = True
-                log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(motor_pos, target_pos, counter))
+                log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
                 if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(2)
@@ -420,12 +420,20 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
+    # collect latest GPS and TPR data now that a measurement may be triggered
+    values = update_gps_values(gps, values, tpr, rht, motor)
+    # update viewing azimuth details
+    values['solar_az'], values['solar_el'],\
+        values['motor_angles'] = azi_func.calculate_positions(values['lat0'], values['lon0'],
+                                                              values['alt0'], values['dt'],
+                                                              values['ship_bearing_mean'], motor,
+                                                              values['motor_pos'])
+
+
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):
         # Get the current time of the computer as a unique trigger id
         trigger_id['all_sensors'] = datetime.datetime.now()
-        # collect latest GPS and TPR data now that a measurement will be triggered
-        values = update_gps_values(gps, values, tpr, rht, motor)
 
         # Collect and combine radiometry data
         spec_data = []
@@ -442,8 +450,6 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
         and (ready['ed_sampling']):
         trigger_id['ed_sensor'] = datetime.datetime.now()
-
-        values = update_gps_values(gps, values, tpr, rht, motor) # collect latest GPS data
 
         # trigger Ed
         spec_data = []
@@ -465,8 +471,6 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         log.debug("seconds since last commit: {0}".format(seconds_elapsed_since_last_any_commit))
         if seconds_elapsed_since_last_any_commit > 60:
             trigger_id['gps_location'] = datetime.datetime.now()
-            # record metadata and GPS data at least every minute
-            values = update_gps_values(gps, values, tpr, rht, motor) # collect latest GPS data
 
             if db_dict['used']:
                 db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['gps_location'], spectra_data=None, software_version=__version__)
