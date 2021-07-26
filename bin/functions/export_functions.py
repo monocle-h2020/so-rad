@@ -252,7 +252,7 @@ def update_status_parse_server(conf, db):
         meta_as_dict['time'] = meta_as_dict[db['time_field']]
 
     if 'time_source' not in record_as_dict:
-        record_as_dict['time_source'] = 'GNSS'  # So-Rad always takes time/pos from a GNSS device.
+        meta_as_dict['time_source'] = 'GNSS'  # So-Rad always takes time/pos from a GNSS device.
 
     meta_json = json.dumps(meta_as_dict)
 
