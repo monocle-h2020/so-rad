@@ -101,7 +101,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data, software_versi
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
-                            values['motor_angles']['target_motor_pos_rel_az_deg'], values['pi_temp'],
+                            values['rel_view_az'], values['pi_temp'],
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
                             values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp']))
 
@@ -120,7 +120,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data, software_versi
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
-                            values['motor_angles']['target_motor_pos_rel_az_deg'], values['pi_temp'],
+                            values['rel_view_az'], values['pi_temp'],
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
                             values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'], len(spectra_data)))

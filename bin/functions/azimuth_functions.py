@@ -30,6 +30,62 @@ def wrap180(value):
 
     return value
 
+def solar_az_el(lat, lon, altitude, datetime_):
+    """
+    Return solar azimuth and elevation angles using ephem
+    """
+    observer = ephem.Observer()
+    sun = ephem.Sun()
+
+    # Update the observer to our current location
+    observer.lat = str(lat)
+    observer.lon = str(lon)
+    observer.elevation = altitude
+    observer.date = datetime_
+
+    sun.compute(observer)
+
+    # Get solar angles
+    solar_az_deg = math.degrees(sun.az)
+    solar_el_deg = math.degrees(sun.alt)
+
+    return solar_az_deg, solar_el_deg
+
+
+def sun_relative_azimuth(lat, lon, altitude, datetime_, ship_bearing, motor_deg, motor_dict):
+    """
+    Return the current azimuth of sensors with respect to the sun
+    """
+    try:
+        assert lat is not None
+        assert lon is not None
+        assert datetime_ is not None
+        assert ship_bearing is not None
+        assert motor_dict is not None
+        assert motor_deg is not None
+    except AssertionError:
+        return None, None
+
+    # Get solar angles
+    solar_az_deg, solar_el_deg = solar_az_el(lat, lon, altitude, datetime_)
+
+    # Viewing positions relative to compass (range 0 - 359, 0 = North)
+    view_comp_cw = (solar_az_deg + 135.0) % 360.0
+    view_comp_ccw = (solar_az_deg - 135.0) % 360.0
+
+    # positions relative to motor home (offset corrected)  position (0 = motor home)
+    motor_home_offset = motor_dict['home_pos']
+    # motor_to_sun_deg  = (solar_az_deg - ship_bearing) - motor_home_offset + motor_dict['motor_deg'] % 360.0
+    motor_to_ship_rel = motor_deg + motor_home_offset  # the motor offset is accounted for here, and only here. This gives the angle between radiometers and ship heading
+    motor_to_compass = (motor_to_ship_rel + ship_bearing)  % 360.0   # compass angle of the radiometers
+
+    motor_to_sun = wrap180(motor_to_compass - solar_az_deg)           # difference between motor and solar compass angles
+
+    # Check that the positions are -180 -> 180
+    assert 180.0 >= motor_to_sun >= -180.0
+
+    return motor_to_sun, solar_az_deg
+
 
 def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict, motor_pos_steps):
     """
@@ -52,21 +108,8 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     except AssertionError:
         return None, None, None
 
-
-    observer = ephem.Observer()
-    sun = ephem.Sun()
-
-    # Update the observer to our current location
-    observer.lat = str(lat)
-    observer.lon = str(lon)
-    observer.elevation = altitude
-    observer.date = datetime_
-
-    sun.compute(observer)
-
     # Get solar angles
-    solar_az_deg = math.degrees(sun.az)
-    solar_el_deg = math.degrees(sun.alt)
+    solar_az_deg, solar_el_deg = solar_az_el(lat, lon, altitude, datetime_)
 
     # Viewing positions relative to compass (range 0 - 359, 0 = North)
     view_comp_cw = (solar_az_deg + 135.0) % 360.0
@@ -150,3 +193,19 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     # 2 - target_motor_pos_rel_az_deg is the achievable angle, which will be true after motor has moved (respecting angle limits)
 
     return solar_az_deg, solar_el_deg, motor_angles
+
+if __name__ == '__main__':
+    """Test to check behaviour or relative viewing angle calculations."""
+    import datetime
+    motor_dict = {}
+    motor_dict['home_pos'] = 10
+    lat = 50.0
+    lon = -4.0
+    altitude = 40
+    datetime_ = datetime.datetime.now()
+    print(f"motor\tship\tsun\trel_az")
+    for mdeg in range(0,360,30):
+        for sdeg in range(0,360,60):
+            motor_dict['motor_deg'] = mdeg
+            rel_az, solar_az = sun_relative_azimuth(lat, lon, altitude, datetime_, sdeg, motor_dict)
+            print(f"{mdeg}\t{sdeg}\t{int(solar_az)}\t{int(rel_az)}")

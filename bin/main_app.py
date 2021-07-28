@@ -258,7 +258,7 @@ def format_log_message(counter, ready, values):
     message = "{0} | ".format(counter)
     # handle string formatting where value may be None
     strdict = {}
-    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg', 'lat0', 'lon0']:
+    for valkey in ['speed', 'solar_el', 'solar_az', 'headMot', 'relPosHeading', 'accHeading', 'ship_bearing_mean', 'motor_deg', 'tilt_avg', 'lat0', 'lon0', 'rel_view_az']:
         if values[valkey] is not None:
             if valkey in ['lat0', 'lon0']:
                 strdict[valkey] = "{0:.5f}".format(values[valkey])
@@ -268,12 +268,12 @@ def format_log_message(counter, ready, values):
             strdict[valkey] = "n/a"
 
     if values['motor_angles']['target_motor_pos_rel_az_deg'] is None:
-        strdict['RelViewAz'] = "n/a"
+        strdict['tar_view_az'] = "n/a"
     else:
-        strdict['RelViewAz'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
+        strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
 
     message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
-    message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['RelViewAz']} | loc: {strdict['lat0']} {strdict['lon0']}"
+    message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
 
     return message
 
@@ -302,7 +302,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'counter': counter, 'speed': None, 'nsat0': None, 'motor_pos': None, 'motor_deg': None, 'ship_bearing_mean': None,
-              'solar_az': None, 'solar_el': None, 'motor_angles': None, 'batt_voltage': None,
+              'solar_az': None, 'solar_el': None, 'motor_angles': None, 'rel_view_az': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSolN': None, 'flags_gnssFixOK': None,
@@ -423,12 +423,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # collect latest GPS and TPR data now that a measurement may be triggered
     values = update_gps_values(gps, values, tpr, rht, motor)
     # update viewing azimuth details
-    values['solar_az'], values['solar_el'],\
-        values['motor_angles'] = azi_func.calculate_positions(values['lat0'], values['lon0'],
-                                                              values['alt0'], values['dt'],
-                                                              values['ship_bearing_mean'], motor,
-                                                              values['motor_pos'])
-
+    values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], values['alt0'], values['dt'],
+                                                                              values['ship_bearing_mean'], values['motor_deg'], motor)
 
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):
