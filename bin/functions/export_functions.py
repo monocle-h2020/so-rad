@@ -148,6 +148,9 @@ def add_metadata(export_config_dict, record, db):
     if 'time_source' not in record_as_dict:
         record_as_dict['time_source'] = 'GNSS'  # So-Rad always takes time/pos from a GNSS device.
 
+    if 'sensor_type' not in record_as_dict:
+        record_as_dict['sensor_type'] = 'trios_ramses'  # when implementing other sensors derive from radiometry config - protocol (= pytrios)
+
     json_record = json.dumps(record_as_dict)
 
     return json_record
