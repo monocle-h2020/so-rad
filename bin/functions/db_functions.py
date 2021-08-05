@@ -28,14 +28,26 @@ def connect_db(db_dict):
         conn = sqlite3.connect(db_dict['file'])
         cur = conn.cursor()
     except Exception as err:
-        msg = "Error connecting to database: \n {0}".format(err)
-        log.critical(msg)
+        msg = "Error connecting to database file at: {0}".format(db_dict['file'])
+        log.error(msg)
+        log.exception(err)
         raise Exception(msg)
     return conn, cur
 
 
+def database_info(conn, cur):
+    """describe the data in the database"""
+    # first and last entry
+    sql = """SELECT * FROM sorad_metadata WHERE n_rad_obs > 0 ORDER BY pc_time ASC LIMIT 1"""
+    cur.execute(sql)
+    log.info(f"First data entry: {cur.fetchone()}")
+    sql = """SELECT * FROM sorad_metadata WHERE n_rad_obs > 0 ORDER BY pc_time DESC LIMIT 1"""
+    cur.execute(sql)
+    log.info(f"Last data entry: {cur.fetchone()}")
+
+
 def column_names(conn, cur, table="sorad_metadata"):
-    """retreive column names from an sqlite3 db table"""
+    """retrieve column names from an sqlite3 db table"""
     sql = """SELECT name FROM PRAGMA_TABLE_INFO(?)"""
     cur.execute(sql, (table,))
     columns = cur.fetchall()
@@ -53,7 +65,7 @@ def create_tables(db_dict):
                 os.makedirs(os.path.dirname(db_dict['file']))
             except:
                 log.warning("Could not create path to database location: {0}".format(db_dict['file']))
-                raise
+                return
 
     # the following should create a new database file if it does not already exist
     conn, cur = connect_db(db_dict)

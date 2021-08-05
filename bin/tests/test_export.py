@@ -21,10 +21,10 @@ import logging
 import argparse
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
+from initialisation import db_init
 import functions.db_functions as db_func
 import functions.config_functions as cf_func
-from initialisation import db_init
-from functions.export_functions import run_export, update_status_parse_server
+import functions.export_functions as exp
 
 
 def parse_args():
@@ -44,6 +44,9 @@ def parse_args():
                         help="set log level to debug")
     parser.add_argument('-u', '--update', required=False, action='store_true',
                         help="Update remote status record")
+    parser.add_argument('-v', '--version', required=False, type=float, default=None,
+                        help="Specify a specific software version to use.")
+
 
     args = parser.parse_args()
 
@@ -77,9 +80,17 @@ if __name__ == '__main__':
     # update config with local overrides
     conf = cf_func.update_config(conf, args.local_config_file)
 
-    db = db_init(conf['DATABASE'])
     if args.source is not None:
-        db['file'] = args.source
+        assert os.path.exists(args.source)
+        conf['DATABASE']['database_path'] = args.source
+        log.info(f"Using database file at {args.source}")
+
+    db = db_init(conf['DATABASE'])
+
+
+    conn, cur = db_func.connect_db(db)
+    db_func.database_info(conn, cur)
+    conn.close()
 
     if args.force_upload > 0:
         limit = args.force_upload
@@ -89,8 +100,8 @@ if __name__ == '__main__':
         test_run = True
 
     if not args.update:
-        export_result, status_code, successes = run_export(conf, db, limit=limit, test_run=test_run)
+        export_result, status_code, successes = exp.run_export(conf, db, limit=limit, test_run=test_run, version=args.version)
         log.info(f"{successes} records uploaded")
     else:
-        export_result, status_code = update_status_parse_server(conf, db)
+        export_result, status_code = exp.update_status_parse_server(conf, db)
         log.info(f"status upload success: {export_result}")

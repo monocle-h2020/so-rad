@@ -41,13 +41,15 @@ TIMEOUT=5  # timeout for getting a response on data upload.
 TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
 
 log = logging.getLogger('export')
+log.setLevel('DEBUG')
 
-def run_export(conf, db, limit=1, test_run=True):
+
+def run_export(conf, db, limit=1, test_run=True, version=None, ignore_success=False, update_local=True):
     """
     Main function
     """
     export_config_dict = conf['EXPORT']
-    n_total, n_new, records = identify_new_local_records(db, limit=limit)
+    n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version, ignore_success=ignore_success)
     log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
     if db['add_sample_uuid']:
@@ -87,7 +89,8 @@ def run_export(conf, db, limit=1, test_run=True):
             update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
             return export_result, response_code, successes
 
-        update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
+        if update_local:
+            update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
 
     return export_result, response_code, successes
 
@@ -280,8 +283,11 @@ def update_status_parse_server(conf, db):
     return export_result, resultcode
 
 
-def identify_new_local_records(db, limit=10):
+def identify_new_local_records(db, limit=10, version=None, ignore_success=False):
     """report on total and new (not uploaded) records, latest record"""
+    log = logging.getLogger('export.scanlocal')
+    log.setLevel('DEBUG')
+
     n_total = 0
     n_uploaded = 0
     conn, cur = db_func.connect_db(db)
@@ -290,6 +296,19 @@ def identify_new_local_records(db, limit=10):
     sql_n_total = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0"""
     cur.execute(sql_n_total)
     n_total = cur.fetchone()[0]
+
+    # query number of radiometry samples in database with specific software version
+    if version is not None:
+        sql_n_version = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND sorad_version = ?"""
+        cur.execute(sql_n_version, (version,))
+        n_version = cur.fetchone()[0]
+
+        if logging.getLevelName(log.level) == 'DEBUG':
+            sql_all_versions = """SELECT sorad_version, count(*) FROM sorad_metadata WHERE n_rad_obs > 0 GROUP BY sorad_version"""
+            cur.execute(sql_all_versions)
+            versions = cur.fetchall()
+            for ver in versions:
+                log.debug(f"{ver}")
 
     # query number of radiometry samples not yet uploaded
     sql_n_not_inserted = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND ({success} IS NULL OR {success}=0)""".\

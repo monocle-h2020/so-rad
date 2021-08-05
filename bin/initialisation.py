@@ -83,12 +83,17 @@ def db_init(db_config):
        if 'gps_lat' in header_meta:
            db['lat_field'] = 'gps_lat'
            db['lon_field'] = 'gps_long'
+       elif 'gps1_lat' in header_meta:
+           db['lat_field'] = 'gps1_lat'
+           db['lon_field'] = 'gps1_long'
        else:
            log.critical("Lat/lon fields not recognised in database")
 
     if 'time' not in header_meta:
        if 'gps_time' in header_meta:
            db['time_field'] = 'gps_time'
+       elif 'gps1_time' in header_meta:
+           db['time_field'] = 'gps1_time'
        else:
            log.critical("time field not recognised in database")
 
