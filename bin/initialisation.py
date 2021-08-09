@@ -73,7 +73,7 @@ def db_init(db_config):
         log.debug("Database format < June 2021")
         db['export_success_field']  = 'sos_inserted'
         db['export_attempts_field'] = 'sos_insertion_attempts'
-    elif 'export success' in header_meta:
+    elif 'export_success' in header_meta:
         log.debug("Database format > June 2021")
         db['export_success_field']  = 'export_success'
         db['export_attempts_field'] = 'export_attempts'

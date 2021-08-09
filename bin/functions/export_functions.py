@@ -41,7 +41,7 @@ TIMEOUT=5  # timeout for getting a response on data upload.
 TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
 
 log = logging.getLogger('export')
-log.setLevel('DEBUG')
+log.setLevel('INFO')
 
 
 def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True):
@@ -54,7 +54,7 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
     """
     export_config_dict = conf['EXPORT']
     n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version)
-    log.info("records={0}, not_uploaded={1}".format(n_total, n_new))
+    log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
     if db['add_sample_uuid']:
         log.debug("Adding sample_uuid")
@@ -86,10 +86,10 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
         #log.debug(respdata.decode('utf-8'))  # dump the http request (super-debug!)
 
         if export_result:
-            log.info(f"{i}/{len(records)} Record {json.loads(record_json)['id_']} uploaded succesfully")
+            log.debug(f"{i}/{len(records)} Record {json.loads(record_json)['id_']} uploaded succesfully")
             successes += 1
         else:
-            log.info("Data upload failed, try again later")
+            log.debug("Data upload failed, try again later")
             update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
             return export_result, response_code, successes
 
@@ -317,12 +317,12 @@ def identify_new_local_records(db, limit=10, version=None):
         cur.execute(sql_n_version, (version,))
         n_version = cur.fetchone()[0]
 
-    #if logging.getLevelName(log.level) == 'INFO':
-    sql_all_versions = """SELECT sorad_version, count(*) FROM sorad_metadata WHERE n_rad_obs > 0 GROUP BY sorad_version"""
-    cur.execute(sql_all_versions)
-    versions = cur.fetchall()
-    for ver in versions:
-        log.info(f"{ver}")
+    if logging.getLevelName(log.level) == 'DEBUG':
+        sql_all_versions = """SELECT sorad_version, count(*) FROM sorad_metadata WHERE n_rad_obs > 0 GROUP BY sorad_version"""
+        cur.execute(sql_all_versions)
+        versions = cur.fetchall()
+        for ver in versions:
+            log.info(f"{ver}")
 
     # query number of radiometry samples not yet uploaded
     if version is not None:
