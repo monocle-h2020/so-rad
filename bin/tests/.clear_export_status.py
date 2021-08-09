@@ -36,14 +36,10 @@ def parse_args():
     parser.add_argument('-l', '--local_config_file', required=False,
                         help="system-specific config overrides providing program settings",
                         default=u"../config-local.ini")
-    parser.add_argument('-f', '--force_upload', required=False, type=int, default=0,
-                        help="force upload of set number of records to remote server (defaults to 0)")
     parser.add_argument('-s', '--source', required=False, type=str, default=None,
                         help="path to a specific database file rather than the one in current use")
     parser.add_argument('-d', '--debug', required=False, action='store_true',
                         help="set log level to debug")
-    parser.add_argument('-u', '--update', required=False, action='store_true',
-                        help="Update remote status record")
     parser.add_argument('-v', '--version', required=False, type=float, default=None,
                         help="Specify a specific software version to use.")
 
@@ -86,25 +82,8 @@ if __name__ == '__main__':
         log.info(f"Using database file at {args.source}")
 
     db = db_init(conf['DATABASE'])
-
-
     conn, cur = db_func.connect_db(db)
     db_func.database_info(conn, cur)
+
+    db_func.reset_export_succes_count_for_version(conn, cur, db, version=args.version)
     conn.close()
-
-    if args.force_upload > 0:
-        limit = args.force_upload
-        test_run = False
-    else:
-        limit = 1
-        test_run = True
-
-    if not args.update:
-        export_result, status_code, successes = exp.run_export(conf, db, limit=limit,
-                                                              test_run=test_run, version=args.version,
-                                                              update_local=True)
-
-        log.info(f"{successes} records uploaded")
-    else:
-        export_result, status_code = exp.update_status_parse_server(conf, db)
-        log.info(f"status upload success: {export_result}")

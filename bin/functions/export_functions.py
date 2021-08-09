@@ -44,13 +44,17 @@ log = logging.getLogger('export')
 log.setLevel('DEBUG')
 
 
-def run_export(conf, db, limit=1, test_run=True, version=None, ignore_success=False, update_local=True):
+def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True):
     """
     Main function
+
+    :test_run bool:  will only read, not export or write
+    :version float:  will limit activity to data associated with a specific sorad_version in the db
+    :update_local bool: update the local db file with the export status (success/fail) and number of attempts to export
     """
     export_config_dict = conf['EXPORT']
-    n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version, ignore_success=ignore_success)
-    log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
+    n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version)
+    log.info("records={0}, not_uploaded={1}".format(n_total, n_new))
 
     if db['add_sample_uuid']:
         log.debug("Adding sample_uuid")
@@ -82,39 +86,49 @@ def run_export(conf, db, limit=1, test_run=True, version=None, ignore_success=Fa
         #log.debug(respdata.decode('utf-8'))  # dump the http request (super-debug!)
 
         if export_result:
-            log.debug("Record {0} uploaded succesfully".format(json.loads(record_json)['id_']))
+            log.info(f"{i}/{len(records)} Record {json.loads(record_json)['id_']} uploaded succesfully")
             successes += 1
         else:
-            log.debug("Data upload failed, try again later")
+            log.info("Data upload failed, try again later")
             update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
             return export_result, response_code, successes
 
         if update_local:
-            update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
+            update_local_db(db, json.loads(record_json)['id_'], export_result, record_json, test_run)
 
     return export_result, response_code, successes
 
 
-def update_local_db(db, metadata_id, export_result, record_json):
+def update_local_db(db, metadata_id, export_result, record_json, test_run):
     """
     update the local db once a record export attempt has been completed. Try to access the local database several times to circumvent temporary locks.
     """
+    log = logging.getLogger('export.updatelocaldb')
+    rec = json.loads(record_json)
     conn, cur = db_func.connect_db(db)
     record_dict = json.loads(record_json)
-    attempts = 1
     attempts_field= db['export_attempts_field']
     success_field = db['export_success_field']
-
+    attempts = rec[attempts_field]
+    if attempts is None:
+        attempts = 1
+    else:
+        attempts = int(attempts) + 1
+    log.debug(f"update record {metadata_id} with attempts {rec[attempts_field]} -> {attempts} and succes={export_result}")
     sql_update = f"""UPDATE sorad_metadata SET {success_field} = ?, {attempts_field} = {attempts} WHERE id_ = ?"""
 
     db_update_attempt = 0
     done = False
     while (not done) and (db_update_attempt < 5):
         try:
-            cur.execute(sql_update, (export_result, metadata_id))
-            conn.commit()
-            done = True
-            log.debug(f"Updated local db record {metadata_id}")
+            if test_run:
+                cur.execute(sql_update, (export_result, metadata_id))
+                conn.rollback()
+            else:
+                cur.execute(sql_update, (export_result, metadata_id))
+                conn.commit()
+                done = True
+                log.debug(f"Updated local db record {metadata_id}")
         except Exception as msg:
             log.exception(msg)
             time.sleep(0.2) * db_update_attempt**2
@@ -283,10 +297,9 @@ def update_status_parse_server(conf, db):
     return export_result, resultcode
 
 
-def identify_new_local_records(db, limit=10, version=None, ignore_success=False):
+def identify_new_local_records(db, limit=10, version=None):
     """report on total and new (not uploaded) records, latest record"""
     log = logging.getLogger('export.scanlocal')
-    log.setLevel('DEBUG')
 
     n_total = 0
     n_uploaded = 0
@@ -299,20 +312,25 @@ def identify_new_local_records(db, limit=10, version=None, ignore_success=False)
 
     # query number of radiometry samples in database with specific software version
     if version is not None:
-        sql_n_version = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND sorad_version = ?"""
+        sql_n_version = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND sorad_version = ? AND ({success} IS NULL OR {success}=0)""".format(success=db['export_success_field'])
+
         cur.execute(sql_n_version, (version,))
         n_version = cur.fetchone()[0]
 
-        if logging.getLevelName(log.level) == 'DEBUG':
-            sql_all_versions = """SELECT sorad_version, count(*) FROM sorad_metadata WHERE n_rad_obs > 0 GROUP BY sorad_version"""
-            cur.execute(sql_all_versions)
-            versions = cur.fetchall()
-            for ver in versions:
-                log.debug(f"{ver}")
+    #if logging.getLevelName(log.level) == 'INFO':
+    sql_all_versions = """SELECT sorad_version, count(*) FROM sorad_metadata WHERE n_rad_obs > 0 GROUP BY sorad_version"""
+    cur.execute(sql_all_versions)
+    versions = cur.fetchall()
+    for ver in versions:
+        log.info(f"{ver}")
 
     # query number of radiometry samples not yet uploaded
-    sql_n_not_inserted = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND ({success} IS NULL OR {success}=0)""".\
-                         format(success=db['export_success_field'])
+    if version is not None:
+        sql_n_not_inserted = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND ({success} IS NULL OR {success}=0) AND sorad_version = {version}""".\
+                             format(success=db['export_success_field'], version=version)
+    else:
+        sql_n_not_inserted = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0 AND ({success} IS NULL OR {success}=0)""".\
+                             format(success=db['export_success_field'], version=version)
 
     cur.execute(sql_n_not_inserted)
     n_not_inserted = cur.fetchone()[0]
@@ -324,8 +342,12 @@ def identify_new_local_records(db, limit=10, version=None, ignore_success=False)
 
     # query records not yet uploaded, youngest records first up to any specified limit. Includes metadata + radiometry
     #  can we try records with a high number of export tries, last? To prevent getting stuck on a possibly corrupt record?
-    sql_meta = """SELECT meta.id_ FROM sorad_metadata meta WHERE meta.n_rad_obs > 0 AND ({success} IS NULL OR {success}=0) ORDER BY meta.id_ DESC LIMIT ?""".\
-               format(success=db['export_success_field'])
+    if version is not None:
+        sql_meta = """SELECT meta.id_ FROM sorad_metadata meta WHERE meta.n_rad_obs > 0 AND ({success} IS NULL OR {success}=0) AND sorad_version = {version} ORDER BY meta.id_ DESC LIMIT ?""".\
+                   format(success=db['export_success_field'], version=version)
+    else:
+        sql_meta = """SELECT meta.id_ FROM sorad_metadata meta WHERE meta.n_rad_obs > 0 AND ({success} IS NULL OR {success}=0) ORDER BY meta.id_ DESC LIMIT ?""".\
+                   format(success=db['export_success_field'])
 
     cur.execute(sql_meta, (limit,))
     meta_ids = cur.fetchall()

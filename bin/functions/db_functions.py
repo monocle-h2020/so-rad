@@ -34,6 +34,16 @@ def connect_db(db_dict):
         raise Exception(msg)
     return conn, cur
 
+def reset_export_succes_count_for_version(conn, cur, db_dict, version=None):
+    """Use with caution. Reset the export success status of records in the local db so that they will be re-uploaded. To prevent duplicates, these records should already be removed from the remote store"""
+    attempts_field= db_dict['export_attempts_field']
+    success_field = db_dict['export_success_field']
+    if version is None:
+        log.error("You must supply a specific sorad_version with this function")
+    sql = f"""UPDATE sorad_metadata SET {success_field}=0, {attempts_field}=0 WHERE sorad_version = ?"""
+    cur.execute(sql, (version,))
+    conn.commit()
+
 
 def database_info(conn, cur):
     """describe the data in the database"""
@@ -93,6 +103,7 @@ def create_tables(db_dict):
             measurement text,
             FOREIGN KEY(metadata_id) REFERENCES sorad_metadata(id_))"""
     cur.execute(sql)
+    conn.commit()
     conn.close()
 
 

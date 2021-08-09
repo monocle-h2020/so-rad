@@ -73,10 +73,12 @@ def db_init(db_config):
         log.debug("Database format < June 2021")
         db['export_success_field']  = 'sos_inserted'
         db['export_attempts_field'] = 'sos_insertion_attempts'
-    else:
+    elif 'export success' in header_meta:
         log.debug("Database format > June 2021")
         db['export_success_field']  = 'export_success'
         db['export_attempts_field'] = 'export_attempts'
+    else:
+        log.critical("database format not recognized")
 
     # location info may also have changed with different versions
     if 'location' not in header_meta:
