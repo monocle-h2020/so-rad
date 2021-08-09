@@ -14,14 +14,19 @@ import logging
 import threading
 import sys
 import time
-import board
-import busio
 import numpy as np
 import argparse
 import datetime
 import math
 from numpy import argwhere, array, mean, std, append, nanstd, nanmean
+
 log = logging.getLogger('tpr')
+try:
+    import board
+    import busio
+except NotImplementedError as err:
+    log.error("Module not imported due to unsupported platform. Some functions may not work")
+    log.exception(err)
 
 
 class Ada_adxl345(object):

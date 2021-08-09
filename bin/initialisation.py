@@ -73,22 +73,29 @@ def db_init(db_config):
         log.debug("Database format < June 2021")
         db['export_success_field']  = 'sos_inserted'
         db['export_attempts_field'] = 'sos_insertion_attempts'
-    else:
+    elif 'export success' in header_meta:
         log.debug("Database format > June 2021")
         db['export_success_field']  = 'export_success'
         db['export_attempts_field'] = 'export_attempts'
+    else:
+        log.critical("database format not recognized")
 
     # location info may also have changed with different versions
     if 'location' not in header_meta:
        if 'gps_lat' in header_meta:
            db['lat_field'] = 'gps_lat'
            db['lon_field'] = 'gps_long'
+       elif 'gps1_lat' in header_meta:
+           db['lat_field'] = 'gps1_lat'
+           db['lon_field'] = 'gps1_long'
        else:
            log.critical("Lat/lon fields not recognised in database")
 
     if 'time' not in header_meta:
        if 'gps_time' in header_meta:
            db['time_field'] = 'gps_time'
+       elif 'gps1_time' in header_meta:
+           db['time_field'] = 'gps1_time'
        else:
            log.critical("time field not recognised in database")
 

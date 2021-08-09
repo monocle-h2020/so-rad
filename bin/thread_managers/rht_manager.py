@@ -16,8 +16,12 @@ import logging
 import threading
 import datetime
 import time
-import Adafruit_DHT
 log = logging.getLogger('rht')
+try:
+    import Adafruit_DHT
+except Exception as err:
+    log.error("Module not imported - either missing or due to unsupported platform. Some functions may not work")
+    log.exception(err)
 
 
 class Ada_dht22(object):
