@@ -81,23 +81,12 @@ def db_init(db_config):
         log.critical("database format not recognized")
 
     # location info may also have changed with different versions
-    if 'location' not in header_meta:
-       if 'gps_lat' in header_meta:
-           db['lat_field'] = 'gps_lat'
-           db['lon_field'] = 'gps_long'
-       elif 'gps1_lat' in header_meta:
-           db['lat_field'] = 'gps1_lat'
-           db['lon_field'] = 'gps1_long'
-       else:
-           log.critical("Lat/lon fields not recognised in database")
-
-    if 'time' not in header_meta:
-       if 'gps_time' in header_meta:
-           db['time_field'] = 'gps_time'
-       elif 'gps1_time' in header_meta:
-           db['time_field'] = 'gps1_time'
-       else:
-           log.critical("time field not recognised in database")
+    if 'gps_lat' in header_meta:
+        db['gps_fields'] = 'gps_'
+    elif 'gps1_lat' in header_meta:
+        db['gps_fields'] = 'gps1_'
+    else:
+        log.critical("gps fields not recognised in database")
 
     # if the sample_uuid is not stored on data collection, set switch to add it on upload
     db['add_sample_uuid'] = 'sample_uuid' not in db['header']
