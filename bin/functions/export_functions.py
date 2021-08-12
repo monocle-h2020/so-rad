@@ -154,13 +154,22 @@ def add_metadata(export_config_dict, record, db):
     if 'processing_level' not in record_as_dict:
         record_as_dict['processing_level'] = 0
 
+    for key, val in record_as_dict:
+        # replace gps1_ with gps_ in keys
+        if 'gps1_' in key:
+            record_as_dict[key.replace('gps1_', 'gps_')] = record_as_dict.pop(key)
+            try:
+                del record_as_dict[key.replace('gps1_', 'gps2_')]
+            except: pass
+
     # create location object
     if 'location' not in record_as_dict:
         record_as_dict['location'] = json.dumps({'__type': 'GeoPoint',
-                                                 'latitude': record_as_dict[db['lat_field']],
-                                                 'longitude': record_as_dict[db['lon_field']]})
+                                                 'latitude': record_as_dict[db['gps_lat']],
+                                                 'longitude': record_as_dict[db['gps_lon']]})
     if 'time' not in record_as_dict:
-        record_as_dict['time'] = record_as_dict[db['time_field']]
+        record_as_dict['time'] = record_as_dict['gps_time']
+        del record_as_dict['gps_time']
 
     if 'time_source' not in record_as_dict:
         record_as_dict['time_source'] = 'GNSS'  # So-Rad always takes time/pos from a GNSS device.
