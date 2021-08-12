@@ -442,6 +442,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             db_id = db_func.commit_db(db_dict, verbose, values, trigger_id['all_sensors'], spectra_data=spec_data, software_version=__version__)
             log.info("{2} | New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id, counter))
 
+        try:
+            for sid, spec in zip(sids, spec_data):
+                if None in spec:
+                    log.warning(f"{counter} | None value encountered in spectrum from {sid}")
+        except Exception as err:
+            log.exception(err)
+
     # alternatively trigger just the Ed sampling, if corresponding conditions are met
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
         and (ready['ed_sampling']):
