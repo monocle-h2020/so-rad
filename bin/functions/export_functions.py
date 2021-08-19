@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3 -*- coding: utf-8 -*-
 """
 Data export functions
 
@@ -271,16 +270,29 @@ def update_status_parse_server(conf, db):
     meta_as_dict['platform_uuid']     = export_config_dict.get('platform_uuid')
     meta_as_dict['owner_contact']     = export_config_dict.get('owner_contact')
     meta_as_dict['operator_contact']  = export_config_dict.get('operator_contact')
+
+    for key, val in meta_as_dict.items():
+        # replace gps1_ with gps_ in keys
+        if 'gps1_' in key:
+            meta_as_dict[key.replace('gps1_', 'gps_')] = meta_as_dict.pop(key)
+            try:
+                del meta_as_dict[key.replace('gps1_', 'gps2_')]
+            except: pass
+
     # create location object
     if 'location' not in meta_as_dict:
         meta_as_dict['location'] = json.dumps({'__type': 'GeoPoint',
-                                               'latitude': meta_as_dict[db['lat_field']],
-                                               'longitude': meta_as_dict[db['lon_field']]})
+                                                 'latitude': meta_as_dict['gps_lat'],
+                                                 'longitude': meta_as_dict['gps_long']})
     if 'time' not in meta_as_dict:
-        meta_as_dict['time'] = meta_as_dict[db['time_field']]
+        meta_as_dict['time'] = meta_as_dict['gps_time']
+        del meta_as_dict['gps_time']
 
     if 'time_source' not in meta_as_dict:
         meta_as_dict['time_source'] = 'GNSS'  # So-Rad always takes time/pos from a GNSS device.
+
+    if 'sensor_type' not in meta_as_dict:
+        meta_as_dict['sensor_type'] = 'trios_ramses'  # when implementing other sensors derive from radiometry config - protocol (= pytrios)
 
     meta_json = json.dumps(meta_as_dict)
 
