@@ -97,7 +97,7 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
     return export_result, response_code, successes
 
 
-def update_local_db(db, metadata_id, export_result, record_json, test_run):
+def update_local_db(db, metadata_id, export_result, record_json, test_run=False):
     """
     update the local db once a record export attempt has been completed. Try to access the local database several times to circumvent temporary locks.
     """
