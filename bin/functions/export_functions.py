@@ -199,8 +199,9 @@ def export_to_parse_server(export_config_dict, json_record):
     except requests.exceptions.ReadTimeout:
         log.warning("Timeout while uploading data to remote server")
         return False, None, None
-    except:
+    except Exception as err:
         log.warning("Unhandled exception while uploading data to remote server")
+        log.exception(err)
         return False, None, None
 
 
