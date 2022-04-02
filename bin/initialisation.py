@@ -235,7 +235,7 @@ def gps_init(gps_config, ports):
     gps['port1'] = None
     gps['gps_heading_correction'] = gps_config.getfloat('gps_heading_correction')
 
-    if gps['protocol'] in ['rtk', ]:
+    if gps['protocol'] in ['rtk', 'pyubx2']:
         # heading will be determined from distance between receivers rather than movement, so we need to know which one is nearer the front of the ship
        gps['location1'] = gps_config.get('location1').lower()
        gps['location2'] = gps_config.get('location2').lower()
@@ -262,6 +262,8 @@ def gps_init(gps_config, ports):
        gps['manager'] = gps_manager.RTKUBX()
     elif gps['protocol'] == 'nmea0183':
        gps['manager'] = gps_manager.NMEA0183()
+    elif gps['protocol'] == 'pyubx2':
+       gps['manager'] = gps_manager.PYUBX2()
     else:
        log.exception("GPS protocol '{0}' is not implemented".format(gps['protocol']))
 
