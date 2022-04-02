@@ -115,7 +115,7 @@ def motor_init(motor_config, ports):
         port_autodetect_string = motor_config.get('port_autodetect_string')
         for port, desc, hwid in sorted(ports):
             log.info("port info: {0} {1} {2}".format(port, desc, hwid))
-            if (desc == port_autodetect_string):
+            if port_autodetect_string in port+desc+hwid:
                 motor['port'] = port
                 log.info("Motor auto-detected on port: {0}".format(port))
     else:
