@@ -153,7 +153,7 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
             continue
 
         elif data.identity == 'NAV-RELPOSNED':
-            log.info("RPN message")
+            log.debug("RPN message")
             rpn_read = True
             dataDictionary['version'] =      data.version
             dataDictionary['reserved1'] =    data.reserved1
@@ -183,7 +183,7 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
             dataDictionary['diffSolN'] =     data.diffSoln
             dataDictionary['gnssFixOK'] =    data.gnssFixOK
         elif data.identity == 'NAV-PVT':
-            log.info("PVT message")
+            log.debug("PVT message")
             pvt_read = True
             dataDictionary['iTOW'] = data.iTOW
             dataDictionary['year'] = data.year
