@@ -23,15 +23,9 @@ from thread_managers import battery_manager
 from thread_managers import tpr_manager
 from thread_managers import gps_manager
 from thread_managers import rht_manager
+from thread_managers import gpio_manager
 from functions import db_functions
 log = logging.getLogger()   # report to root logger
-
-try:
-    import RPi.GPIO as GPIO
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-except Exception as msg:
-    log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
 
 
 def db_init(db_config):
@@ -322,11 +316,15 @@ def rad_init(rad_config, ports):
     # using the pin info provided in the config file
     rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
-        rad['gpio1'] = rad_config.getint('gpio1')
+        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
+        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
+        if rad['gpio_protocol'] == 'rpi':
+            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
+        elif rad['gpio_protocol'] == 'gpiozero':
+            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(rad['gpio1'], GPIO.OUT)
-        GPIO.output(rad['gpio1'], GPIO.HIGH)
+        rad['gpio1'] = rad_config.getint('gpio1')
+        rad['gpio_interface'].on(rad['gpio1'])
         time.sleep(1) # Wait to allow sensors to boot
 
     # Return the radiometry dict and relevant manager class
@@ -336,19 +334,20 @@ def rad_init(rad_config, ports):
     return rad, Rad_manager
 
 
-def init_gpio(conf, state=0):
+def init_gpio(conf, rad, state=0):
     """set all GPIO pins identified in config file to low (0) or high (1)"""
-    set_state = {0: GPIO.LOW, 1: GPIO.HIGH}
 
     # If GPIO control is requested use the pins stated in the config file
     if conf['DEFAULT'].getboolean('use_gpio_control'):
         pins = []
-        if conf['RADIOMETERS'].getboolean('use_gpio_control'):
-            pins.append(conf['RADIOMETERS'].getint('gpio1'))
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(pins, GPIO.OUT)
-        GPIO.output(pins, set_state[state])
-        GPIO.cleanup()
+        if rad['use_gpio_control']:
+            pins.append(rad['gpio1'])
+        if state == 0:
+            for pin in pins:
+                rad['gpio_interface'].off(pin)
+        elif state == 1:
+            for pin in pins:
+                rad['gpio_interface'].on(pin)
 
 
 def sample_init(sample_conf):

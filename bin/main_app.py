@@ -28,13 +28,8 @@ from functions.export_functions import run_export, update_status_parse_server, i
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-# only import RPi libraries if running on a Pi (other environments can be used for unit testing)
-try:
-    import RPi.GPIO as GPIO
-except Exception as msg:
-    print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210723.1
+__version__ = 20220402.1
 
 
 def parse_args():
@@ -204,8 +199,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht,
         rht['manager'].stop()
 
     # Turn all GPIO pins off
-    GPIO.output(gpios, GPIO.LOW)
-    GPIO.cleanup()
+    initialisation.init_gpio(conf, state=0)  # set all used pins to LOW
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
@@ -291,7 +285,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     : rad                   - radiometry configuration
     : battery               - battery management configuration
     : motor                 - motor configuration
-    : pgios                 - gpio pins in use
+    : gpios                 - gpio pins in use
 
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
