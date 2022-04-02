@@ -259,15 +259,15 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    if values['motor_angles']is None:
-        strdict['tar_view_az'] = "n/a"
-    elif values['motor_angles']['target_motor_pos_rel_az_deg'] is None:
+    if not ready['heading']:
         strdict['tar_view_az'] = "n/a"
     else:
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
 
-    message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
-    message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+    try:
+        message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
+        message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+    except: pass
 
     return message
 
@@ -363,7 +363,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             except:
                 pass
 
-        # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
+        # If bearing is not fixed, fetch the calculated mean bearing using data from GPS+heading sensors
         if not bearing_fixed:
             if ready['heading']:
                 values['ship_bearing_mean'] = (gps['manager'].heading - gps['gps_heading_correction']) % 360.0
@@ -388,8 +388,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                          values['motor_angles']['target_motor_pos_deg'],
                          values['motor_angles']['target_motor_pos_rel_az_deg'], counter))
         except TypeError:
-            log.warning("A value could not (yet) be read")
+            # at least one value is None
             pass
+
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
