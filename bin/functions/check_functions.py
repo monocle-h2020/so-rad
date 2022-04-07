@@ -102,6 +102,12 @@ def check_heading(gps):
            (gps['manager'].heading != 1):
             return True
 
+    elif gps['protocol'] == "pyubx2":
+        if (gps['manager'].flag_relPosHeadingValid == 1) and \
+           (gps['manager'].accHeading < gps['heading_accuracy_limit']) and \
+           (gps['manager'].heading is not None):
+            return True
+
     elif gps['protocol'] == 'nmea0183':
         if gps['manager'].speed >= gps['heading_speed_limit']:
             return True
