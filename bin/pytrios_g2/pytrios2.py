@@ -1,21 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TriOS G2 connector class
+TriOS G2 connector using modbus interface
 
-The general structure of a single modbus command is
-
-Slave address 8 bits
-Function code 8 bits
---03h (3) read from holding register
---06h (6) write to a holding register - only used on address 1, to trigger a single light measurement. Write value 0x0400.
---10h (16) write multiple registers
---11h (17) write special register, should return sensor information
-Data          nx8 bits
-Error check   16 bits
---error checks use CRC-16 method
-
-The response code follows the slave_id, function code, data length, data, checksum pattern
 """
 
 import time
@@ -32,11 +19,15 @@ import logging
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 
+import matplotlib.pyplot as plt
 
-def run():
-    """ main program loop.
-    Reads config file to set up environment then starts various threads to monitor inputs.
-    Monitors for a keyboard interrupt to provide a clean exit where possible.
+
+def test(plot=False):
+    """
+    Reads config file to set up environment then
+    - check sensor lan state (switch off to save power)
+    - record one sample with the sensor
+    - plot the spectrum (optional)
     """
     ports = list_ports.comports()
     for port, desc, hwid in ports:
@@ -47,15 +38,9 @@ def run():
     log.info("checking for trios sensor")
     result = report_slave_id(mod)  # does not work yet
 
-
-    log.info("checking lan state (0)")
+    log.info("checking lan state")
     lanstate = get_lan_state(mod)
-    log.info("setting lan state ON")
-    set_lan_state(mod, True)
-
-
-    log.info("checking lan state (1)")
-    lanstate = get_lan_state(mod)
+    log.info(f"lan state: {lanstate}")
 
     if lanstate:
         log.info("setting land state OFF")
@@ -63,15 +48,23 @@ def run():
         log.info("checking lan state (2)")
         lanstate = get_lan_state(mod)
 
-    # result = test_for_triosg2(mod)
+    log.info("Sampling one spectrum")
+    result = sample_one(mod)
+    log.info(f"Integration time: {result.integration_time['value']} ({type(result.integration_time['value'])})")
+    log.info(f"Inclination (pre/post): {result.pre_inclination['value']} ({type(result.pre_inclination['value'])})/ {result.post_inclination['value']} ({type(result.post_inclination['value'])})")
+    log.info(f"Uncalibrated spectrum ({type(result.spectrum)}): {result.spectrum}")
 
-    #result = trigger_measurement(mod)
-    #log.info(result)
-    #time.sleep(6)
-
-    #g2 = read_all_system_registers(mod)
-    g2 = read_last_meas(mod)
     mod['serial'].close()
+
+    if plot:
+        plt.ion()
+        plt.figure(1)
+        plt.clf()
+        plt.plot(result.spectrum)
+        log.info("Close plot window to exit")
+        try:
+            plt.pause(0)
+        except: pass  # suppress noise
 
 
 class G2registers():
@@ -97,7 +90,7 @@ class G2registers():
         self.light_pixel_start =      {'name': 'light_pixel_start',       'start': 276, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.light_pixel_stop =       {'name': 'light_pixel_stop',        'start': 277, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
 
-        # on new sensors, many of these registers are not yet initiated and won't be read correctly.
+        # on unused sensors, many of these registers are not yet initiated and won't be read correctly.
         # After the first measurement has been triggered this should work
         self.par =                    {'name': 'par',                     'start':1000, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
         self.spectrum_type =          {'name': 'spectrum_type',           'start':2000, 'len': 1,  'datatype': '>H', 'timeout':0.15, 'value': None}
@@ -127,17 +120,44 @@ class G2registers():
         #self.ordinate =              {'name': 'ordinate',                'start':2612, 'len': 125,  'datatype': '250e', 'timeout':0.3, 'value': None}
 
 
-def trigger_measurement(mod):
-    """Write register 0x06 with value 0x0400 (1024) to trigger a single measurement"""
-    response = write_single_command(mod['serial'], 1, 6, 1, 1024, timeout=1)
-    log.info(response)
+def sample_one(mod):
+    """Trigger a measurement, then monitor sensor idle state and read and return (meta)data when ready"""
+    meastimer = read_one_register(mod, register_name='measurement_timeout')
+    if meastimer > 0:
+        log.info("Sensor busy, try again")
+        return None
+
+    result = trigger_measurement(mod)
+
+    timeout = 20
+    t0 = time.perf_counter()
+    meastimer = 200
+    while (meastimer > 0) and ((time.perf_counter() - t0) < timeout):
+        log.debug("Waiting for data..")
+        time.sleep(0.1)
+        meastimer = read_one_register(mod, register_name='measurement_timeout')
+
+    if meastimer > 0:
+        log.warning("Sensor timed out")
+        return None
+
+    # data should now be available
+    result = read_last_meas(mod)
+    log.debug(result)
+    return result
 
 
 def set_lan_state(mod, state=False):
     """Enable or Disable the LAN interface. Saved across restarts. After enabling the device should be power cycled."""
     lanreg = G2registers().lan_enable_state
     response = write_single_command(mod['serial'], 1, 6, lanreg['start'], {True:65535, False:0}[state], timeout=1.0)
-    log.info(crc_check_incoming(response))
+    log.debug(crc_check_incoming(response))
+
+
+def trigger_measurement(mod):
+    """Write register 0x06 with value 0x0400 (1024) to trigger a single measurement"""
+    response = write_single_command(mod['serial'], 1, 6, 1, 1024, timeout=1)
+    log.debug(response)
 
 
 def get_lan_state(mod):
@@ -154,7 +174,7 @@ def get_lan_state(mod):
             lanstate = False
         else:
             lanstate = None
-        log.info(f"LAN interface state: {lanstate}")
+        log.debug(f"LAN interface state: {lanstate}")
     except CrcError as err:
         log.exception(err)
         log.warning(f"LAN interface state - Checksum failed: {response}")
@@ -162,10 +182,53 @@ def get_lan_state(mod):
     return lanstate
 
 
+def read_last_meas(mod):
+    """
+    Populate a dictionary with all instrument data from all trios G2 registers. The length attribute can then be used to read spectral data.
+    """
+    g2 = G2registers()
+    for g2var in [g2.integration_time,
+                  g2.system_date_and_time,
+                  g2.spectrum_type,
+                  g2.length,
+                  g2.pre_inclination,
+                  g2.post_inclination,
+                  g2.temp_inclination_sensor,
+                  g2.dark_pixel_avg,
+                  g2.raw_ordinate0, g2.raw_ordinate1]:
+
+        response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=g2var['timeout'])
+        datatype = g2var['datatype']
+        try:
+            crc_check_incoming(response)
+            g2var['value'] = unpack_response(response, datatype)
+            log.debug(f"{g2var['name']}: {g2var['value']}")
+        except CrcError as err:
+            log.exception(err)
+            log.warning(f"{g2var['name']} Checksum failed: {response}")
+
+    g2.spectrum = list(g2.raw_ordinate0['value'] + g2.raw_ordinate1['value'])
+
+    return g2
+
+
 def write_single_command(mod_serial, slave_id, function_code, register_address, value, timeout=0.2):
     """
     Write a command using function 0x06 (6, single coil) or 0x10 (11, multiple coils)
+
+    The general structure of a single modbus command is
+    Slave address 8 bits
+    Function code 8 bits
+    --03h (3) read from holding register
+    --06h (6) write to a holding register - only used on address 1, to trigger a single light measurement. Write value 0x0400.
+    --10h (16) write multiple registers
+    --11h (17) write special register, should return sensor information
+    Data          nx8 bits
+    Error check   16 bits
+    --error checks use CRC-16 method
+    The response code follows the slave_id, function code, data length, data, checksum pattern
     """
+
     id = hex(slave_id)[2:].zfill(2)
     fun_code = hex(function_code)[2:].zfill(2)
     reg_address = hex(register_address)[2:].zfill(4)
@@ -188,7 +251,24 @@ def write_single_command(mod_serial, slave_id, function_code, register_address, 
     a = mod_serial.in_waiting
     # read response of location
     response = mod_serial.read(size=a)
+
     return response
+
+
+def read_one_register(mod, register_name='system_date_and_time'):
+    """perform request and read operation by register name"""
+
+    g2 = G2registers()
+    reg = g2.__dict__[register_name]
+    response = read_command(mod['serial'], 1, 3, reg['start'], reg['len'], timeout=reg['timeout'])
+    datatype = reg['datatype']
+    try:
+        crc_check_incoming(response)
+        result = unpack_response(response, datatype)
+    except CrcError as err:
+        log.exception(err)
+        log.warning(f"Reading register {register_name} failed: {response}")
+    return result
 
 
 def read_all_system_registers(mod):
@@ -236,34 +316,6 @@ def read_all_system_registers(mod):
                   g2.pre_pressure,
                   g2.post_pressure,
                   g2.dark_pixel_avg]:
-
-        response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=g2var['timeout'])
-        datatype = g2var['datatype']
-        try:
-            crc_check_incoming(response)
-            g2var['value'] = unpack_response(response, datatype)
-            log.info(f"{g2var['name']}: {g2var['value']}")
-        except CrcError as err:
-            log.exception(err)
-            log.warning(f"{g2var['name']} Checksum failed: {response}")
-
-    return g2
-
-
-def read_last_meas(mod):
-    """
-    Populate a dictionary with all instrument data from all trios G2 registers. The length attribute can then be used to read spectral data.
-    """
-    g2 = G2registers()
-    for g2var in [g2.integration_time,
-                  g2.system_date_and_time,
-                  g2.spectrum_type,
-                  g2.length,
-                  g2.pre_inclination,
-                  g2.post_inclination,
-                  g2.temp_inclination_sensor,
-                  g2.dark_pixel_avg,
-                  g2.raw_ordinate0, g2.raw_ordinate1]:
 
         response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=g2var['timeout'])
         datatype = g2var['datatype']
@@ -488,4 +540,4 @@ def calc_crc16(inputcommand):
 if __name__ == '__main__':
     # start logging here
     log = init_logger()
-    run()
+    test(plot=True)
