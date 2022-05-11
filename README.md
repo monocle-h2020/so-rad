@@ -2,13 +2,16 @@ Operation of radiometers for reflectance measurements, referenced by GPS locatio
 
 - runs on a Raspberry Pi 3 Model B+
 - sqlite support to locally buffer records
-- SOS communication to data backend (Work-In-Progress)
 - Supports NMEA or UBlox-9 (including RTK-heading) positioning devices
 - Supports relative humidity and temperature sensors
 - Supports accelerometer for Tilt/Pitch/Roll registration
+- upload data on-the-fly to a remote Parseserver when connected to internet
+- support for TriOS RAMSES G1 and G2 sensors
+- modular design so you can add support for further sensors and peripheral devices 
 
+Open to community contributions - please get in touch
 
-Developed as part of the project "Multiscale Observation Networks for Optical monitoring of Coastal waters, Lakes and Estuaries"
+Developed in project MONOCLE: Multiscale Observation Networks for Optical monitoring of Coastal waters, Lakes and Estuaries.
 This project has received funding from the European Union’s Horizon 2020 research and innovation programme under grant agreement No 776480
 
 <img src="https://avatars1.githubusercontent.com/u/36449994?s=200&v=4" height="200">
