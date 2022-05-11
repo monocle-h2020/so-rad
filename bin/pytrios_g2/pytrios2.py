@@ -16,9 +16,8 @@ import struct
 #import threading
 import datetime
 import logging
-import inspect
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-
+#import inspect
+#sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 import matplotlib.pyplot as plt
 
 
@@ -36,7 +35,7 @@ def test(plot=False):
     mod = connect_modbus(ports, port_autodetect_string="USB-RS485 Cable", hwid_autodetect_string='SER=FT5TZXD9')
 
     log.info("checking for trios sensor")
-    result = report_slave_id(mod)  # does not work yet
+    result = report_slave_id(mod)
 
     log.info("checking lan state")
     lanstate = get_lan_state(mod)
@@ -136,6 +135,9 @@ def sample_one(mod):
         log.debug("Waiting for data..")
         time.sleep(0.1)
         meastimer = read_one_register(mod, register_name='measurement_timeout')
+        if meastimer is None:
+            meastimer = 0.1
+            log.info("No data received while polling for measurement_timeout register")
 
     if meastimer > 0:
         log.warning("Sensor timed out")
@@ -207,7 +209,10 @@ def read_last_meas(mod):
             log.exception(err)
             log.warning(f"{g2var['name']} Checksum failed: {response}")
 
-    g2.spectrum = list(g2.raw_ordinate0['value'] + g2.raw_ordinate1['value'])
+    try:
+        g2.spectrum = list(g2.raw_ordinate0['value'] + g2.raw_ordinate1['value'])
+    except:
+        log.warning(f"Failed to construct spectrum")
 
     return g2
 
@@ -261,13 +266,20 @@ def read_one_register(mod, register_name='system_date_and_time'):
     g2 = G2registers()
     reg = g2.__dict__[register_name]
     response = read_command(mod['serial'], 1, 3, reg['start'], reg['len'], timeout=reg['timeout'])
+
+    if response == b'':  # nothing received, try once more.
+        log.debug("No response, trying again.. ")
+        response = read_command(mod['serial'], 1, 3, reg['start'], reg['len'], timeout=reg['timeout'])
+
     datatype = reg['datatype']
     try:
         crc_check_incoming(response)
-        result = unpack_response(response, datatype)
     except CrcError as err:
-        log.exception(err)
-        log.warning(f"Reading register {register_name} failed: {response}")
+        log.warning(f"Failed to read register {register_name}: {response}")
+        return None
+
+    result = unpack_response(response, datatype)
+
     return result
 
 
@@ -427,10 +439,10 @@ def report_slave_id(mod):
         serialn = response[3:-2].split(b'\x00')[2].decode('ascii')
         version = response[3:-2].split(b'\x00')[3].decode('ascii')
         log.info(f"{mod['serial'].port}: {make} | {model} | {serialn} | {version}")
-        return True
+        return serialn
     except:
         log.info(f"No TriOS G2 response on {mod['serial']}")
-        return False
+        return None
 
 
 def init_logger():
@@ -449,33 +461,34 @@ def init_logger():
     return log
 
 
-def connect_modbus(ports, port_autodetect_string=None, hwid_autodetect_string=None,
-                   port_default=None, baud=9600, db=8, sb=1, parity=serial.PARITY_NONE):
-    """connect via modbus"""
-    mod = {}
+def find_modbus(ports, autodetect_string=None, port_default=None):
+    """Connect a single sensor via modbus. For testing purposes, not used in So-Rad scope"""
+    mod = {'port': None, 'serial': None}
 
     match = False
     if port_autodetect_string is not None:
         for port, desc, hwid in sorted(ports):
             log.info("port info: {0} {1} {2}".format(port, desc, hwid))
-            if port_autodetect_string in desc:
-                if hwid_autodetect_string is not None:
-                    if hwid_autodetect_string in hwid:
-                        # also check hwid if there is more than one interface of this type.
-                        mod['port'] = port
-                        log.info("Device interface auto-detected on port: {0}".format(port))
-                else:
-                    mod['port'] = port
-                    log.info("Device interface auto-detected on port: {0}".format(port))
+            if autodetect_string in hwid:
+                mod['port'] = port
+            elif autodetect_string in desc:
+                mod['port'] = port
+            else:
+                log.warning(f"Radiometer identifier {port_autodetect_string} not found on any port")
 
     elif port_default is not None:
         log.info(f"Use port default: {port_default}")
         mod['port'] = port_default
 
     else:
-        # test connection on any matching port?
-        log.error("No suitable port")
+        log.error("No suitable ports configured")
 
+    # Return the object containing serial ports found
+    return mod
+
+
+def open_modbus(mod, baud=9600, db=8, sb=1, parity=serial.PARITY_NONE):
+    """Initiate modbus interface given a dictionary with port info"""
     # Create a serial object for the motor port
     if mod['port'] is not None:
         mod['serial'] = serial.Serial(port=mod['port'],
@@ -485,10 +498,12 @@ def connect_modbus(ports, port_autodetect_string=None, hwid_autodetect_string=No
         mod['serial'].reset_input_buffer()
         mod['serial'].reset_output_buffer()
     else:
-        raise serial.SerialException('Could not open motor port')
+        raise serial.SerialException('Modbus port not specified')
 
-    # Return the motor dict
-    return mod
+
+def close_modbus(mod):
+    """check sensor is idle, then close"""
+    mod['port'].close()
 
 
 def read_command(mod_serial, slave_id, function_code, register_address, no_of_registers, timeout=0.2):
@@ -541,3 +556,5 @@ if __name__ == '__main__':
     # start logging here
     log = init_logger()
     test(plot=True)
+else:
+    log = logging.getLogger('pt2')

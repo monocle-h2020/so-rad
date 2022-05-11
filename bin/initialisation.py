@@ -297,7 +297,7 @@ def rad_init(rad_config, ports):
         log.info("Radiometers not used. Update config file setting n_sensors to change this.")
         return rad, None
 
-    assert rad['rad_interface'] in ['pytrios',]
+    assert rad['rad_interface'] in ['pytrios','pytrios_g2']
 
     # If the sensors are pytrios sensors, get more variables from the config file
     if rad['rad_interface'] == 'pytrios':
@@ -306,13 +306,19 @@ def rad_init(rad_config, ports):
         rad['integration_time'] = rad_config.getint('integration_time')
 
     # If port autodetect is wanted, look for what ports have the identifying string also provided
+    # TODO: extend to find 3 separate autodetect strings.
     if rad_config.getboolean('port_autodetect'):
         rad_ports = []
         port_autodetect_string = rad_config.get('port_autodetect_string')
         for port, desc, hwid in sorted(ports):
-            if (desc == port_autodetect_string):
+            if port_autodetect_string in hwid:
                 rad_ports.append(port)
-        assert len(rad_ports) == 3
+            elif port_autodetect_string in desc:
+                rad_ports.append(port)
+            else:
+                log.warning(f"Radiometer identifier {port_autodetect_string} not found on any port")
+        if len(rad_ports) != 3:
+            log.critical(f"Only {len(rad_ports)} identified.")
         rad['port1'] = rad_ports[0]
         rad['port2'] = rad_ports[1]
         rad['port3'] = rad_ports[2]
@@ -332,6 +338,8 @@ def rad_init(rad_config, ports):
     # Return the radiometry dict and relevant manager class
     if rad['rad_interface'] == 'pytrios':
         Rad_manager = radiometer_manager.TriosManager
+    elif rad['rad_interface'] == 'pytrios_g2':
+        Rad_manager = radiometer_manager.TriosG2Manager
 
     return rad, Rad_manager
 
