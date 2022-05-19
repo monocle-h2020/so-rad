@@ -81,6 +81,6 @@ if __name__ == '__main__':
     ports = list_ports.comports()
     for p in ports:
         print(p)
-    port = '/dev/ttyUSB0'  # edit this
+    port = '/dev/ttyS5'  # edit this
     run_test(port)
 

@@ -191,12 +191,9 @@ def read_last_meas(mod):
     g2 = G2registers()
     for g2var in [g2.integration_time,
                   g2.system_date_and_time,
-                  g2.spectrum_type,
-                  g2.length,
                   g2.pre_inclination,
                   g2.post_inclination,
                   g2.temp_inclination_sensor,
-                  g2.dark_pixel_avg,
                   g2.raw_ordinate0, g2.raw_ordinate1]:
 
         response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=g2var['timeout'])
