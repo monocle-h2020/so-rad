@@ -32,14 +32,19 @@ def test(plot=False):
     for port, desc, hwid in ports:
         log.info(f"port: {port} | description: {desc} | hwid: {hwid}")
 
-    mod = connect_modbus(ports, port_autodetect_string="USB-RS485 Cable", hwid_autodetect_string='SER=FT5TZXD9')
+    mod = find_modbus(ports, autodetect_string="SER=FT5TZXD9")
+    open_modbus(mod)
 
     log.info("checking for trios sensor")
     result = report_slave_id(mod)
 
+    log.info("reading serial number")
+    devserial = read_one_register(mod, 'device_serial_number')
+    log.info(f"Serial number: {devserial}")
+
     log.info("checking lan state")
     lanstate = get_lan_state(mod)
-    log.info(f"lan state: {lanstate}")
+    log.info(f"Lan state: {lanstate}")
 
     if lanstate:
         log.info("setting land state OFF")
@@ -463,15 +468,15 @@ def find_modbus(ports, autodetect_string=None, port_default=None):
     mod = {'port': None, 'serial': None}
 
     match = False
-    if port_autodetect_string is not None:
+    if autodetect_string is not None:
         for port, desc, hwid in sorted(ports):
             log.info("port info: {0} {1} {2}".format(port, desc, hwid))
             if autodetect_string in hwid:
                 mod['port'] = port
             elif autodetect_string in desc:
                 mod['port'] = port
-            else:
-                log.warning(f"Radiometer identifier {port_autodetect_string} not found on any port")
+        if mod['port'] is None:
+            log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
 
     elif port_default is not None:
         log.info(f"Use port default: {port_default}")
