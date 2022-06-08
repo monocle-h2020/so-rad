@@ -28,13 +28,8 @@ from functions.export_functions import run_export, update_status_parse_server, i
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-# only import RPi libraries if running on a Pi (other environments can be used for unit testing)
-try:
-    import RPi.GPIO as GPIO
-except Exception as msg:
-    print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210723.1
+__version__ = 20220402.1
 
 
 def parse_args():
@@ -94,9 +89,7 @@ def init_all(conf):
     """Initialise all components"""
 
     log = logging.getLogger()
-
     db = initialisation.db_init(conf['DATABASE'])
-    initialisation.init_gpio(conf, state=0)  # set all used pins to LOW
 
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
@@ -173,7 +166,7 @@ def init_all(conf):
     return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger()
 
@@ -204,8 +197,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht,
         rht['manager'].stop()
 
     # Turn all GPIO pins off
-    GPIO.output(gpios, GPIO.LOW)
-    GPIO.cleanup()
+    initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
@@ -267,13 +259,15 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    if values['motor_angles']['target_motor_pos_rel_az_deg'] is None:
+    if not ready['heading']:
         strdict['tar_view_az'] = "n/a"
     else:
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
 
-    message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
-    message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+    try:
+        message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
+        message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+    except: pass
 
     return message
 
@@ -291,7 +285,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     : rad                   - radiometry configuration
     : battery               - battery management configuration
     : motor                 - motor configuration
-    : pgios                 - gpio pins in use
+    : gpios                 - gpio pins in use
 
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
@@ -331,7 +325,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             message = format_log_message(counter, ready, values)
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
-            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, rad, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
@@ -369,7 +363,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             except:
                 pass
 
-        # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
+        # If bearing is not fixed, fetch the calculated mean bearing using data from GPS+heading sensors
         if not bearing_fixed:
             if ready['heading']:
                 values['ship_bearing_mean'] = (gps['manager'].heading - gps['gps_heading_correction']) % 360.0
@@ -386,12 +380,16 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                   values['ship_bearing_mean'], motor,
                                                                   values['motor_pos'])
 
-        log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
+        try:
+            log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
                  .format(values['solar_az'], values['solar_el'],
                          values['motor_angles']['view_comp_ccw'], values['motor_angles']['view_comp_cw'],
                          values['motor_angles']['ach_mot_ccw'], values['motor_angles']['ach_mot_cw'],
                          values['motor_angles']['target_motor_pos_deg'],
                          values['motor_angles']['target_motor_pos_rel_az_deg'], counter))
+        except TypeError:
+            # at least one value is None
+            pass
 
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
@@ -503,7 +501,7 @@ def run():
         db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
+        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht)
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -579,10 +577,10 @@ def run():
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht)
             raise
 
 if __name__ == '__main__':
