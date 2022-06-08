@@ -47,7 +47,7 @@ def run_test(port):
     instrument = TriosG2Ramses(port)
     instrument.start()
     instrument.connect()
-    instrument.get_identity = True
+    instrument.get_identity()
 
     while instrument.busy:
         time.sleep(0.1)
@@ -81,6 +81,6 @@ if __name__ == '__main__':
     ports = list_ports.comports()
     for p in ports:
         print(p)
-    port = '/dev/ttyS5'  # edit this
+    port = '/dev/ttyUSB1'  # edit this
     run_test(port)
 

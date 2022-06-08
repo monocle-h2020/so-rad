@@ -18,7 +18,7 @@ import datetime
 import logging
 #import inspect
 #sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 
 def test(plot=False):
