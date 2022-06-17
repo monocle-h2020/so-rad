@@ -16,6 +16,7 @@ import functions.config_functions as cf
 from PyTrios import PyTrios as ps
 import RPi.GPIO as GPIO
 import datetime
+import logging
 try:
     import gnuplotlib as gp
     import numpy as np
@@ -32,42 +33,64 @@ def run_test(conf):
         print(p)
     config = conf['RADIOMETERS']
     rad, Rad_manager = rad_init(config, ports)
-    ports = [config['port1'], config['port2'], config['port3']]
-    print("Starting radiometry manager")
+    log.info("Starting radiometry manager")
 
     radiometry_manager = Rad_manager(rad)
     time.sleep(1)
 
-    print(radiometry_manager)
+    trig_id, specs, sids, itimes, preincs, postincs, inctemps  = radiometry_manager.sample_all(datetime.datetime.now())
+    log.info(trig_id)
+    log.info(sids)
+    log.info(itimes)
+    log.info(preincs)
+    log.info(postincs)
+    log.info(inctemps)
 
-    trig_id, specs, sids, itimes = radiometry_manager.sample_all(datetime.datetime.now())
-    for i, s in zip(sids,specs):
-        print("Received spectrum from {0}: {1}".format(i, s))
+
+    for sid, itime, preinc, postinc, inctemp, spec in zip(sids, itimes, preincs, postincs, inctemps, specs):
+        log.info(f"Received spectrum from {sid}: {trig_id} {itime} {preinc}-{postinc} {spec}")
         if plot:
             try:
                gp.plot(np.array(s), terminal = 'dumb 80,40', unset = 'grid')
             except:
-                print("Plotting failed for some reason. Sorry")
+                log.error("Plotting failed for some reason. Sorry")
 
     time.sleep(0.5)
 
-    print("Stopping radiometry manager threads")
+    trig_id, spec, sid, itime, inc_pre, inc_post, temp = radiometry_manager.sample_ed(datetime.datetime.now())
+    log.info(f"Received Ed spectrum from {sid}: {trig_id} {itime} {temp} {inc_pre}-{inc_post} {spec}")
+    if plot:
+        try:
+            gp.plot(np.array(s), terminal = 'dumb 80,40', unset = 'grid')
+        except:
+            log.error("Plotting failed for some reason. Sorry")
+
+    time.sleep(0.5)
+
+    log.info("Stopping radiometry manager threads")
     if radiometry_manager is not None:
         radiometry_manager.stop()
 
     # switch off gpio
     if rad['use_gpio_control']:
-        print("Switch off GPIO control")
+        log.info("Switch off GPIO control")
         pin = int(rad['gpio1'])
         GPIO.setmode(GPIO.BCM)
         GPIO.output(pin, GPIO.LOW)
         GPIO.cleanup()
 
-    sys.exit(0)
 
 if __name__ == '__main__':
     args = parse_args()
     conf = cf.read_config(args.config_file)
     conf = cf.update_config(conf, args.local_config_file)
-    run_test(conf)
 
+    log = logging.getLogger()
+    handler = logging.StreamHandler(sys.stdout)
+    log.setLevel(logging.INFO)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s| %(levelname)s | %(name)s | %(message)s')
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+
+    run_test(conf)

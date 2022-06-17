@@ -77,6 +77,11 @@ if __name__ == '__main__':
             t0 = time.perf_counter()  # timeout reference
             while moving and time.perf_counter()-t0 < 5:
                 moving, motor_step_pos = motor_func.motor_moving(motor['serial'], target_step_pos, tolerance=int(motor['steps_per_degree']*3))
+                if motor_step_pos is None:
+                    moving is True
+                    time.sleep(0.1)
+                    continue
+
                 motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
                 if moving is None:
                     moving = True

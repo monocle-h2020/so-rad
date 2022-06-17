@@ -21,6 +21,7 @@ import threading
 import pytrios_g2.pytrios2 as pt2
 
 log = logging.getLogger('rad')
+log.setLevel('DEBUG')
 
 try:
     import RPi.GPIO as GPIO
@@ -37,27 +38,25 @@ class TriosG2Manager(object):
     A thread is started per port with a sensor attached - we don't support daisy chaining in this manager although it is inherently possible within the RS485 protocol to set specific slave addresses.
     """
     def __init__(self, rad):
-        # import pytrios only if used
+        # import specific library for this sensor type
         import pytrios_g2 as pt2
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']
         self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
         self.instruments = []  # store TriosG2Ramses instances
         self.connect_sensors()
+
         # track reboot cycles to prevent infinite rebooting of sensors if something unexpected happens (e.g a permanent sensor failure)
         self.reboot_counter = 0
         self.last_cold_start = datetime.datetime.now()
         self.last_connectivity_check = datetime.datetime.now()
-        self.lasttrigger = None  # don't use this to get a timestamp on measurements, just used as a delay timer
+        self.lasttrigger = None  # don't use this to get a timestamp on measurements, just used as a timer
 
-        self.busy = False  # check this value to see if sensors are ready to sample
-        self.ready = False  # why do we have both busy and ready..?
+        self.busy = False  # check this value to see if sensors are being set up or triggered
+        self.ready = False  # true when manager finishes initialisation.
 
         # thread properties
         self.started = False
-
-
-        self.busy = False
 
     def connect_sensors(self):
         """connect to each port, start threads and collect sensor information"""
@@ -66,22 +65,28 @@ class TriosG2Manager(object):
              return
 
         for port in self.ports:
-            self.instruments.append(TriosG2ramses(port))
+            self.instruments.append(TriosG2Ramses(port))
 
         for instrument in self.instruments:
              instrument.start()
              instrument.connect()
-             instrument.identify = True
+             instrument.get_identity()
+        for instrument in self.instruments:
+            while instrument.busy:
+                time.sleep(0.1)
+            log.info(f"Sensor on {instrument.mod['port']}: {instrument.sam}")
+        self.ready = True
+        self.busy = False
 
     def stop(self):
-        # TODO stop threads
-        for mod in self.mods:
-            pt2.close_modbus(mod)
+        for instrument in self.instruments:
+            instrument.stop()
 
     def power_cycle_sensors(self):
         """reboot sensors by cycling power through GPIO/relay control
         All sensors must then be reconnected/identified"""
         self.busy = True
+        self.ready = False
         self.stop()
 
         GPIO.setmode(GPIO.BCM)
@@ -134,11 +139,24 @@ class TriosG2Manager(object):
 
     def sample_ed(self, trigger_id):
         """this will trigger sampling only the sensor identified as the Ed sensor"""
-        edsam = self.tk_ed
-        if not isinstance(edsam, list):
-            edsam = [edsam]
-        log.info("Triggering Ed sensor = {0} ({1})".format(edsam, type(edsam)))
-        return self.sample_all(trigger_id, sams_included=edsam)
+        edsam = self.config['ed_sensor_id']
+        instrument = [inst for inst in self.instruments if inst.sam == edsam]
+        if len(instrument) == 0:
+            log.error(f"Ed sensor {edsam} not found")
+            return None
+        else:
+            instrument =  instrument[0]
+
+        self.busy = True
+        instrument.sample_one(trigger_id)
+        while instrument.busy:
+            time.sleep(0.1)
+
+        self.busy = False
+        result = instrument.result
+        return trigger_id, result.spectrum, instrument.sam, result.integration_time,\
+               result.pre_inclination, result.post_inclination, result.temp_inclination_sensor
+
 
     def sample_all(self, trigger_id, sams_included=None):
         """Send a command to take a spectral sample from every sensor currently detected by the program"""
@@ -146,79 +164,76 @@ class TriosG2Manager(object):
         self.busy = True
         try:
             if sams_included is None:
-                sams_included = self.sams
+                instruments_included = self.instruments
+            else:
+                instruments_included = [inst for inst in self.instruments if inst.sam in sams_included]
 
-            for s in sams_included:
-                if self.config['inttime'] > 0:
-                    # trigger single measurement at fixed integration time
-                    self.tc[s].startIntSet(self.tc[s].serial, self.config['inttime'], trigger=self.lasttrigger)
-                else:
-                    # trigger single measurement at auto integration time
-                    self.tc[s].startIntAuto(self.tc[s].serial, trigger=self.lasttrigger)
+            # setting non-auto integration time is not implemented yet for pytrios_g2
+            for instrument in instruments_included:
+                #if self.config['inttime'] > 0:
+                #    # trigger single measurement at fixed integration time
+                #    self.tc[s].startIntSet(self.tc[s].serial, self.config['inttime'], trigger=self.lasttrigger)
+                #else:
+                #    # trigger single measurement at auto integration time
+                instrument.sample_one(trigger_time=True)
 
             # follow progress
-            npending = len(sams_included)
+            npending = sum([i.busy for i in instruments_included])
             while npending > 0:
-                # pytrios has a 12-sec timeout period for sam instruments so this will not loop forever
-                # triggered measurements may not be pending but also not finished (i.e. incomplete or missing data)
-                finished = [k for k in sams_included if self.tc[k].is_finished()]
-                pending = [k for k in sams_included if self.tc[k].is_pending()]
-                nfinished = len(finished)
-                npending = len(pending)
+                npending = sum([i.busy for i in instruments_included])
                 time.sleep(0.05)
 
-            # account failed and successful measurement attempts
-            missing = list(set(sams_included) - set(finished))
+            # count failed and successful measurement attempts
+            #missing = list(set(sams_included) - set(finished))
 
-            for k in finished:
-                self.tc[k].failures = 0
-            for k in missing:
-                self.tc[k].failures +=1
+            #for k in finished:
+            #    self.tc[k].failures = 0
+            #for k in missing:
+            #    self.tc[k].failures +=1
 
             # how long did the measurements take to arrive?
-            if nfinished > 0 and self.config['verbosity_chn'] > 2:
-                if type(self.tc[k].TSAM.lastRawSAMTime) == type(self.lasttrigger) and self.tc[k].TSAM.lastRawSAMTime is not None:
-                    delays = [self.tc[k].TSAM.lastRawSAMTime - self.lasttrigger for k in sams_included]
-                    delaysec = max([d.total_seconds() for d in delays])
-                    log.info("\t{0} spectra received, triggered at {1} ({2} s)"
-                        .format(nfinished, self.lasttrigger, delaysec))
+            #if nfinished > 0 and self.config['verbosity_chn'] > 2:
+            #    if type(self.tc[k].TSAM.lastRawSAMTime) == type(self.lasttrigger) and self.tc[k].TSAM.lastRawSAMTime is not None:
+            #        delays = [self.tc[k].TSAM.lastRawSAMTime - self.lasttrigger for k in sams_included]
+            #        delaysec = max([d.total_seconds() for d in delays])
+            #        log.info("\t{0} spectra received, triggered at {1} ({2} s)"
+            #            .format(nfinished, self.lasttrigger, delaysec))
 
-            if len(missing) > 0 and self.config['verbosity_chn'] > 0:
-                log.warning("Incomplete or missing result from {0}".format(",".join(missing)))
+            #if len(missing) > 0 and self.config['verbosity_chn'] > 0:
+            #    log.warning("Incomplete or missing result from {0}".format(",".join(missing)))
 
             # gather succesful results
-            specs = [self.tc[s].TSAM.lastRawSAM
-                    for s in sams_included if self.tc[s].is_finished()]
-            sids = [self.tc[s].TInfo.serialn
-                    for s in sams_included if self.tc[s].is_finished()]
-            itimes = [self.tc[s].TSAM.lastIntTime
-                    for s in sams_included if self.tc[s].is_finished()]
+            results = [instrument.result for instrument in instruments_included]
+            sids =  [instrument.sam for instrument in instruments_included]
+            specs = [result.spectrum for result in results]
+            itimes = [result.integration_time for result in results]
+            pre_incs = [result.pre_inclination for result in results]
+            post_incs = [result.post_inclination for result in results]
+            temp_incs = [result.temp_inclination_sensor for result in results]
 
             # call reboot function for sensors that keep failing, followed by new query on respective COM port?
-            rebooting = False
-            for s in sams_included:
-                if self.tc[s].failures > self.config['allow_consecutive_timeouts']:
-                    rebooting = True
+            #rebooting = False
+            #for s in sams_included:
+            #    if self.tc[s].failures > self.config['allow_consecutive_timeouts']:
+            #        rebooting = True
 
-            if rebooting:
-                time_since_last_reboot = datetime.datetime.now()-self.last_cold_start
-                reboot_int = self.config['minimum_reboot_interval_sec']
-                if self.config['use_gpio_control'] and time_since_last_reboot.total_seconds() > reboot_int:
-                    if self.config['verbosity_chn'] > 0:
-                        log.warning("Rebooting sensors")
-                    self.power_cycle_sensors()
-                else:
-                    if self.config['verbosity_chn'] > 0:
-                        log.warning("Reconnecting sensors (no relay control set)")
-                    self.connect_sensors()
+            #if rebooting:
+            #    time_since_last_reboot = datetime.datetime.now()-self.last_cold_start
+            #    reboot_int = self.config['minimum_reboot_interval_sec']
+            #    if self.config['use_gpio_control'] and time_since_last_reboot.total_seconds() > reboot_int:
+            #        if self.config['verbosity_chn'] > 0:
+            #            log.warning("Rebooting sensors")
+            #        self.power_cycle_sensors()
+            #    else:
+            #        if self.config['verbosity_chn'] > 0:
+            #            log.warning("Reconnecting sensors (no relay control set)")
+            #        self.connect_sensors()
 
             self.busy = False
-            return trigger_id, specs, sids, itimes  # specs, sids, itimes may be empty lists
+            return trigger_id, specs, sids, itimes, pre_incs, post_incs, temp_incs  # specs, sids, itimes etc may be empty lists
 
         except Exception as m:
-            ps.TClose(self.coms)
             log.exception("Exception in TriosManager: {}".format(m))
-            raise
 
 
 class TriosG2Ramses(object):
@@ -245,7 +260,7 @@ class TriosG2Ramses(object):
         self.stop()
 
     def __repr__(self):
-        return "Temp {0:0.2f}C \tRelative Humidity {1:0.2f}%".format(self.temp, self.rh)
+        return (f"TriosG2Ramses {self.sam}")
 
     def start(self):
         """
@@ -280,7 +295,6 @@ class TriosG2Ramses(object):
         self.ready = True
         self.busy = False
 
-
     def sample_one(self, trigger_time=True):
         """
         Prime for sampling, set sensor status to busy
@@ -291,7 +305,6 @@ class TriosG2Ramses(object):
         self.trigger_sample = trigger_time
         log.info(f"Next sample trigger: {self.trigger_sample}")
 
-
     def get_identity(self):
         """
         Prime to identify sensor, set sensor status to busy
@@ -299,7 +312,6 @@ class TriosG2Ramses(object):
         """
         self.busy = True
         self.identify = True
-
 
     def _identify(self):
         """called by thread monitor to identify connected sensor"""
