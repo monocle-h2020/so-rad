@@ -493,12 +493,18 @@ def open_modbus(mod, baud=9600, db=8, sb=1, parity=serial.PARITY_NONE):
     """Initiate modbus interface given a dictionary with port info"""
     # Create a serial object for the motor port
     if mod['port'] is not None:
-        mod['serial'] = serial.Serial(port=mod['port'],
+        try:
+            mod['serial'] = serial.Serial(port=mod['port'],
                                       baudrate=baud,
                                       timeout=1.0, bytesize=db, parity=parity,
                                       stopbits=sb, xonxoff=0)
-        mod['serial'].reset_input_buffer()
-        mod['serial'].reset_output_buffer()
+            mod['serial'].reset_input_buffer()
+            mod['serial'].reset_output_buffer()
+        except OSError as ose:
+             log.error(mod)
+             log.exception(ose)
+        finally:
+             return None
     else:
         raise serial.SerialException('Modbus port not specified')
 
