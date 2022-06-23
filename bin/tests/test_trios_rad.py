@@ -36,7 +36,7 @@ def run_test(conf, repeat=False):
     """Test connectivity to TriOS RAMSES radiometer sensors using the routines used in the main application"""
     ports = list_ports.comports()
     for p in ports:
-        print(p)
+        log.info(p)
     config = conf['RADIOMETERS']
     rad, Rad_manager = rad_init(config, ports)
     log.info("Starting radiometry manager")
@@ -79,4 +79,4 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
-    run_test(conf, repeat=True)  # select repeat = True to repeat test until interrupted
+    run_test(conf, repeat=False)  # select repeat = True to repeat test until interrupted
