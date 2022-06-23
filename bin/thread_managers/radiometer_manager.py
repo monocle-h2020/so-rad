@@ -89,6 +89,7 @@ class TriosG2Manager(object):
         self.busy = True
         self.ready = False
         self.stop()
+        self.instruments = []
 
         GPIO.setmode(GPIO.BCM)
         pin = self.config['gpio1']
@@ -100,7 +101,6 @@ class TriosG2Manager(object):
         self.reboot_counter += 1
         self.last_cold_start = datetime.datetime.now()
         self.connect_sensors()
-        self.busy = False
 
     def check_and_restore_sensor_number(self):
         """check (called periodically from main app) whether the expected number of sensors are connected.
@@ -213,23 +213,13 @@ class TriosG2Manager(object):
             post_incs = [result.post_inclination['value'] for result in results]
             temp_incs = [result.temp_inclination_sensor['value'] for result in results]
 
-            # call reboot function for sensors that keep failing, followed by new query on respective COM port?
-            #rebooting = False
-            #for s in sams_included:
-            #    if self.tc[s].failures > self.config['allow_consecutive_timeouts']:
-            #        rebooting = True
-
-            #if rebooting:
-            #    time_since_last_reboot = datetime.datetime.now()-self.last_cold_start
-            #    reboot_int = self.config['minimum_reboot_interval_sec']
-            #    if self.config['use_gpio_control'] and time_since_last_reboot.total_seconds() > reboot_int:
-            #        if self.config['verbosity_chn'] > 0:
-            #            log.warning("Rebooting sensors")
-            #        self.power_cycle_sensors()
-            #    else:
-            #        if self.config['verbosity_chn'] > 0:
-            #            log.warning("Reconnecting sensors (no relay control set)")
-            #        self.connect_sensors()
+            # call reboot function for sensors that keep failing, followed by new query on respective COM ports
+            if self.failures > self.config['allow_consecutive_timeouts']:
+                time_since_last_reboot = datetime.datetime.now()-self.last_cold_start
+                reboot_int = self.config['minimum_reboot_interval_sec']
+                if self.config['use_gpio_control'] and time_since_last_reboot.total_seconds() > reboot_int:
+                    log.warning("Rebooting sensors")
+                    self.power_cycle_sensors()
 
             self.busy = False
             return trigger_time, specs, sids, itimes, pre_incs, post_incs, temp_incs  # specs, sids, itimes etc may be empty lists
@@ -596,11 +586,13 @@ class TriosManager(object):
                     self.connect_sensors()
 
             self.busy = False
-            return trigger_id, specs, sids, itimes  # specs, sids, itimes may be empty lists
+            pre_incs = [None]
+            post_incs = [None]
+            temp_incs = [None]
+            # specs, sids, itimes may be empty lists, Last three fields for forward compatibility
+            return trigger_id, specs, sids, itimes, pre_incs, post_incs, temp_incs
 
         except Exception as m:
             ps.TClose(self.coms)
             log.exception("Exception in TriosManager: {}".format(m))
             raise
-
-
