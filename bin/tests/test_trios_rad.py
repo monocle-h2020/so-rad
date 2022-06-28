@@ -35,8 +35,8 @@ def single_test(radiometry_manager, ed=True):
 def run_test(conf, repeat=False):
     """Test connectivity to TriOS RAMSES radiometer sensors using the routines used in the main application"""
     ports = list_ports.comports()
-    for p in ports:
-        log.info(p)
+    for port, desc, hwid in sorted(ports):
+        log.info("port info: {0} {1} {2}".format(port, desc, hwid))
     config = conf['RADIOMETERS']
     rad, Rad_manager = rad_init(config, ports)
     log.info("Starting radiometry manager")

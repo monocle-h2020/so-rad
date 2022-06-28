@@ -279,12 +279,12 @@ class TriosG2Ramses(object):
         log.info("Connecting to radiometers")
         pt2.open_modbus(self.mod)
 
-        lanstate0 = pt2.get_lan_state(self.mod)
-        if lanstate0:
-            log.info(f"Disable LAN state on {self.mod['port']}")
-            pt2.set_lan_state(self.mod, False)
-            lanstate = pt2.get_lan_state(self.mod)
-            log.info(f"Lan state {lanstate}")
+        #lanstate0 = pt2.get_lan_state(self.mod)
+        #if lanstate0:
+        #    log.info(f"Disable LAN state on {self.mod['port']}")
+        #    pt2.set_lan_state(self.mod, False)
+        #    lanstate = pt2.get_lan_state(self.mod)
+        #    log.info(f"Lan state {lanstate}")
 
         self.ready = True
         self.busy = False
@@ -317,7 +317,6 @@ class TriosG2Ramses(object):
             pt2.close_modbus(self.mod)
             self.ready = False
             log.critical(f"No Ramses G2 sensor found on {self.mod['port']}")
-            raise Exception(f"No Ramses G2 sensor found on {self.mod['port']}")
         else:
             self.ready = True
             self.busy = False

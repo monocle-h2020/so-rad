@@ -211,6 +211,7 @@ def rht_init(rht_config):
     rht['manager'] = None
 
     if not rht['used']:
+        log.info(f"RHT sensor disabled in config")
         return rht
 
     assert rht['interface'].lower() in ['ada_dht22', ]

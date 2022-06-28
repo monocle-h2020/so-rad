@@ -13,15 +13,11 @@ import os
 import sys
 import codecs
 import struct
-#import threading
 import datetime
 import logging
-#import inspect
-#sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-#import matplotlib.pyplot as plt
 
 
-def test(plot=False):
+def test():
     """
     Reads config file to set up environment then
     - check sensor lan state (switch off to save power)
@@ -32,11 +28,23 @@ def test(plot=False):
     for port, desc, hwid in ports:
         log.info(f"port: {port} | description: {desc} | hwid: {hwid}")
 
-    mod = find_modbus(ports, autodetect_string="SER=FT5TZXD9")
-    open_modbus(mod)
+    mod = find_modbus(ports, autodetect_string="SER=FT5UMZYB")  # edit the autodetect_string to test a specific interface.
 
-    log.info("checking for trios sensor")
-    result = report_slave_id(mod)
+    open_modbus(mod)
+    time.sleep(0.5)
+
+    log.info("Checking for trios sensor")
+    tries = 0
+    result = None
+    while result is None and tries < 3:
+        tries +=1
+        result = report_slave_id(mod, slave_id=1, timeout=3)
+    if result is None:
+        mod['serial'].close()
+        return
+
+    log.info("Reading system registers")
+    result = read_all_system_registers(mod)
 
     log.info("reading serial number")
     devserial = read_one_register(mod, 'device_serial_number')
@@ -58,18 +66,17 @@ def test(plot=False):
     log.info(f"Inclination (pre/post): {result.pre_inclination['value']} ({type(result.pre_inclination['value'])})/ {result.post_inclination['value']} ({type(result.post_inclination['value'])})")
     log.info(f"Uncalibrated spectrum ({type(result.spectrum)}): {result.spectrum}")
 
+    log.info("checking inttime state")
+    inttime = read_one_register(mod, 'integration_time_cfg')
+    log.info(f"Integration time: {inttime}")
+
+    if inttime > 0:
+        log.info("Setting integration time to auto (0)")
+        set_integration_time(mod, inttime=0)
+        inttime = read_one_register(mod, 'integration_time_cfg')
+        log.info(f"Integration time: {inttime}")
+
     mod['serial'].close()
-
-    if plot:
-        plt.ion()
-        plt.figure(1)
-        plt.clf()
-        plt.plot(result.spectrum)
-        log.info("Close plot window to exit")
-        try:
-            plt.pause(0)
-        except: pass  # suppress noise
-
 
 class G2registers():
     """All G2 registers and how to read them"""
@@ -77,7 +84,7 @@ class G2registers():
         self.slave_address =          {'name': 'slave_address',           'start': 0,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.measurement_timeout =    {'name': 'measurement_timeout',     'start': 1,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.deep_sleep_timeout  =    {'name': 'deep_sleep_timeout',      'start': 2,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.device_serial_number =   {'name': 'device_serial_number',    'start': 10,  'len': 5,  'datatype': 'str', 'timeout':0.15, 'value': None}
+        self.device_serial_number =   {'name': 'device_serial_number',    'start': 10,  'len': 5,  'datatype': 'str', 'timeout':0.25, 'value': None}
         self.firmware_version =       {'name': 'firmware_version',        'start': 15,  'len': 5,  'datatype': 'str', 'timeout':0.15, 'value': None}
         self.self_trigger_activated = {'name': 'self_trigger_activated',  'start': 102, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.self_trigger_interval =  {'name': 'self_trigger_interval',   'start': 103, 'len': 2,  'datatype': '>L',  'timeout':0.15, 'value': None}
@@ -160,6 +167,11 @@ def set_lan_state(mod, state=False):
     response = write_single_command(mod['serial'], 1, 6, lanreg['start'], {True:65535, False:0}[state], timeout=1.0)
     log.debug(crc_check_incoming(response))
 
+def set_integration_time(mod, inttime=0):
+    """Enable or Disable the LAN interface. Saved across restarts. After enabling the device should be power cycled."""
+    lanreg = G2registers().integration_time_cfg
+    response = write_single_command(mod['serial'], 1, 6, lanreg['start'], inttime, timeout=1.0)
+    log.debug(crc_check_incoming(response))
 
 def trigger_measurement(mod):
     """Write register 0x06 with value 0x0400 (1024) to trigger a single measurement"""
@@ -185,6 +197,7 @@ def get_lan_state(mod):
     except CrcError as err:
         log.exception(err)
         log.warning(f"LAN interface state - Checksum failed: {response}")
+        lanstate = None
 
     return lanstate
 
@@ -262,16 +275,16 @@ def write_single_command(mod_serial, slave_id, function_code, register_address, 
     return response
 
 
-def read_one_register(mod, register_name='system_date_and_time'):
+def read_one_register(mod, register_name='system_date_and_time', slave_address=1):
     """perform request and read operation by register name"""
 
     g2 = G2registers()
     reg = g2.__dict__[register_name]
-    response = read_command(mod['serial'], 1, 3, reg['start'], reg['len'], timeout=reg['timeout'])
+    response = read_command(mod['serial'], slave_address, 3, reg['start'], reg['len'], timeout=reg['timeout'])
 
-    if response == b'':  # nothing received, try once more.
+    if response == b'':  # nothing received, try once more but slower.
         log.debug("No response, trying again.. ")
-        response = read_command(mod['serial'], 1, 3, reg['start'], reg['len'], timeout=reg['timeout'])
+        response = read_command(mod['serial'], slave_address, 3, reg['start'], reg['len'], timeout=reg['timeout']*2)
 
     datatype = reg['datatype']
     try:
@@ -403,36 +416,40 @@ class CrcError(Exception):
     pass
 
 
-def report_slave_id(mod):
+def report_slave_id(mod, slave_id=1, timeout=3.0):
     """
     Special function reporting back sensor informationin ascii coding: sensor name, serial number and firmware version.
     """
-    slave_id = 1
     function_code = 17
     register_address = 0
     no_of_registers = 0
-    id = hex(slave_id)[2:].zfill(2)
     fun_code = hex(function_code)[2:].zfill(2)
     reg_address = hex(register_address)[2:].zfill(4)
     n_regs = hex(no_of_registers)[2:].zfill(4)
 
-    #initial_command = "".join([id, fun_code, reg_address, n_regs])
+    id = hex(slave_id)[2:].zfill(2)
+    log.info(f"slave_id: {slave_id} | {id}")
+
     initial_command = "".join([id, fun_code, reg_address, n_regs])
 
     #update crc16
     crc16_modbus = hex(int(crc.modbus(codecs.decode(initial_command, 'hex'))))[2:].zfill(4)
     crc16_check = ''.join([crc16_modbus[2:4], crc16_modbus[0:2]])
 
-    #command = "".join([id, fun_code, reg_address, n_regs, crc16_check])
     command = "".join([id, fun_code, reg_address, n_regs, crc16_check])
 
     # Send the command to the controller
     mod['serial'].flushInput()
     mod['serial'].flushOutput()
     mod['serial'].write(codecs.decode(command, 'hex'))
+
     # Read the response
-    time.sleep(0.5)
     a = mod['serial'].in_waiting
+    t0 = time.perf_counter()
+    while a<1 and (time.perf_counter() - t0 < timeout):
+        time.sleep(0.2)
+        a = mod['serial'].in_waiting
+
     # read response of location
     response = mod['serial'].read(size=a)
     try:
@@ -443,7 +460,7 @@ def report_slave_id(mod):
         log.info(f"{mod['serial'].port}: {make} | {model} | {serialn} | {version}")
         return serialn
     except:
-        log.info(f"No TriOS G2 response on {mod['serial']}")
+        log.info(f"No TriOS G2 response on {mod['serial'].port}: {response}")
         return None
 
 
@@ -511,13 +528,12 @@ def open_modbus(mod, baud=9600, db=8, sb=1, parity=serial.PARITY_NONE):
 
 def close_modbus(mod):
     """check sensor is idle, then close"""
-    mod['port'].close()
+    mod['serial'].close()
 
 
 def read_command(mod_serial, slave_id, function_code, register_address, no_of_registers, timeout=0.2):
     """
     Read multiple registers
-    e.g. read temperature of driver and motor = read_command(1, 3, 248, 4)
     """
     id = hex(slave_id)[2:].zfill(2)
     fun_code = hex(function_code)[2:].zfill(2)
@@ -563,6 +579,6 @@ def calc_crc16(inputcommand):
 if __name__ == '__main__':
     # start logging here
     log = init_logger()
-    test(plot=True)
+    test()
 else:
     log = logging.getLogger('pt2')
