@@ -304,15 +304,22 @@ def rad_init(rad_config, ports):
     # If port autodetect is wanted, look for what ports have the identifying string also provided
     if rad_config.getboolean('port_autodetect'):
         rad_ports = []
-        port_autodetect_string = rad_config.get('port_autodetect_string')
-        for port, desc, hwid in sorted(ports):
-            if (desc == port_autodetect_string):
-                rad_ports.append(port)
-        assert len(rad_ports) == 3
-        rad['port1'] = rad_ports[0]
-        rad['port2'] = rad_ports[1]
-        rad['port3'] = rad_ports[2]
+        port_autodetect_strings = rad_config.get('port_autodetect_string').split(',')
+        for autodetect_string in port_autodetect_strings:
+            found = False
+            for port, desc, hwid in sorted(ports):
+                if autodetect_string in port+desc+hwid:
+                    rad_ports.append(port)
+                    found = True
+            if not found:
+                log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
+        if len(rad_ports) < rad['n_sensors']:
+            log.critical(f"{len(rad_ports)} identified out of {rad['n_sensors']} expected.")
+
+        for i, p in enumerate(rad_ports):
+            rad[f'port{i+1}'] = p
         log.info("Radiometers configured on ports: {0}".format(", ".join(rad_ports)))
+
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers
     # using the pin info provided in the config file
