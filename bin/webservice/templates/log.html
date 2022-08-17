@@ -1,13 +1,23 @@
 {% extends "layout.html" %}
 {% block content %}
   <div class="jumbo">
-    <h2>SO-RAD Log Page</h2>
+    <h2>Log</h2>
   </div>
+
+  <div>
+   <form action="/log" method = "POST">
+    <p>Rows <input type = "number" value = {{ common['nrows'] }} name = "nrows" />  
+       <input type = "submit" value = "Show"/>
+       <input type = "submit" value = "Show all" name="All"/>
+       <input type = "submit" value = "Show 100" name="100"/></p>
+  </p>
+   </form>
+  </div>
+
   <br>
   {% for m in message %}
     <div class=body>{{ m }}</div>
   {% endfor %}
   <br>
-
 
 {% endblock %}

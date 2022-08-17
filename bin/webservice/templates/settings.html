@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="jumbo">
+    <h2>Settings</h2>
+  </div>
+
+  <div>
+   <form action="/settings" method = "POST">
+    <table>
+     <th>Setting description</th>
+     <th>Value</th>
+     <th>Units</th>
+     <th>Comment</th>
+     
+     <tr>
+       <td> {{ formdata['ccw_limit_deg']['label'] }}     </td>
+       <td align="right"> <input type = "number" min="-180" max="180" step="1" value = {{ formdata['ccw_limit_deg']['setting'] }} name = "ccw_limit_deg"/> </td>
+       <td> {{ formdata['ccw_limit_deg']['postlabel'] }} </td>
+       <td> {{ formdata['ccw_limit_deg']['comment'] }} </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['cw_limit_deg']['label'] }}      </td>
+       <td align="right"> <input type = "number" min="-180" max="180" step="1" value = {{ formdata['cw_limit_deg']['setting'] }}  name = "cw_limit_deg"/>  </td>
+       <td> {{ formdata['cw_limit_deg']['postlabel'] }}  </td>
+       <td> {{ formdata['cw_limit_deg']['comment'] }}  </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['home_pos']['label'] }}          </td>
+       <td align="right"> <input type = "number" min="-180" max="180" step="1" value = {{ formdata['home_pos']['setting'] }} name = "home_pos"/>           </td>
+       <td> {{ formdata['home_pos']['postlabel'] }}      </td>
+       <td> {{ formdata['home_pos']['comment'] }}      </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['gps_offset']['label'] }}          </td>
+       <td align="right"> <input type = "number" min="-180" max="180" step="1" value = {{ formdata['gps_offset']['setting'] }} name = "gps_offset"/>           </td>
+       <td> {{ formdata['gps_offset']['postlabel'] }}      </td>
+       <td> {{ formdata['gps_offset']['comment'] }}      </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['sampling_speed_limit']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="0" max="999999" step=".1" value = {{ formdata['sampling_speed_limit']['setting'] }} name = "sampling_speed_limit"/>       </td>
+       <td> {{ formdata['sampling_speed_limit']['postlabel'] }}    </td>
+       <td> {{ formdata['sampling_speed_limit']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['solar_elevation_limit']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="-90" max="90" step=".1" value = {{ formdata['solar_elevation_limit']['setting'] }} name = "solar_elevation_limit"/>       </td>
+       <td> {{ formdata['solar_elevation_limit']['postlabel'] }}    </td>
+       <td> {{ formdata['solar_elevation_limit']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['sampling_interval']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="10" max="999999" step="1" value = {{ formdata['sampling_interval']['setting'] }} name = "sampling_interval"/>       </td>
+       <td> {{ formdata['sampling_interval']['postlabel'] }}    </td>
+       <td> {{ formdata['sampling_interval']['comment'] }}    </td>
+     </tr>
+    </table>
+       <p>       <input type = "submit" value = "Save"/> </p>
+   </form>
+  </div>
+
+{% endblock %}
