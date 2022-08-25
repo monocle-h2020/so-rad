@@ -20,7 +20,7 @@ DHT_PIN = args.pin
 
 
 def test_run():
-    for i in range(10):
+    for i in range(100):
         humidity, temperature = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
         print("[{0}] RH: {1}% Temperature: {2} degrees C".format(i, humidity, temperature))
         time.sleep(0.1)

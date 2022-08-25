@@ -29,7 +29,7 @@ import functions.config_functions as cf_func
 from numpy import nan, max
 
 
-__version__ = 20220402.1
+__version__ = 20220623.1
 
 
 def parse_args():
@@ -213,7 +213,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, i
     sys.exit(0)
 
 
-def update_gps_values(gps, values, tpr=None, rht=None, motor=None):
+def update_system_values(gps, values, tpr=None, rht=None, motor=None):
     """update system value dict to the latest available in the sensor managers"""
     log = logging.getLogger()
     values['lat0'] = gps['manager'].lat
@@ -245,7 +245,7 @@ def update_gps_values(gps, values, tpr=None, rht=None, motor=None):
 
 
 def format_log_message(counter, ready, values):
-    """construct a log message based on several system checks"""
+    """Format log messages"""
     checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
     message = "{0} | ".format(counter)
     # handle string formatting where value may be None
@@ -291,7 +291,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     : trigger_id            - identifier of the last measurement (a datetime object)
     """
 
-    log = logging.getLogger()
+    log = logging.getLogger('main')
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
@@ -338,7 +338,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         # valid positioning data is required to do anything else
-        values = update_gps_values(gps, values, tpr, rht, motor)
+        values = update_system_values(gps, values, tpr, rht, motor)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
@@ -371,7 +371,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 values['ship_bearing_mean'] = None
 
         # collect latest GPS data
-        values = update_gps_values(gps, values)
+        values = update_system_values(gps, values)
 
         # Fetch sun variables and determine optimal motor pointing angles
         values['solar_az'], values['solar_el'],\
@@ -396,10 +396,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # If the sun is in a suitable position but the motor is not at the required position, move the motor, unless speed criterion is not met
         # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
-        if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
-                                                                                                                  and (ready['speed'])\
-                                                                                                                  and (ready['heading'])\
-                                                                                                                  and (motor['used']):
+        # TODO: add option to turn also when speed limit isn't met, but don't by default, to save power
+        if (ready['sun']) and (ready['speed']) and (ready['heading'])\
+            and (motor['used']) and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']):
+
             log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
@@ -413,13 +413,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
                 if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
-                time.sleep(2)
+                time.sleep(0.5)
 
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # collect latest GPS and TPR data now that a measurement may be triggered
-    values = update_gps_values(gps, values, tpr, rht, motor)
+    values = update_system_values(gps, values, tpr, rht, motor)
     # update viewing azimuth details
     values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], values['alt0'], values['dt'],
                                                                               values['ship_bearing_mean'], values['motor_deg'], motor)
@@ -431,7 +431,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # Collect and combine radiometry data
         spec_data = []
-        trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
+        trig_id, specs, sids, itimes, pre_incs, post_incs, temp_incs = radiometry_manager.sample_all(trigger_id['all_sensors'])
+
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
@@ -454,7 +455,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # trigger Ed
         spec_data = []
-        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
+        trig_id, specs, sids, itimes, pre_incs, post_incs, temp_incs = radiometry_manager.sample_ed(trigger_id['ed_sensor'])
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
@@ -510,25 +511,29 @@ def run():
 
     trigger_id = {'all_sensors': datetime.datetime.now(),
                   'ed_sensor': datetime.datetime.now(),
-                  'gps_location': datetime.datetime.now()}  # stores when data were last recorded
+                  'gps_location': datetime.datetime.now()}  # stores when data were last recorded, initialise here
 
     # Repeat indefinitely until program is closed
     counter = 0
     remote_update_timer = time.perf_counter() - 290.0  # set timer to 10 seconds before next trigger
-    export_result = True
+    export_result = True  # tracks whether exporting has been succesful
 
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
         counter += 1
+        last_check_cycle_start = time.perf_counter()
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
+            log.info(f"Check cycle completed in {time.perf_counter() - last_check_cycle_start} s")
 
             use_export = conf['EXPORT'].getboolean('use_export')
             if not use_export:
-                log.info("{counter} | No data export configured")
-                time.sleep(main_check_cycle_sec)
+                log.debug("f{counter} | No data export configured")
+                time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
+                if time_to_sleep > 0:
+                    time.sleep(time_to_sleep)
                 continue
 
             # remote data store(s) operations go here, ideally within the time window where the system is idling
@@ -571,7 +576,8 @@ def run():
             else:
                 log.debug(f"{counter} | No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
 
-            time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
+            time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
+
             if time_to_sleep > 0:
                 time.sleep(time_to_sleep)
 

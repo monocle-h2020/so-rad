@@ -41,8 +41,9 @@ def update_config(config, local_config_file=None):
                     log.info("Local config override: {0}-{1} {2}>{3}"\
                              .format(section, key, config[section][key], '(hidden)'))
                 else:
-                    log.info("Local config override: {0}-{1} {2}>{3}"\
-                             .format(section, key, config[section][key], val))
+                    if val != config[section][key]:
+                        log.info("Local config override: {0}-{1} {2}>{3}"\
+                                 .format(section, key, config[section][key], val))
                 config[section][key] = val
     return config
 

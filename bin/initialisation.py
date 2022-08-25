@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -212,6 +211,7 @@ def rht_init(rht_config):
     rht['manager'] = None
 
     if not rht['used']:
+        log.info(f"RHT sensor disabled in config")
         return rht
 
     assert rht['interface'].lower() in ['ada_dht22', ]
@@ -246,7 +246,7 @@ def gps_init(gps_config, ports):
     port_autodetect_string = gps_config.get('port_autodetect_string')
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
-        if (desc == port_autodetect_string) and (gps_config.getboolean('port_autodetect')):
+        if (port_autodetect_string in port+desc+hwid) and (gps_config.getboolean('port_autodetect')):
             gps['port1'] = port
             log.info("GPS1 using port: {0}".format(port))
     if gps['port1'] is None:
@@ -254,7 +254,7 @@ def gps_init(gps_config, ports):
         log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
 
-    # Create serial objects for both the GPS sensor ports using variables from the config file
+    # Create serial objects for the GPS sensor port using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
 
     # assign the relevant gps manager class
@@ -293,15 +293,15 @@ def rad_init(rad_config, ports):
         log.info("Radiometers not used. Update config file setting n_sensors to change this.")
         return rad, None
 
-    assert rad['rad_interface'] in ['pytrios',]
+    assert rad['rad_interface'] in ['pytrios','pytrios_g2']
 
-    # If the sensors are pytrios sensors, get more variables from the config file
+    # If the interface is pytrios set more variables from the config file
     if rad['rad_interface'] == 'pytrios':
         rad['verbosity_chn'] = rad_config.getint('verbosity_chn')
         rad['verbosity_com'] = rad_config.getint('verbosity_com')
         rad['integration_time'] = rad_config.getint('integration_time')
 
-    # If port autodetect is wanted, look for what ports have the identifying string also provided
+    # If port autodetect is selected look for ports with identifying strings
     if rad_config.getboolean('port_autodetect'):
         rad_ports = []
         port_autodetect_strings = rad_config.get('port_autodetect_string').split(',')
@@ -339,6 +339,8 @@ def rad_init(rad_config, ports):
     # Return the radiometry dict and relevant manager class
     if rad['rad_interface'] == 'pytrios':
         Rad_manager = radiometer_manager.TriosManager
+    elif rad['rad_interface'] == 'pytrios_g2':
+        Rad_manager = radiometer_manager.TriosG2Manager
 
     return rad, Rad_manager
 
