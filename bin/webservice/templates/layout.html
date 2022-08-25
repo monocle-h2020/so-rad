@@ -2,14 +2,42 @@
 <html>
 <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <head>
-    <title>So-Rad Web API</title>
+    <title>{{ common['platform_id'] }}</title>
     <strong><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></strong>    
+      {% block scripts %}
+      {% endblock %}
   </head>
   <body>
     <header>
       <div class="container">
-        <h1 class="logo">SO-RAD Web API</h1>
+        <h1 class="logo">So-Rad {{ common['platform_id'] }} Web Monitoring Interface</h1>
+        {{ common['platform_uuid'] }}
       </div>
+      <br>
+      <div>
+          <a href="{{ url_for('index') }}">Home</a>
+          <a href="{{ url_for('log') }}">Log</a>
+          <a href="{{ url_for('database') }}">Database</a>
+          {% if current_user.is_anonymous %}
+            <a href="{{ url_for('login') }}">Login</a>
+          {% else %}
+             <a href="{{ url_for('settings') }}">Settings</a>
+             <a href="{{ url_for('logout') }}">Logout ({{ current_user.name }})</a>
+          {% endif %}
+      </div>
+ 
+     <hr>
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+     <ul>
+        {% for message in messages %}
+        <li>{{ message }}</li>
+        {% endfor %}
+     </ul>
+        {% endif %}
+        {% endwith %}
+
+      <br>
     </header> 
      
     <div class="container">
