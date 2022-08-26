@@ -114,14 +114,18 @@ class User(UserMixin):
         return f"<User {self.name}> id {self.id} hash {self.hash}"
 
 admin_hash = os.environ.get('admin_hash')
+#admin_hash = 'abc'  # debug obvs
+
 users = {'admin': User('admin', admin_hash)}
 
-
-
+# to generate the password hash with a new installation do:
+# from werkzeug.security import generate_password_hash
+# generate_password_hash(pw)  #  where pw is the password provided to the operator.
+# then add this to etc/environment i.e. admin_hash="thehash"
 
 # define app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or str(uuid.uuid1())
 login = LoginManager(app)
 login.login_view = 'login'
 
@@ -133,7 +137,6 @@ def load_user(id):
         if k.id == id:
             return k
     return None
-
 
 
 # define functions used by routes below
@@ -184,7 +187,6 @@ def log2dict(line, values={}):
             return values
         values['datestr'] = line.split(' ')[0].strip()
         values['timestr'] = line.split(' ')[1].strip()
-
         values['batt_ok'] = line.split('Bat')[1].split(' ')[1].strip()
         values['gps_ok'] = line.split('GPS')[1].split(' ')[1].strip()
         values['heading_ok'] = line.split('Head')[1].split(' ')[1].strip()
@@ -193,18 +195,14 @@ def log2dict(line, values={}):
         values['motor_ok'] = line.split('Motor')[1].split(' ')[1].strip()
         values['motor_alarm'] = line.split('Motor')[1].split(' ')[2].strip('() ')
         values['sun_elevation_ok'] = line.split('Sun')[1].split(' ')[1].strip()
-
         values['sun_elevation'] =    line.split('Sun')[1].split(' ')[2].strip('() ')
         values['tilt'] = line.split('Tilt')[1].split(' ')[1].strip()
         values['sun_azimuth'] = line.split('SunAz')[1].split(' ')[1].strip()
         values['ship_heading'] = line.split('Ship')[1].split(' ')[1].strip()
         values['motor_heading'] = line.split('Ship')[1].split(' ')[3].strip('|')
-
         values['fix'] = line.split('Fix')[1].split(' ')[1].strip()
         values['nsat'] = line.split('Fix')[1].split(' ')[2].split('(')[1].strip()
-
         values['relviewaz'] = line.split('RelViewAz')[1].split(' ')[1].strip()
-
         values['latitude'] = line.split('loc')[1].split(' ')[1].strip()
         values['longitude'] = line.split('loc')[1].split(' ')[2].strip()
 
@@ -240,8 +238,9 @@ def stop_service(service):
 def service_status(service):
     "display system service status"
     assert ' ' not in service  # 1 word allowed
-    status = os.system(f"service status {service}")
-    if status == '0':
+    status = os.system(f"systemctl status {service}")
+    print(status)
+    if status == 0:
         return True
     else:
         return False
@@ -250,17 +249,21 @@ def run_test(test):
     "Run a system test"
     return
 
-
 # pass math functions to jinja2
 @app.context_processor
 def utility_processor():
     return dict(cos=cos, sin=sin, radians=radians)
 
 
-
 ####  ROUTES  ####
 
 # define routes
+@app.route('/test')
+def test():
+    """Just to check that nginx/flask are working"""
+    return "Test OK"
+
+
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/index', methods=['GET', 'POST'])
 def index():
@@ -276,16 +279,25 @@ def index():
                 common['nrows'] = 1
 
         errormessage = False
+        common['systemlog'] = True
+        common['dbreads'] = True
 
         # info from log
+        logvalues = []
+        timeseries = {'sun_azimuth': [], 'motor_heading': [], 'ship_heading': [], 'relviewaz': [], 'sensoraz': [], 'cw_limit': [], 'ccw_limit': []}
+        labels = []
         logrows = read_log(log_file_location, n=common['nrows'], reverse=True)
         if logrows is not None and len(logrows) > 0:
             common['nrows'] = len(logrows)
-            logvalues = []
             for logrow in logrows:
                 if 'Sun' in logrow:
                     logvalues.append(log2dict(logrow))
+        else:
+            flash("Log file not found.")
+            common['systemlog'] = False
+            #errormessage = True
 
+        if len(logvalues) > 0:
             labels = [logrow['timestr'] for logrow in logvalues]
             timeseries = {
                 'sun_azimuth':   [float(logrow['sun_azimuth']) for logrow in logvalues],
@@ -297,8 +309,9 @@ def index():
                 'ccw_limit':     [float(logrow['ship_heading']) + common['home_pos'] - common['cw_limit_deg'] for logrow in logvalues]
             }
         else:
-            flash("Log file not found.")
-            errormessage = True
+            flash("No recent system status information read from log file. Try increasing the number of rows read or consult log file.")
+            common['systemlog'] = False
+            #errormessage = False
 
         # info from db
         dbrows = get_from_db(db_path, n=1)
@@ -306,16 +319,15 @@ def index():
             dbtable = dict(dbrows[0])
         else:
             flash("Database file not found or database empty.")
-            errormessage = True
+            common['dbreads'] = False
+            #errormessage = True
 
         # read so-rad status
         common['so-rad_status'] = service_status('so-rad')
-        print(common['so-rad_status'])
+        #print(common['so-rad_status'])
+        #common['so-rad_status'] = True
 
-        if errormessage:
-            return render_template('layout.html', message = '', common=common)
-        else:
-            return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
+        return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
                                labels=labels, timeseries=timeseries, common=common)
 
     except Exception as msg:
@@ -488,4 +500,4 @@ def log():
 
 
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=False)
