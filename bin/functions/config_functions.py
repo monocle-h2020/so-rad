@@ -36,9 +36,9 @@ def update_config(config, local_config_file=None):
     for section in local.sections():
         if len(local[section].items()) > 0:
             for key, val in local[section].items():
-                if section in ['EXPORT']:
+                if section in ['EXPORT', 'FLASK']:
                     # keep these values out of the log files
-                    log.info("Local config override: {0}-{1} {2}>{3}"\
+                    log.debug("Local config override: {0}-{1} {2}>{3}"\
                              .format(section, key, config[section][key], '(hidden)'))
                 else:
                     if val != config[section][key]:

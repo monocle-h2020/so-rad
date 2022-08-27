@@ -28,7 +28,6 @@ def update_config():
     """replace any default config values with local overrides"""
     if local_config_file is None:
         return conf
-
     local = configparser.ConfigParser()
     local.read(local_config_file)
     for section in local.sections():
@@ -113,19 +112,17 @@ class User(UserMixin):
         #return f"<User {self.name}>"
         return f"<User {self.name}> id {self.id} hash {self.hash}"
 
-admin_hash = os.environ.get('admin_hash')
-#admin_hash = 'abc'  # debug obvs
-
+admin_hash = conf['FLASK']['admin_hash']
 users = {'admin': User('admin', admin_hash)}
 
 # to generate the password hash with a new installation do:
 # from werkzeug.security import generate_password_hash
 # generate_password_hash(pw)  #  where pw is the password provided to the operator.
-# then add this to etc/environment i.e. admin_hash="thehash"
+# then add this to config-local.ini
 
 # define app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or str(uuid.uuid1())
+app.config['SECRET_KEY'] = conf['FLASK']['key1'] or str(uuid.uuid1())
 login = LoginManager(app)
 login.login_view = 'login'
 
@@ -238,8 +235,7 @@ def stop_service(service):
 def service_status(service):
     "display system service status"
     assert ' ' not in service  # 1 word allowed
-    status = os.system(f"systemctl status {service}")
-    print(status)
+    status = os.system(f"/usr/bin/systemctl status {service}")
     if status == 0:
         return True
     else:
