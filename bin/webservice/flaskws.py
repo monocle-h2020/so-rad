@@ -115,10 +115,11 @@ class User(UserMixin):
 admin_hash = conf['FLASK']['admin_hash']
 users = {'admin': User('admin', admin_hash)}
 
+
 # to generate the password hash with a new installation do:
 # from werkzeug.security import generate_password_hash
 # generate_password_hash(pw)  #  where pw is the password provided to the operator.
-# then add this to config-local.ini
+# then add this to the FLASK section of config-local.ini
 
 # define app
 app = Flask(__name__)
