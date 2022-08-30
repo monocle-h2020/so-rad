@@ -140,39 +140,47 @@ def load_user(id):
 
 def read_log(log_file_location, n=100, reverse=True):
     """Read the last n lines from a logfile"""
+    rows = []
+
     if not os.path.exists(log_file_location):
-        return None
-    if n is None:
+        return rows
+
+    bufsize = 1024
+    fsize = os.stat(log_file_location).st_size
+
+    if (bufsize >= fsize) or n is None:
         with open(log_file_location, 'r') as logfile:
             rows = logfile.readlines()
         if reverse:
             rows.reverse()
         return rows
-    rows = []
+
     if reverse:
-        bufsize = 1024
-        fsize = os.stat(log_file_location).st_size
-        iter = 0
         with open(log_file_location, 'r+') as logfile:
-            if bufsize > fsize:
-                bufsize = fsize-1
+            logfile.seek(0, 2)
+            i = 0
             while True:
-                iter += 1
-                logfile.seek(fsize-bufsize * iter)
-                rows.extend(logfile.readlines())
-                if len(rows) >= n or logfile.tell() == 0:
+                i += 1
+                seekpos = logfile.tell() - bufsize * i
+                if seekpos < 0:
+                    seekpos = 0
+                logfile.seek(seekpos)
+                rows = logfile.readlines()
+                if len(rows) >= n or logfile.tell() == 0 or seekpos == 0:
                     break
         rows.reverse()
         rows = rows[0:n]
         return rows
-    with open(log_file_location, 'r') as logfile:
-        nn=0
-        while nn < n:
-            row = logfile.readline()
-            if not row:
-                break
-            rows.append(logfile.readline())
-            nn+=1
+
+    else:
+        with open(log_file_location, 'r') as logfile:
+            nn=0
+            while nn < n:
+               row = logfile.readline()
+               if not row:
+                   break
+               rows.append(logfile.readline())
+               nn+=1
     return rows
 
 
@@ -182,31 +190,30 @@ def log2dict(line, values={}):
         logtype = line.split(' ')[5]
         if logtype not in ['INFO']:
             return values
-        values['datestr'] = line.split(' ')[0].strip()
-        values['timestr'] = line.split(' ')[1].strip()
-        values['batt_ok'] = line.split('Bat')[1].split(' ')[1].strip()
-        values['gps_ok'] = line.split('GPS')[1].split(' ')[1].strip()
-        values['heading_ok'] = line.split('Head')[1].split(' ')[1].strip()
-        values['rad_ok'] = line.split('Rad')[1].split(' ')[1].strip()
-        values['speed_ok'] = line.split('Spd')[1].split(' ')[1].strip()
-        values['motor_ok'] = line.split('Motor')[1].split(' ')[1].strip()
-        values['motor_alarm'] = line.split('Motor')[1].split(' ')[2].strip('() ')
-        values['sun_elevation_ok'] = line.split('Sun')[1].split(' ')[1].strip()
-        values['sun_elevation'] =    line.split('Sun')[1].split(' ')[2].strip('() ')
-        values['tilt'] = line.split('Tilt')[1].split(' ')[1].strip()
-        values['sun_azimuth'] = line.split('SunAz')[1].split(' ')[1].strip()
-        values['ship_heading'] = line.split('Ship')[1].split(' ')[1].strip()
-        values['motor_heading'] = line.split('Ship')[1].split(' ')[3].strip('|')
-        values['fix'] = line.split('Fix')[1].split(' ')[1].strip()
-        values['nsat'] = line.split('Fix')[1].split(' ')[2].split('(')[1].strip()
-        values['relviewaz'] = line.split('RelViewAz')[1].split(' ')[1].strip()
-        values['latitude'] = line.split('loc')[1].split(' ')[1].strip()
-        values['longitude'] = line.split('loc')[1].split(' ')[2].strip()
+        values['datestr'] =          line.split(' ')[0].strip()
+        values['timestr'] =          line.split(' ')[1].strip()
+        values['batt_ok'] =          bool(int(line.split('Bat')[1].split(' ')[1].strip()))
+        values['gps_ok'] =           bool(int(line.split('GPS')[1].split(' ')[1].strip()))
+        values['heading_ok'] =       bool(int(line.split('Head')[1].split(' ')[1].strip()))
+        values['rad_ok'] =           bool(int(line.split('Rad')[1].split(' ')[1].strip()))
+        values['speed_ok'] =         bool(int(line.split('Spd')[1].split(' ')[1].strip()))
+        values['motor_ok'] =         bool(int(line.split('Motor')[1].split(' ')[1].strip()))
+        values['motor_alarm'] =      int(line.split('Motor')[1].split(' ')[2].strip('() '))
+        values['sun_elevation_ok'] = bool(int(line.split('Sun')[1].split(' ')[1].strip()))
 
-    except ValueError:
+        values['latitude'] =         float(line.split('loc')[1].split(' ')[1].strip())
+        values['longitude'] =        float(line.split('loc')[1].split(' ')[2].strip())
+        values['tilt'] =             float(line.split('Tilt')[1].split(' ')[1].strip())
+        values['fix'] =              int(line.split('Fix')[1].split(' ')[1].strip())
+        values['nsat'] =             int(line.split('Fix')[1].split(' ')[2].split('(')[1].strip())
+        values['sun_elevation'] =    float(line.split('Sun')[1].split(' ')[2].strip('() '))
+        values['sun_azimuth'] =      float(line.split('SunAz')[1].split(' ')[1].strip())
+        values['ship_heading'] =     float(line.split('Ship')[1].split(' ')[1].strip())
+        values['motor_heading'] =    float(line.split('Ship')[1].split(' ')[3].strip('|'))
+        values['relviewaz'] =        float(line.split('RelViewAz')[1].split(' ')[1].strip())
+    except:
         # probably the wrong log line, so stop parsing here
         return values
-
     return values
 
 
@@ -274,40 +281,51 @@ def index():
             if common['nrows'] == 0:
                 common['nrows'] = 1
 
-        errormessage = False
         common['systemlog'] = True
         common['dbreads'] = True
+        common['plot'] = True
 
         # info from log
         logvalues = []
-        timeseries = {'sun_azimuth': [], 'motor_heading': [], 'ship_heading': [], 'relviewaz': [], 'sensoraz': [], 'cw_limit': [], 'ccw_limit': []}
+        timeseries = {}
         labels = []
+
         logrows = read_log(log_file_location, n=common['nrows'], reverse=True)
+        print(f"read {len(logrows)} log rows")
         if logrows is not None and len(logrows) > 0:
             common['nrows'] = len(logrows)
             for logrow in logrows:
                 if 'Sun' in logrow:
                     logvalues.append(log2dict(logrow))
         else:
+            print("Log file not found.")
             flash("Log file not found.")
             common['systemlog'] = False
-            #errormessage = True
 
         if len(logvalues) > 0:
             labels = [logrow['timestr'] for logrow in logvalues]
             timeseries = {
-                'sun_azimuth':   [float(logrow['sun_azimuth']) for logrow in logvalues],
-                'motor_heading': [float(logrow['motor_heading']) for logrow in logvalues],
-                'ship_heading':  [float(logrow['ship_heading']) for logrow in logvalues],
-                'relviewaz':     [float(logrow['relviewaz']) for logrow in logvalues],
-                'sensoraz':      [float(logrow['sun_azimuth']) + float(logrow['relviewaz']) for logrow in logvalues],
-                'cw_limit':      [float(logrow['ship_heading']) + common['home_pos'] + common['cw_limit_deg'] for logrow in logvalues],
-                'ccw_limit':     [float(logrow['ship_heading']) + common['home_pos'] - common['cw_limit_deg'] for logrow in logvalues]
-            }
+                  'sun_azimuth':   [logrow['sun_azimuth'] for logrow in logvalues if 'sun_azimuth' in logrow.keys()],
+                  'motor_heading': [logrow['motor_heading'] for logrow in logvalues if 'motor_heading' in logrow.keys()],
+                  'ship_heading':  [logrow['ship_heading'] for logrow in logvalues if 'ship_heading' in logrow.keys()],
+                  'relviewaz':     [logrow['relviewaz'] for logrow in logvalues if 'realviewaz' in logrow.keys()],
+                  'cw_limit':      [logrow['ship_heading'] + common['home_pos'] + common['cw_limit_deg'] for logrow in logvalues if 'ship_heading' in logrow.keys()],
+                  'ccw_limit':     [logrow['ship_heading'] + common['home_pos'] - common['cw_limit_deg'] for logrow in logvalues if 'ship_heading' in logrow.keys()],
+                  'sensoraz':      [logrow['sun_azimuth'] + logrow['relviewaz'] for logrow in logvalues if ('sun_azimuth' in logrow.keys()) and ('relviewaz' in logrow.keys())]
+                }
+            for key, val in timeseries.items():
+                if len(val) == 0:
+                     print(f"{key} is missing data")
+                     common['plot'] = False
+                     common['systemlog'] = False
+
+            if not common['plot']:
+                print("Some plot values could not be read. Try increasing the number of rows read or consult system logs")
+                flash("Some plot values could not be read. Try increasing the number of rows read or consult system logs")
         else:
-            flash("No recent system status information read from log file. Try increasing the number of rows read or consult log file.")
+            print("No recent system status information read from log file. Try increasing the number of rows read or consult system logs")
+            flash("No recent system status information read from log file. Try increasing the number of rows read or consult system logs")
             common['systemlog'] = False
-            #errormessage = False
 
         # info from db
         dbrows = get_from_db(db_path, n=1)
@@ -316,15 +334,20 @@ def index():
         else:
             flash("Database file not found or database empty.")
             common['dbreads'] = False
-            #errormessage = True
 
         # read so-rad status
         common['so-rad_status'] = service_status('so-rad')
-        #print(common['so-rad_status'])
-        #common['so-rad_status'] = True
 
-        return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
-                               labels=labels, timeseries=timeseries, common=common)
+        try:
+            print(logvalues)
+            print(labels)
+            print(timeseries)
+            print(dbtable)
+            return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
+                                   labels=labels, timeseries=timeseries, common=common)
+        except:
+            flash("Unable to load the requested page")
+            return render_template('layout.html', common=common)
 
     except Exception as msg:
         return msg
