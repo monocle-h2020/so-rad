@@ -138,7 +138,6 @@ def load_user(id):
 
 
 # define functions used by routes below
-
 def read_log(log_file_location, n=100, reverse=True):
     """Read the last n lines from a logfile"""
     rows = []
@@ -268,9 +267,14 @@ def test():
     return "Test OK"
 
 
-@app.route('/', methods=['GET', 'POST'])
-@app.route('/index', methods=['GET', 'POST'])
+@app.route('/', methods=['GET'])
+@app.route('/index', methods=['GET'])
 def index():
+    return render_template('layout.html', common=common)
+
+
+@app.route('/status', methods=['GET', 'POST'])
+def status():
     """Home page showing instrument status"""
     try:
         if request.method == 'POST':
@@ -340,10 +344,6 @@ def index():
         common['so-rad_status'] = service_status('so-rad')
 
         try:
-            print(logvalues)
-            print(labels)
-            print(timeseries)
-            print(dbtable)
             return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
                                    labels=labels, timeseries=timeseries, common=common)
         except:
@@ -419,7 +419,8 @@ def collect_settings_formdata():
                                   'comment':    'normally 0 (motor aligned with platform forward heading)',
                                   'min':       -180,
                                   'max':       180},
-                'gps_offset':     {'label':    'GPS receivers to platform axis offset',
+                'gps_heading_correction':
+                                 {'label':    'GPS receivers to platform axis offset',
                                   'setting':   int(conf['GPS']['gps_heading_correction']),
                                   'postlabel': 'degrees',
                                   'comment':   'normally 0 or 90',
@@ -464,7 +465,7 @@ def settings():
                 forminput['ccw_limit_deg'] = int(request.form['ccw_limit_deg'])
                 forminput['cw_limit_deg']  = int(request.form['cw_limit_deg'])
                 forminput['home_pos']      = int(request.form['home_pos'])
-                forminput['gps_offset']    = int(request.form['gps_offset'])
+                forminput['gps_heading_correction']    = int(request.form['gps_heading_correction'])
                 forminput['sampling_speed_limit']  = float(request.form['sampling_speed_limit'])
                 forminput['solar_elevation_limit'] = float(request.form['solar_elevation_limit'])
                 forminput['sampling_interval']     = int(request.form['sampling_interval'])

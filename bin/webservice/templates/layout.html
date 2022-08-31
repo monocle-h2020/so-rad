@@ -16,12 +16,13 @@
       <br>
       <div>
           <a href="{{ url_for('index') }}">Home</a>
+          <a href="{{ url_for('status') }}">Status</a>
           <a href="{{ url_for('log') }}">Log</a>
           <a href="{{ url_for('database') }}">Database</a>
+          <a href="{{ url_for('settings') }}">Settings</a>
           {% if current_user.is_anonymous %}
             <a href="{{ url_for('login') }}">Login</a>
           {% else %}
-             <a href="{{ url_for('settings') }}">Settings</a>
              <a href="{{ url_for('logout') }}">Logout ({{ current_user.name }})</a>
           {% endif %}
       </div>

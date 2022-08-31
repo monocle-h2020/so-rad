@@ -65,13 +65,17 @@
 
   </table>
 </div>
+{% endif %}
 
+{% if common['systemlog']==true %}
 <br>
 <!-- Chart(s) -->
 <div align="center" margin-left="auto" margin-right="auto">
     <canvas id="scatterChart" width="400" height="300"></canvas>
 </div>
+{% endif %}
 
+{% if common['systemlog']==true %}
 <br>
 <!-- Table 2 -->
 <div align="center" margin-left="auto" margin-right="auto">
