@@ -6,6 +6,11 @@
     <strong><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></strong>    
       {% block scripts %}
       {% endblock %}
+    <script>
+      if ( window.history.replaceState ) {
+        window.history.replaceState( null, null, window.location.href );
+      }
+    </script>
   </head>
   <body>
     <header>
@@ -20,6 +25,7 @@
           <a href="{{ url_for('log') }}">Log</a>
           <a href="{{ url_for('database') }}">Database</a>
           <a href="{{ url_for('settings') }}">Settings</a>
+          <a href="{{ url_for('control') }}">Control</a>
           {% if current_user.is_anonymous %}
             <a href="{{ url_for('login') }}">Login</a>
           {% else %}

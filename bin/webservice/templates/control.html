@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="jumbo">
+    <h2>Control</h2>
+  </div>
+
+  <div>
+   <form action="/control" method = "POST">
+    <!-- value is the button label and dict value, name is the key in the returned dict-->
+    <p>
+      <input type = "submit" value = "Restart So-Rad service" name="restart"/>  
+      <input type = "submit" value = "Stop So-Rad service" name="stop"/>
+      <input type = "submit" value = "Check So-Rad service status" name="check"/>
+      {% if common['so-rad_status']==true %}
+        <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
+      {% else %}
+        <div style="color:#000000;background-color:#ee1111;font-weight:bold">So-Rad service is not running</div>
+      {% endif %}
+    </p>
+    <p>
+       <input type = "submit" value = "Test GPS" name="gps_test"/>
+    </p>
+    <p>
+       <input type = "submit" value = "Run test 2" name="test2"/>
+    </p>
+    <p>
+       <input type = "submit" value = "Reboot" name="reboot"/>
+       <input type = "submit" value = "Cancel Reboot" name="cancelreboot"/>
+    </p>
+  </p>
+   </form>
+  </div>
+
+  <div>
+    {% for message in messages %}
+      {{ message }}<br>
+   {% endfor %}
+  </div>
+
+{% endblock %}

@@ -41,8 +41,9 @@ def parse_args():
     parser.add_argument('-l', '--local_config_file', required=True,
                         help="system-specific config overrides providing program settings",
                         default=u"config-local.ini")
-    parser.add_argument("--verbose", "-v", type=int, choices=[0, 1, 2, 3, 4],
-                         help="set verbosity on output", default=3)
+    parser.add_argument("--verbose", "-v", action='store_true', help="verbose output")
+    parser.add_argument("--terse", "-t", action='store_true', help="terse output")
+
     args = parser.parse_args()
 
     if not os.path.exists(args.config_file):

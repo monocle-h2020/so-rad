@@ -17,6 +17,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.urls import url_parse
 import uuid
 from math import sin, cos, radians
+import datetime
+import subprocess
 
 def read_config():
     """uses local conf and global config_file objects"""
@@ -233,24 +235,48 @@ def get_from_db(db_path, n=10):
 
 def restart_service(service):
     "restart a systemd service"
-    return
+    assert ' ' not in service  # 1 word allowed
+    status = os.system(f"/usr/bin/sudo systemctl restart {service}")
+    print(status)
+    if status == 0:
+        return True
+    elif status == 1:
+        return False
+    else:
+        return status
 
 def stop_service(service):
     "stop a systemd service"
-    return
+    assert ' ' not in service  # 1 word allowed
+    status = os.system(f"/usr/bin/sudo systemctl stop {service}")
+    print(status)
+    return status
 
 def service_status(service):
     "display system service status"
     assert ' ' not in service  # 1 word allowed
-    status = os.system(f"/usr/bin/systemctl status {service}")
-    if status == 0:
-        return True
-    else:
-        return False
+    command = ["/usr/bin/systemctl", "is-active", f"{service}"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    status = process.wait()
+    message = process.stdout.read().decode('utf-8').strip()
 
-def run_test(test):
-    "Run a system test"
-    return
+    if status == '0':
+        return True, message
+    else:
+        return False, message
+
+def run_gps_test():
+    "Run a system test: show GPS status"
+    command = ["/usr/bin/python", "../tests/test_gps.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    status = process.wait()
+    message = process.stdout.read().decode('utf-8')
+    messages = message.split('\n')
+    if status == '0':
+        return True, messages
+    else:
+        return False, messages
+
 
 # pass math functions to jinja2
 @app.context_processor
@@ -271,6 +297,66 @@ def test():
 @app.route('/index', methods=['GET'])
 def index():
     return render_template('layout.html', common=common)
+
+
+@app.route('/control', methods=['GET', 'POST'])
+@login_required
+def control():
+    """Home page showing instrument status"""
+
+    selection = ''
+    common['so-rad_status'], message = service_status('so-rad')
+
+    if request.method == 'GET':
+         return render_template('control.html', common=common)
+
+    selection = list(request.form.keys())[0]   # key = name
+    flash(f"{selection} requested")
+
+    if ('test' in selection) and (common['so-rad_status']):
+        print("debug checkpoint")
+        flash("Please stop the So-Rad service before running tests. If you already stopped the service, click the check button below to verify that the service has stopped.")
+
+    if selection == 'restart':
+        status = restart_service('so-rad')
+        common['so-rad_status'] = status
+        return render_template('control.html', common=common)
+
+    elif selection == 'stop':
+        status = stop_service('so-rad')
+        common['so-rad_status'] = status
+        return render_template('control.html', common=common)
+
+    elif selection == 'check':
+        common['so-rad_status'], message = service_status('so-rad')
+        flash(f"So-Rad service status: {message}")
+        return render_template('control.html', common=common)
+
+    elif selection == 'gps_test':
+        # run a so-rad test script.
+        status, messages = run_gps_test()
+        return render_template('control.html', messages=messages, common=common)
+
+    elif selection == 'test2':
+        # run a so-rad test script.
+        #messages = run_gps_test()
+        #flash(messages)
+        return render_template('control.html', common=common)
+
+    elif selection == 'reboot':
+        status = os.system('/usr/bin/sudo shutdown -r 1 &')
+        print(status)
+        flash(f"Reboot scheduled at {datetime.datetime.utcnow().isoformat()}")
+        return render_template('control.html', common=common)
+
+    elif selection == 'cancelreboot':
+        status = os.system('/usr/bin/sudo shutdown -c')
+        print(status)
+        return render_template('control.html', common=common)
+
+    else:
+        flash("Unknown request posted")
+        return render_template('control.html', common=common)
 
 
 @app.route('/status', methods=['GET', 'POST'])
@@ -341,7 +427,7 @@ def status():
             common['dbreads'] = False
 
         # read so-rad status
-        common['so-rad_status'] = service_status('so-rad')
+        common['so-rad_status'], message = service_status('so-rad')
 
         try:
             return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
@@ -495,7 +581,6 @@ def settings():
         return f"An unexpected error occurred handling your request: {err}"
 
 
-#@log_full_page.route('/log')
 @app.route('/log', methods=['GET', 'POST'])
 def log():
     try:
