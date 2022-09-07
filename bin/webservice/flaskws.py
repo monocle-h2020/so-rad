@@ -4,8 +4,7 @@
 Connect to db to provide latest activity from solar tracking radiometry platform (SO-RAD).
 """
 
-from flask import Flask, render_template, abort, flash, redirect, url_for, request
-#from flask import Blueprint
+from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -91,7 +90,8 @@ def save_updates_to_local_config(updates):
     with open(local_config_file, "w") as lcfout:
         try:
             lcfout.write(newtext)
-            flash("Written new local config file")
+            flash(Markup(f"""Written new local config file. You will need to restart the So-Rad service for changes to take effect <a href="/control" class="alert-link">here</a>"""))
+
         except Exception as err:
             flash(f"Failed to write local config file: {err}")
 
@@ -102,20 +102,31 @@ def save_updates_to_local_config(updates):
 
 # users
 class User(UserMixin):
-    def __init__(self, name, hash):
-        self.id = str(uuid.uuid1())
+    def __init__(self, name, id, hash):
+        self.id = id
         self.name = name
         self.hash = hash
+        self.is_authenticated = self.is_authenticated()
+        self.is_active = self.is_active()
 
     def check_password(self, password):
         return check_password_hash(self.hash, password)
 
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def get_id(self):
+        return self.id
+
     def __repr__(self):
         #return f"<User {self.name}>"
-        return f"<User {self.name}> id {self.id} hash {self.hash}"
+        return f"<User {self.name}> id {self.id}"
 
 admin_hash = conf['FLASK']['admin_hash']
-users = {'admin': User('admin', admin_hash)}
+users = {'admin': User('admin', 'bosh', admin_hash)}
 
 
 # to generate the password hash with a new installation do:
@@ -259,8 +270,7 @@ def service_status(service):
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     status = process.wait()
     message = process.stdout.read().decode('utf-8').strip()
-
-    if status == '0':
+    if status == 0:
         return True, message
     else:
         return False, message
@@ -454,7 +464,10 @@ def login():
         if (form.username.data is None) or (not user.check_password(form.password.data)):
             flash('Invalid username or password')
             return redirect(url_for('login'))
-        login_user(user, remember=form.remember_me.data)
+        else:
+            login_user(user, remember=form.remember_me.data)
+            flash(f"User {current_user.name} logged in.")
+
         next_page = request.args.get('next')
         if not next_page or url_parse(next_page).netloc != '':
             next_page = url_for('index')
