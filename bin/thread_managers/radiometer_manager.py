@@ -156,6 +156,7 @@ class TriosG2Manager(object):
 
         self.busy = False
         result = instrument.result
+        #TODO handle case where instrument is busy and None values were returned.
         return trigger_time, result.spectrum, instrument.sam, result.integration_time['value'],\
                result.pre_inclination['value'], result.post_inclination['value'], result.temp_inclination_sensor['value']
 
