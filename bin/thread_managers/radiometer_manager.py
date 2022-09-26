@@ -45,6 +45,7 @@ class TriosG2Manager(object):
         self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
         self.instruments = []  # store TriosG2Ramses instances
         self.connect_sensors()
+        self.sams = []
 
         # track reboot cycles to prevent infinite rebooting of sensors if something unexpected happens (e.g a permanent sensor failure)
         self.reboot_counter = 0
@@ -76,6 +77,10 @@ class TriosG2Manager(object):
             while instrument.busy:
                 time.sleep(0.1)
             log.info(f"Sensor on {instrument.mod['port']}: {instrument.sam}")
+        for i in self.instruments:
+            if i is not None:
+                self.sams.append(i.sam)
+
         self.ready = True
         self.busy = False
 

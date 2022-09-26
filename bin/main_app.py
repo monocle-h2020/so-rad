@@ -157,6 +157,8 @@ def init_all(conf):
             radiometry_manager = Rad_manager(rad)
             time.sleep(0.1)
             rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
+            if len(radiometry_manager.sams) < rad['n_sensors']:
+                raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
             stop_all(db, None, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
