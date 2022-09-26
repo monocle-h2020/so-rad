@@ -189,24 +189,29 @@ class TriosG2Manager(object):
             if npending > 0:
                 # one or more instruments did not return a result
                 pending = [i.sam for i in instruments_included if i.busy]
+                log.warning("Incomplete or missing result from {','.join([p for p in pending])}")
                 self.failures += 1
             else:
                 self.failures = 0
 
-            nfinished = len(instruments_included) - npending
+            instruments_valid = []
+            for i in instruments_included:
+                if i.result is None:
+                    log.warning(f"No result from {i.sam}")
+                else:
+                    instruments_valid.append(i)
+
+            nfinished = len(instruments_valid)
 
             # how long did the measurements take to arrive?
             if nfinished > 0:
-                delays = [i.last_received - i.last_sampled for i in instruments_included]
+                delays = [i.last_received - i.last_sampled for i in instruments_valid]
                 delaysec = [d.total_seconds() for d in delays]
                 log.info(f"{nfinished} spectra received, triggered at {trigger_time} ({','.join([str(d) for d in delaysec])} s)")
 
-            if npending > 0:
-                log.warning("Incomplete or missing result from {','.join([p.sam for p in pending])}")
-
             # gather succesful results
-            results = [instrument.result for instrument in instruments_included]
-            sids =  [instrument.sam for instrument in instruments_included]
+            results = [instrument.result for instrument in instruments_valid]
+            sids =  [instrument.sam for instrument in instruments_valid]
             specs = [result.spectrum for result in results]
             itimes = [result.integration_time['value'] for result in results]
             pre_incs = [result.pre_inclination['value'] for result in results]
@@ -355,10 +360,11 @@ class TriosG2Ramses(object):
 
                 # now sample
                 log.info(f"Measurement triggered on {self.mod['port']}")
-                self.result = None  # clear last result
+                self.result = 'sampling'  # clear last result
                 self.last_sampled = datetime.datetime.now()
                 self.result = pt2.sample_one(self.mod)
-                self.last_received = datetime.datetime.now()
+                if self.result is not None:
+                    self.last_received = datetime.datetime.now()
                 self.trigger_sample = False
                 self.busy = False
 
