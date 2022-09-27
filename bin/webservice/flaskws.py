@@ -205,25 +205,25 @@ def log2dict(line, values={}):
             return values
         values['datestr'] =          line.split(' ')[0].strip()
         values['timestr'] =          line.split(' ')[1].strip()
-        values['batt_ok'] =          bool(int(line.split('Bat')[1].split(' ')[1].strip()))
         values['gps_ok'] =           bool(int(line.split('GPS')[1].split(' ')[1].strip()))
         values['heading_ok'] =       bool(int(line.split('Head')[1].split(' ')[1].strip()))
         values['rad_ok'] =           bool(int(line.split('Rad')[1].split(' ')[1].strip()))
         values['speed_ok'] =         bool(int(line.split('Spd')[1].split(' ')[1].strip()))
+        values['speed'] =            float(line.split('Spd')[1].split(' ')[2].strip('() '))
         values['motor_ok'] =         bool(int(line.split('Motor')[1].split(' ')[1].strip()))
         values['motor_alarm'] =      int(line.split('Motor')[1].split(' ')[2].strip('() '))
         values['sun_elevation_ok'] = bool(int(line.split('Sun')[1].split(' ')[1].strip()))
-
         values['latitude'] =         float(line.split('loc')[1].split(' ')[1].strip())
         values['longitude'] =        float(line.split('loc')[1].split(' ')[2].strip())
         values['tilt'] =             float(line.split('Tilt')[1].split(' ')[1].strip())
-        values['fix'] =              int(line.split('Fix')[1].split(' ')[1].strip())
-        values['nsat'] =             int(line.split('Fix')[1].split(' ')[2].split('(')[1].strip())
+        values['fix'] =              int(line.split('Fix:')[1].split(' ')[1].strip())
+        values['nsat'] =             int(line.split('Fix:')[1].split(' ')[2].split('(')[1].strip())
         values['sun_elevation'] =    float(line.split('Sun')[1].split(' ')[2].strip('() '))
         values['sun_azimuth'] =      float(line.split('SunAz')[1].split(' ')[1].strip())
         values['ship_heading'] =     float(line.split('Ship')[1].split(' ')[1].strip())
         values['motor_heading'] =    float(line.split('Ship')[1].split(' ')[3].strip('|'))
-        values['relviewaz'] =        float(line.split('RelViewAz')[1].split(' ')[1].strip())
+        values['relviewaz'] =        float(line.split('RelViewAz:')[1].split(' ')[1].strip())
+        values['batt_ok'] =          bool(int(line.split('Bat')[1].split(' ')[1].strip()))
     except:
         # probably the wrong log line, so stop parsing here
         return values
@@ -392,28 +392,36 @@ def status():
         labels = []
 
         logrows = read_log(log_file_location, n=common['nrows'], reverse=True)
-        print(f"read {len(logrows)} log rows")
         if logrows is not None and len(logrows) > 0:
+            print(f"read {len(logrows)} log rows")
             common['nrows'] = len(logrows)
-            for logrow in logrows:
-                if 'Sun' in logrow:
-                    logvalues.append(log2dict(logrow))
+            for row in logrows:
+                if 'Sun' in row:
+                    logrow_parsed = {}  # force new instance
+                    logrow_parsed = log2dict(row, logrow_parsed)
+                    logvalues.append(logrow_parsed)
+            print(f"{len(logvalues)} system orientation log lines parsed")
+            print(logvalues)
+
         else:
             print("Log file not found.")
             flash("Log file not found.")
             common['systemlog'] = False
 
         if len(logvalues) > 0:
-            labels = [logrow['timestr'] for logrow in logvalues]
+            labels = [lrow['timestr'] for lrow in logvalues]
+            print(labels)
+            for lrow in logvalues:
+                print(lrow['timestr'])
             timeseries = {
-                  'sun_azimuth':   [logrow['sun_azimuth'] for logrow in logvalues if 'sun_azimuth' in logrow.keys()],
-                  'motor_heading': [logrow['motor_heading'] for logrow in logvalues if 'motor_heading' in logrow.keys()],
-                  'ship_heading':  [logrow['ship_heading'] for logrow in logvalues if 'ship_heading' in logrow.keys()],
-                  'relviewaz':     [logrow['relviewaz'] for logrow in logvalues if 'realviewaz' in logrow.keys()],
-                  'cw_limit':      [logrow['ship_heading'] + common['home_pos'] + common['cw_limit_deg'] for logrow in logvalues if 'ship_heading' in logrow.keys()],
-                  'ccw_limit':     [logrow['ship_heading'] + common['home_pos'] - common['cw_limit_deg'] for logrow in logvalues if 'ship_heading' in logrow.keys()],
-                  'sensoraz':      [logrow['sun_azimuth'] + logrow['relviewaz'] for logrow in logvalues if ('sun_azimuth' in logrow.keys()) and ('relviewaz' in logrow.keys())]
-                }
+                  'sun_azimuth':   [lr['sun_azimuth'] for lr in logvalues if 'sun_azimuth' in lr.keys()],
+                  'motor_heading': [lr['motor_heading'] for lr in logvalues if 'motor_heading' in lr.keys()],
+                  'ship_heading':  [lr['ship_heading'] for lr in logvalues if 'ship_heading' in lr.keys()],
+                  'relviewaz':     [lr['relviewaz'] for lr in logvalues if 'relviewaz' in lr.keys()],
+                  'cw_limit':      [lr['ship_heading'] + common['home_pos'] + common['cw_limit_deg'] for lr in logvalues if 'ship_heading' in lr.keys()],
+                  'ccw_limit':     [lr['ship_heading'] + common['home_pos'] - common['cw_limit_deg'] for lr in logvalues if 'ship_heading' in lr.keys()],
+                  'sensoraz':      [lr['sun_azimuth'] + lr['relviewaz'] for lr in logvalues if ('sun_azimuth' in lr.keys()) and ('relviewaz' in lr.keys())]
+                  }
             for key, val in timeseries.items():
                 if len(val) == 0:
                      print(f"{key} is missing data")

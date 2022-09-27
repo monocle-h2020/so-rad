@@ -82,7 +82,7 @@ class G2registers():
     """All G2 registers and how to read them"""
     def __init__(self):
         self.slave_address =          {'name': 'slave_address',           'start': 0,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.measurement_timeout =    {'name': 'measurement_timeout',     'start': 1,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
+        self.measurement_timeout =    {'name': 'measurement_timeout',     'start': 1,   'len': 1,  'datatype': '>H',  'timeout':0.25, 'value': None}
         self.deep_sleep_timeout  =    {'name': 'deep_sleep_timeout',      'start': 2,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.device_serial_number =   {'name': 'device_serial_number',    'start': 10,  'len': 5,  'datatype': 'str', 'timeout':0.25, 'value': None}
         self.firmware_version =       {'name': 'firmware_version',        'start': 15,  'len': 5,  'datatype': 'str', 'timeout':0.15, 'value': None}
@@ -135,17 +135,21 @@ def sample_one(mod):
     """Trigger a measurement, then monitor sensor idle state and read and return (meta)data when ready"""
     meastimer = read_one_register(mod, register_name='measurement_timeout')
     if meastimer > 0:
-        log.info("Sensor busy, try again")
-        return None
+        log.info(f"Sensor busy. Measurement timeout register returned {meastimer}. Retrying.")
+        time.sleep(0.1)
+        meastimer = read_one_register(mod, register_name='measurement_timeout')
+        if meastimer > 0:
+            log.info(f"Sensor busy. Measurement timeout register returned {meastimer}")
+            return None
 
     result = trigger_measurement(mod)
 
-    timeout = 20
+    timeout = 30
     t0 = time.perf_counter()
     meastimer = 200
     while (meastimer > 0) and ((time.perf_counter() - t0) < timeout):
         log.debug("Waiting for data..")
-        time.sleep(0.1)
+        time.sleep(0.25)
         meastimer = read_one_register(mod, register_name='measurement_timeout')
         if meastimer is None:
             meastimer = 0.1
