@@ -85,10 +85,8 @@ class TriosManager(object):
         self.chns = [self.tc[k].TInfo.TID for k in self.sams]  # channel addressing
         self.sns = [self.tc[k].TInfo.serialn for k in self.sams]  # sensor ids
 
-        if self.config['verbosity_com'] > 1:
-            log.info("found SAM modules: {0}".format(list(zip(self.chns, self.sns))))
-        if self.config['verbosity_com'] > 2:
-            log.info("found channels: {0}".format(list(self.tk)))
+        log.info("found SAM modules: {0}".format(list(zip(self.chns, self.sns))))
+        log.info("found channels: {0}".format(list(self.tk)))
 
     def sample_all(self, trigger_id, sams_included=None):
         """Send a command to take a spectral sample from every sensor currently detected by the program"""
@@ -99,12 +97,8 @@ class TriosManager(object):
                 sams_included = self.sams
 
             for s in sams_included:
-                if self.config['inttime'] > 0:
-                    # trigger single measurement at fixed integration time
-                    self.tc[s].startIntSet(self.tc[s].serial, self.config['inttime'], trigger=self.lasttrigger)
-                else:
-                    # trigger single measurement at auto integration time
-                    self.tc[s].startIntAuto(self.tc[s].serial, trigger=self.lasttrigger)
+                # trigger single measurement at auto integration time
+                self.tc[s].startIntAuto(self.tc[s].serial, trigger=self.lasttrigger)
 
             # follow progress
             npending = len(sams_included)
@@ -126,23 +120,20 @@ class TriosManager(object):
                 self.tc[k].failures +=1
 
             # how long did the measurements take to arrive?
-            if nfinished > 0 and self.config['verbosity_chn'] > 2:
+            if nfinished > 0:
                 if type(self.tc[k].TSAM.lastRawSAMTime) == type(self.lasttrigger) and self.tc[k].TSAM.lastRawSAMTime is not None:
                     delays = [self.tc[k].TSAM.lastRawSAMTime - self.lasttrigger for k in sams_included]
                     delaysec = max([d.total_seconds() for d in delays])
                     log.info("\t{0} spectra received, triggered at {1} ({2} s)"
                         .format(nfinished, self.lasttrigger, delaysec))
 
-            if len(missing) > 0 and self.config['verbosity_chn'] > 0:
+            if len(missing) > 0:
                 log.warning("Incomplete or missing result from {0}".format(",".join(missing)))
 
             # gather succesful results
-            specs = [self.tc[s].TSAM.lastRawSAM
-                    for s in sams_included if self.tc[s].is_finished()]
-            sids = [self.tc[s].TInfo.serialn
-                    for s in sams_included if self.tc[s].is_finished()]
-            itimes = [self.tc[s].TSAM.lastIntTime
-                    for s in sams_included if self.tc[s].is_finished()]
+            specs = [self.tc[s].TSAM.lastRawSAM for s in sams_included if self.tc[s].is_finished()]
+            sids = [self.tc[s].TInfo.serialn for s in sams_included if self.tc[s].is_finished()]
+            itimes = [self.tc[s].TSAM.lastIntTime for s in sams_included if self.tc[s].is_finished()]
 
             self.busy = False
             pre_incs = [None]
