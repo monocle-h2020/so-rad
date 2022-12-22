@@ -35,6 +35,9 @@ class RpiManager(object):
         self.GPIO.setup(pin, self.GPIO.OUT)
         self.GPIO.output(pin, self.GPIO.LOW)
 
+    def stop(self):
+        self.GPIO.cleanup()
+
 
 class GpiozeroManager(object):
     """

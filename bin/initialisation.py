@@ -302,6 +302,7 @@ def rad_init(rad_config, ports):
         rad['integration_time'] = rad_config.getint('integration_time')
 
     # If port autodetect is selected look for ports with identifying strings
+    # Note that no sensor communication takes place here yet, this is only looking for the serial to usb interfaces
     if rad_config.getboolean('port_autodetect'):
         rad_ports = []
         port_autodetect_strings = rad_config.get('port_autodetect_string').split(',')

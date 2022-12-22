@@ -15,7 +15,7 @@ import RPi.GPIO as GPIO
 import datetime
 import logging
 import serial.tools.list_ports as list_ports
-
+import time
 
 def single_test(radiometry_manager, ed=True):
     log.info("Trigger measurement on all sensors")
@@ -34,13 +34,22 @@ def single_test(radiometry_manager, ed=True):
 
 def run_test(conf, repeat=False):
     """Test connectivity to TriOS RAMSES radiometer sensors using the routines used in the main application"""
+
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
         log.info("port info: {0} {1} {2}".format(port, desc, hwid))
     config = conf['RADIOMETERS']
     rad, Rad_manager = rad_init(config, ports)
-    log.info("Starting radiometry manager")
 
+    # switch off gpio
+    if rad['use_gpio_control']:
+        log.info("Switch sensors on via GPIO control")
+        rad['gpio_interface'].off(rad['gpio1'])
+        log.info(f"gpio status: {rad['gpio_interface'].GPIO.input(rad['gpio1'])}")
+
+        time.sleep(1) # Wait to allow sensors to boot
+
+    log.info("Starting radiometry manager")
     radiometry_manager = Rad_manager(rad)
 
     if repeat:
@@ -51,7 +60,7 @@ def run_test(conf, repeat=False):
            except KeyboardInterrupt:
                repeat = False
     else:
-        single_test(radiometry_manager)
+        single_test(radiometry_manager, ed=False)
 
     log.info("Stopping radiometry manager threads")
     if radiometry_manager is not None:
@@ -59,11 +68,9 @@ def run_test(conf, repeat=False):
 
     # switch off gpio
     if rad['use_gpio_control']:
-        log.info("Switch off GPIO control")
-        pin = int(rad['gpio1'])
-        GPIO.setmode(GPIO.BCM)
-        GPIO.output(pin, GPIO.LOW)
-        GPIO.cleanup()
+        log.info("Switch off sensors via GPIO control")
+        rad['gpio_interface'].off(rad['gpio1'])
+        rad['gpio_interface'].stop()
 
 
 if __name__ == '__main__':

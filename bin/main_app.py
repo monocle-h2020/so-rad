@@ -161,7 +161,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -201,6 +201,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, i
 
     # Turn all GPIO pins off
     initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
+    rad['gpio_manager'].stop()  # release gpio control
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
