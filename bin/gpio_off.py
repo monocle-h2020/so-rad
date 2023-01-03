@@ -28,9 +28,11 @@ def run(conf):
             rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
         log.info(rad['gpio_interface'])
+        log.info(f"Pin {pin} status: {rad['gpio_interface'].status(pin)}")
         log.info(f"Switching pin {pin}")
 
         rad['gpio_interface'].off(pin)
+        log.info(f"Pin {pin} status: {rad['gpio_interface'].status(pin)}")
         time.sleep(0.5)
 
     else:

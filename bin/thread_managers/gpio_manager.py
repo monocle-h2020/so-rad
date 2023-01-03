@@ -27,6 +27,7 @@ class RpiManager(object):
             self.GPIO.setmode(self.GPIO.BCM)
         except Exception as msg:
             log.warning("Could not import GPIO library. Functionality may be limited to system tests.\n{0}".format(msg))
+
     def on(self, pin):
         self.GPIO.setup(pin, self.GPIO.OUT)
         self.GPIO.output(pin, self.GPIO.HIGH)
@@ -34,6 +35,10 @@ class RpiManager(object):
     def off(self, pin):
         self.GPIO.setup(pin, self.GPIO.OUT)
         self.GPIO.output(pin, self.GPIO.LOW)
+
+    def status(self, pin):
+        self.GPIO.setup(pin, self.GPIO.OUT)
+        return self.GPIO.input(pin)
 
     def stop(self):
         self.GPIO.cleanup()

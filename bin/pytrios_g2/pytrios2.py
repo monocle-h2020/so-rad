@@ -133,31 +133,39 @@ class G2registers():
 
 def sample_one(mod):
     """Trigger a measurement, then monitor sensor idle state and read and return (meta)data when ready"""
+    # first check *twice* whether sensor is responsive
+    result = G2registers()
+    result.spectrum = None
+
     meastimer = read_one_register(mod, register_name='measurement_timeout')
-    if meastimer > 0:
-        log.info(f"Sensor busy. Measurement timeout register returned {meastimer}. Retrying.")
+    if meastimer is None or meastimer > 0:
+        log.info(f"Sensor busy or no response on {mod['serial'].port}. Retrying.")
         time.sleep(0.1)
         meastimer = read_one_register(mod, register_name='measurement_timeout')
-        if meastimer > 0:
-            log.info(f"Sensor busy. Measurement timeout register returned {meastimer}")
-            return None
+        if meastimer is None:
+            log.info(f"No response on {mod['serial'].port}")
+        elif meastimer > 0:
+            log.info(f"Sensor busy on {mod['serial'].port}. Measurement timeout register returned {meastimer}")
+            return result
 
-    result = trigger_measurement(mod)
+    # trigger measurement
+    trigger_measurement(mod)
 
+    # wait/poll for result
     timeout = 30
     t0 = time.perf_counter()
     meastimer = 200
     while (meastimer > 0) and ((time.perf_counter() - t0) < timeout):
-        log.debug("Waiting for data..")
+        log.debug(f"Waiting for data on {mod['serial'].port}..")
         time.sleep(0.25)
         meastimer = read_one_register(mod, register_name='measurement_timeout')
         if meastimer is None:
             meastimer = 0.1
-            log.info("No data received while polling for measurement_timeout register")
+            log.debug(f"No data received on {mod['serial'].port} while polling for measurement_timeout register.")
 
     if meastimer > 0:
-        log.warning("Sensor timed out")
-        return None
+        log.warning(f"Sensor timed out on {mod['serial'].port}")
+        return result
 
     # data should now be available
     result = read_last_meas(mod)
@@ -202,6 +210,9 @@ def get_lan_state(mod):
         log.exception(err)
         log.warning(f"LAN interface state - Checksum failed: {response}")
         lanstate = None
+    except CrcEmptyMessage as err:
+        log.debug(f"LAN interface state - Checksum failed: empty response")
+        lanstate = None
 
     return lanstate
 
@@ -225,13 +236,17 @@ def read_last_meas(mod):
             g2var['value'] = unpack_response(response, datatype)
             log.debug(f"{g2var['name']}: {g2var['value']}")
         except CrcError as err:
-            log.exception(err)
+            #log.exception(err)
             log.warning(f"{g2var['name']} Checksum failed: {response}")
+        except CrcEmptyMessage as err:
+            #log.exception(err)
+            log.debug(f"{g2var['name']} Checksum failed: Empty response")
 
     try:
         g2.spectrum = list(g2.raw_ordinate0['value'] + g2.raw_ordinate1['value'])
     except:
         log.warning(f"Failed to construct spectrum")
+        g2.spectrum = None
 
     return g2
 
@@ -294,7 +309,10 @@ def read_one_register(mod, register_name='system_date_and_time', slave_address=1
     try:
         crc_check_incoming(response)
     except CrcError as err:
-        log.warning(f"Failed to read register {register_name}: {response}")
+        log.warning(f"CRC check failed on register {register_name}: {response}")
+        return None
+    except CrcEmptyMessage as err:
+        log.debug(f"CRC check: empty response on register {register_name}")
         return None
 
     result = unpack_response(response, datatype)
@@ -399,8 +417,10 @@ def unpack_response(response, datatype='int', ):
 
 def crc_check_incoming(response):
     """crc check on incoming packet"""
-    crc_message = response[0:-2]
+    if len(response) == 0:
+        raise CrcEmptyMessage("Empty repsonse")
 
+    crc_message = response[0:-2]
     crc_hex = response[-2:].hex() # string representation of bytes object code in hex
 
     crc_value = codecs.encode(response[0:-2], 'hex')
@@ -418,6 +438,8 @@ def crc_check_incoming(response):
 
 class CrcError(Exception):
     pass
+class CrcEmptyMessage(Exception):
+    pass
 
 
 def report_slave_id(mod, slave_id=1, timeout=3.0):
@@ -432,7 +454,7 @@ def report_slave_id(mod, slave_id=1, timeout=3.0):
     n_regs = hex(no_of_registers)[2:].zfill(4)
 
     id = hex(slave_id)[2:].zfill(2)
-    log.info(f"slave_id: {slave_id} | {id}")
+    log.debug(f"slave_id: {slave_id} | {id}")
 
     initial_command = "".join([id, fun_code, reg_address, n_regs])
 

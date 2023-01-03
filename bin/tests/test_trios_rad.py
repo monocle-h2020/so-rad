@@ -18,7 +18,7 @@ import serial.tools.list_ports as list_ports
 import time
 
 def single_test(radiometry_manager, ed=True):
-    log.info("Trigger measurement on all sensors")
+    log.info(f"Trigger measurement on {len(radiometry_manager.sams)} sensors")
     trig_id, specs, sids, itimes, preincs, postincs, inctemps  = radiometry_manager.sample_all(datetime.datetime.now())
 
     for sid, itime, preinc, postinc, inctemp, spec in zip(sids, itimes, preincs, postincs, inctemps, specs):
@@ -31,26 +31,31 @@ def single_test(radiometry_manager, ed=True):
         log.info(f"Received Ed spectrum from {sid}: {trig_id} {itime} {temp} {inc_pre}-{inc_post}")
         log.debug(f"Spectrum:{spec}")
 
+    log.info(f"Done with measurements on {radiometry_manager.sams}")
+
 
 def run_test(conf, repeat=False):
     """Test connectivity to TriOS RAMSES radiometer sensors using the routines used in the main application"""
 
+    # initialise based on configuration files and serial devices connected (no connection to sensors made yet)
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
         log.info("port info: {0} {1} {2}".format(port, desc, hwid))
     config = conf['RADIOMETERS']
     rad, Rad_manager = rad_init(config, ports)
 
-    # switch off gpio
+    # set gpio
     if rad['use_gpio_control']:
-        log.info("Switch sensors on via GPIO control")
-        rad['gpio_interface'].off(rad['gpio1'])
-        log.info(f"gpio status: {rad['gpio_interface'].GPIO.input(rad['gpio1'])}")
+        log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
+        log.info("Switch sensors ON via GPIO control")
+        rad['gpio_interface'].on(rad['gpio1'])
+        log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
 
-        time.sleep(1) # Wait to allow sensors to boot
+        time.sleep(1) # Wait for sensors to boot
 
     log.info("Starting radiometry manager")
     radiometry_manager = Rad_manager(rad)
+
 
     if repeat:
        log.info("Starting repeat measurements, press CTRL-C to stop")
@@ -69,7 +74,9 @@ def run_test(conf, repeat=False):
     # switch off gpio
     if rad['use_gpio_control']:
         log.info("Switch off sensors via GPIO control")
+        log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
         rad['gpio_interface'].off(rad['gpio1'])
+        log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
         rad['gpio_interface'].stop()
 
 
@@ -86,4 +93,4 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
-    run_test(conf, repeat=False)  # select repeat = True to repeat test until interrupted
+    run_test(conf, repeat=True)  # select repeat = True to repeat test until interrupted
