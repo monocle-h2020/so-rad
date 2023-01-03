@@ -3,6 +3,8 @@
 """
 TriOS G2 connector using modbus interface
 
+author: stsi
+PML
 """
 
 import time

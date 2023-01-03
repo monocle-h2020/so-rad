@@ -31,10 +31,10 @@ import time
 import struct
 import numpy as np
 import threading
-from .TClasses import TProtocolError, TPackMeasKeyError,\
+from TClasses import TProtocolError, TPackMeasKeyError,\
     TPacket, TSerial, TCommandSend
 
-__version__ = "2015.12.28"
+__version__ = "20221123"
 __author__ = "Stefan Simis"
 __license__ = "GPL v3"
 
