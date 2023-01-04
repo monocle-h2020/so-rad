@@ -99,10 +99,10 @@ def motor_init(motor_config, ports):
     motor['cw_limit'] = motor_config.getint('cw_limit_deg')
     motor['ccw_limit'] = motor_config.getint('ccw_limit_deg')
     motor['home_pos'] = motor_config.getint('home_pos')
-    motor['step_thresh_time'] = motor_config.getint('step_thresh_time')
+    motor['step_thresh_time'] = motor_config.getfloat('step_thresh_time')
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
-    motor['adjust_mode'] = motor_config.get('adjust_mode')
+    motor['adjust_mode'] = motor_config.get('adjust_mode').lower()
     assert motor['adjust_mode'] in ['sampling', 'always']
 
     if not motor['used']:

@@ -398,12 +398,19 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
-        # If the sun is in a suitable position but the motor is not at the required position, move the motor, unless speed criterion is not met
-        # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
-        # TODO: add option to turn also when speed limit isn't met, but don't by default, to save power
-        if (ready['sun']) and (ready['speed']) and (ready['heading'])\
-            and (motor['used']) and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']):
+        # Move motor?
+        move_motor = False
+        # full set of criteria
+        if (ready['sun']) and (ready['speed']) and (ready['heading']) and (motor['used'])\
+            and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
+                move_motor = True
 
+        # relaxed criteria - move the motor more often as long as the heading etc are valid
+        elif (ready['heading']) and (motor['used']) and (motor['adjust_mode']=='always')\
+            and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
+                move_motor = True
+
+        if move_motor:
             log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
