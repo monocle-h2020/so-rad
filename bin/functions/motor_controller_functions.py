@@ -3,7 +3,7 @@
 """
 Motor Controller Functions
 
-For Oriental Motor stepper motor controller. 
+For Oriental Motor stepper motor controller.
 
 Contains a class for the structure of the commands to send to the motor controller
 and instances of each type of command that are needed.
@@ -42,7 +42,7 @@ import logging
 import functions.azimuth_functions as azi_func
 import functions.gps_functions as gps_func
 
-log = logging.getLogger() #gets the root logger
+log = logging.getLogger('motor') #gets the root logger
 
 try:
     import RPi.GPIO as GPIO

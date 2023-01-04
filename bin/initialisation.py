@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -23,15 +22,9 @@ from thread_managers import battery_manager
 from thread_managers import tpr_manager
 from thread_managers import gps_manager
 from thread_managers import rht_manager
+from thread_managers import gpio_manager
 from functions import db_functions
-log = logging.getLogger()   # report to root logger
-
-try:
-    import RPi.GPIO as GPIO
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-except Exception as msg:
-    log.warning("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))
+log = logging.getLogger('init')   # report to root logger
 
 
 def db_init(db_config):
@@ -106,9 +99,11 @@ def motor_init(motor_config, ports):
     motor['cw_limit'] = motor_config.getint('cw_limit_deg')
     motor['ccw_limit'] = motor_config.getint('ccw_limit_deg')
     motor['home_pos'] = motor_config.getint('home_pos')
-    motor['step_thresh_time'] = motor_config.getint('step_thresh_time')
+    motor['step_thresh_time'] = motor_config.getfloat('step_thresh_time')
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
+    motor['adjust_mode'] = motor_config.get('adjust_mode').lower()
+    assert motor['adjust_mode'] in ['sampling', 'always']
 
     if not motor['used']:
         return motor
@@ -121,7 +116,7 @@ def motor_init(motor_config, ports):
         port_autodetect_string = motor_config.get('port_autodetect_string')
         for port, desc, hwid in sorted(ports):
             log.info("port info: {0} {1} {2}".format(port, desc, hwid))
-            if (desc == port_autodetect_string):
+            if port_autodetect_string in port+desc+hwid:
                 motor['port'] = port
                 log.info("Motor auto-detected on port: {0}".format(port))
     else:
@@ -218,6 +213,7 @@ def rht_init(rht_config):
     rht['manager'] = None
 
     if not rht['used']:
+        log.info(f"RHT sensor disabled in config")
         return rht
 
     assert rht['interface'].lower() in ['ada_dht22', ]
@@ -241,7 +237,7 @@ def gps_init(gps_config, ports):
     gps['port1'] = None
     gps['gps_heading_correction'] = gps_config.getfloat('gps_heading_correction')
 
-    if gps['protocol'] in ['rtk', ]:
+    if gps['protocol'] in ['rtk', 'pyubx2']:
         # heading will be determined from distance between receivers rather than movement, so we need to know which one is nearer the front of the ship
        gps['location1'] = gps_config.get('location1').lower()
        gps['location2'] = gps_config.get('location2').lower()
@@ -252,7 +248,7 @@ def gps_init(gps_config, ports):
     port_autodetect_string = gps_config.get('port_autodetect_string')
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
-        if (desc == port_autodetect_string) and (gps_config.getboolean('port_autodetect')):
+        if (port_autodetect_string in port+desc+hwid) and (gps_config.getboolean('port_autodetect')):
             gps['port1'] = port
             log.info("GPS1 using port: {0}".format(port))
     if gps['port1'] is None:
@@ -260,7 +256,7 @@ def gps_init(gps_config, ports):
         log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
 
-    # Create serial objects for both the GPS sensor ports using variables from the config file
+    # Create serial objects for the GPS sensor port using variables from the config file
     gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
 
     # assign the relevant gps manager class
@@ -268,6 +264,8 @@ def gps_init(gps_config, ports):
        gps['manager'] = gps_manager.RTKUBX()
     elif gps['protocol'] == 'nmea0183':
        gps['manager'] = gps_manager.NMEA0183()
+    elif gps['protocol'] == 'pyubx2':
+       gps['manager'] = gps_manager.PYUBX2()
     else:
        log.exception("GPS protocol '{0}' is not implemented".format(gps['protocol']))
 
@@ -297,58 +295,73 @@ def rad_init(rad_config, ports):
         log.info("Radiometers not used. Update config file setting n_sensors to change this.")
         return rad, None
 
-    assert rad['rad_interface'] in ['pytrios',]
+    assert rad['rad_interface'] in ['pytrios','pytrios_g2']
 
-    # If the sensors are pytrios sensors, get more variables from the config file
+    # If the interface is pytrios set more variables from the config file
     if rad['rad_interface'] == 'pytrios':
         rad['verbosity_chn'] = rad_config.getint('verbosity_chn')
         rad['verbosity_com'] = rad_config.getint('verbosity_com')
         rad['integration_time'] = rad_config.getint('integration_time')
 
-    # If port autodetect is wanted, look for what ports have the identifying string also provided
+    # If port autodetect is selected look for ports with identifying strings
+    # Note that no sensor communication takes place here yet, this is only looking for the serial to usb interfaces
     if rad_config.getboolean('port_autodetect'):
         rad_ports = []
-        port_autodetect_string = rad_config.get('port_autodetect_string')
-        for port, desc, hwid in sorted(ports):
-            if (desc == port_autodetect_string):
-                rad_ports.append(port)
-        assert len(rad_ports) == 3
-        rad['port1'] = rad_ports[0]
-        rad['port2'] = rad_ports[1]
-        rad['port3'] = rad_ports[2]
+        port_autodetect_strings = rad_config.get('port_autodetect_string').split(',')
+        for autodetect_string in port_autodetect_strings:
+            found = False
+            for port, desc, hwid in sorted(ports):
+                if autodetect_string in port+desc+hwid:
+                    rad_ports.append(port)
+                    found = True
+            if not found:
+                log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
+        if len(rad_ports) < rad['n_sensors']:
+            log.critical(f"{len(rad_ports)} identified out of {rad['n_sensors']} expected.")
+
+        for i, p in enumerate(rad_ports):
+            rad[f'port{i+1}'] = p
         log.info("Radiometers configured on ports: {0}".format(", ".join(rad_ports)))
+
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers
     # using the pin info provided in the config file
     rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
-        rad['gpio1'] = rad_config.getint('gpio1')
+        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
+        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
+        if rad['gpio_protocol'] == 'rpi':
+            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
+        elif rad['gpio_protocol'] == 'gpiozero':
+            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(rad['gpio1'], GPIO.OUT)
-        GPIO.output(rad['gpio1'], GPIO.HIGH)
+        rad['gpio1'] = rad_config.getint('gpio1')
+        rad['gpio_interface'].on(rad['gpio1'])
         time.sleep(1) # Wait to allow sensors to boot
 
     # Return the radiometry dict and relevant manager class
     if rad['rad_interface'] == 'pytrios':
         Rad_manager = radiometer_manager.TriosManager
+    elif rad['rad_interface'] == 'pytrios_g2':
+        Rad_manager = radiometer_manager.TriosG2Manager
 
     return rad, Rad_manager
 
 
-def init_gpio(conf, state=0):
+def init_gpio(conf, rad, state=0):
     """set all GPIO pins identified in config file to low (0) or high (1)"""
-    set_state = {0: GPIO.LOW, 1: GPIO.HIGH}
 
     # If GPIO control is requested use the pins stated in the config file
     if conf['DEFAULT'].getboolean('use_gpio_control'):
         pins = []
-        if conf['RADIOMETERS'].getboolean('use_gpio_control'):
-            pins.append(conf['RADIOMETERS'].getint('gpio1'))
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(pins, GPIO.OUT)
-        GPIO.output(pins, set_state[state])
-        GPIO.cleanup()
+        if rad['use_gpio_control']:
+            pins.append(rad['gpio1'])
+        if state == 0:
+            for pin in pins:
+                rad['gpio_interface'].off(pin)
+        elif state == 1:
+            for pin in pins:
+                rad['gpio_interface'].on(pin)
 
 
 def sample_init(sample_conf):

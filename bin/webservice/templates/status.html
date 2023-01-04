@@ -1,0 +1,255 @@
+{% extends "layout.html" %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.0.0/chartjs-plugin-annotation.min.js"></script>
+<script>Chart.register('chartjs-plugin-annotation');</script>
+{% endblock %}
+
+{% block content %}
+<div>
+  <h2>Status page</h2>
+</div>
+{% if common['so-rad_status']==true %}
+  <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
+{% else %}
+  <div style="color:#000000;background-color:#ee1111;font-weight:bold">So-Rad service is not running</div>
+{% endif %}
+<br>
+
+
+<div>
+  <h2>Platform history from logs and database</h2>
+</div>
+
+<!-- Form -->
+<div>
+ <form action="/status" method = "POST">
+  <p>Rows <input type = "number" value = {{ common['nrows'] }} name = "nrows" />
+     <input type = "submit" value = "Show"/>
+     <input type = "submit" value = "Show all" name="All"/>
+     <input type = "submit" value = "Show 100" name="100"/>
+  </p>
+ </form>
+</div>
+
+<br>
+
+<!-- Table1 -->
+{% if common['systemlog']==true %}
+<div align="center" margin-left="auto" margin-right="auto">
+  <table width=90%>
+      <tr>  <th colspan=2 width=30%>Time and Location </th>
+            <th colspan=2 width=30%>System orientation</th>
+            <th colspan=2 width=30%>System state </th>  </tr>
+      <tr>  <th>Date/Time Log</th>                          <td>{{ logvalues[0]['datestr']}} {{logvalues[0]['timestr'][0:8] }}    </td>
+            <th>Sun Elevation</th>                          <td>{{ logvalues[0]['sun_elevation'] }}                               </td>
+            <th>Motor alarm</th>                            <td>{{ logvalues[0]['motor_alarm'] }}                                 </td> </tr>
+      <tr>  <th style="color:#4444ff">Date/Time db</th>     <td style="color:#4444ff">{{ dbtable['gps_time'][0:-7] }}             </td>
+            <th>Sun Azimuth</th>                            <td>{{ logvalues[0]['sun_azimuth'] }}                                 </td>
+            <th style="color:#4444ff">Motor Temp</th>       <td style="color:#4444ff">{{ dbtable['motor_temp'] }}                 </td> </tr>
+      <tr>  <th>Latitude</th>                               <td>{{ logvalues[0]['latitude'] }}                                    </td>
+            <th>Ship heading</th>                           <td>{{ logvalues[0]['ship_heading'] }}                                </td>
+            <th style="color:#4444ff">Driver Temp</th>      <td style="color:#4444ff">{{ dbtable['driver_temp'] }}                </td> </tr>
+      <tr>  <th>Longitude</th>                              <td>{{ logvalues[0]['longitude'] }}                                   </td>
+            <th>Motor rotation</th>                         <td>{{ logvalues[0]['motor_heading'] }}                               </td>
+            <th style="color:#4444ff">Control unit Temp</th><td style="color:#4444ff">{{ dbtable['inside_temp'] | round(2) }}     </td> </tr>
+      <tr>  <th>Fix quality</th>                            <td>{{ logvalues[0]['fix'] }}                                         </td>
+            <th>Sensor-sun azimuth</th>                     <td>{{ logvalues[0]['relviewaz'] }}                                   </td>
+            <th style="color:#4444ff">Control unit RH%</th> <td style="color:#4444ff">{{ dbtable['inside_rel_hum'] | round(2) }}  </td> </tr>
+      <tr>  <th>Satellites</th>                             <td>{{ logvalues[0]['nsat'] }}                                        </td>
+            <th style="color:#4444ff">Tilt average</th>    <td style="color:#4444ff">{{ dbtable['tilt_avg'] | round(2) }}         </td>
+            <th style="color:#4444ff">Battery Voltage</th>  <td style="color:#4444ff">{{ dbtable['batt_v'] }}                     </td> </tr>
+      <tr>  <th>Speed</th>                                  <td>{{ logvalues[0]['speed'] }}                                       </td>
+            <th style="color:#4444ff">Tilt st.dev.</th>     <td style="color:#4444ff">{{ dbtable['tilt_std'] | round(2) }}        </td>
+            <th style="color:#4444ff">Software version</th> <td style="color:#4444ff">{{ dbtable['sorad_version'] }}              </td> </tr>
+
+  </table>
+</div>
+{% endif %}
+
+{% if common['systemlog']==true %}
+<br>
+<!-- Chart(s) -->
+<div align="center" margin-left="auto" margin-right="auto">
+    <canvas id="scatterChart" width="400" height="300"></canvas>
+</div>
+{% endif %}
+
+{% if common['systemlog']==true %}
+<br>
+<!-- Table 2 -->
+<div align="center" margin-left="auto" margin-right="auto">
+  <table width=90%>
+      <tr>  <th colspan=7> Sampling status (T=Ready, F=Waiting)    </th>  </tr>
+      <tr>  <th width=10%>Time</th>
+            <th width=10%>GPS</th>
+            <th width=10%>Radiometers</th>
+            <th width=10%>Speed</th>
+            <th width=10%>Heading</th>
+            <th width=10%>Motor</th>
+            <th width=10%>[Battery]</th> </tr>
+            {% for lv in logvalues %}
+            <tr>
+            <td>{{ lv['datestr'] }} {{ lv['timestr'][0:8] }} </td>
+            <td>{{ lv['gps_ok'] }}     </td>
+            <td>{{ lv['rad_ok'] }}     </td>
+            <td>{{ lv['speed_ok'] }}   </td>
+            <td>{{ lv['heading_ok'] }} </td>
+            <td>{{ lv['motor_ok'] }}   </td>
+            <td>{{ lv['batt_ok'] }}    </td> </tr>
+            {% endfor %}
+  </table>
+</div>
+
+<!-- sensor orientation graph -->
+      <script>
+        var ctx = document.getElementById("scatterChart").getContext("2d");
+        const data = {
+          datasets: [{
+            label: 'Sun',
+            data: [{
+              x: {{ sin(radians(timeseries['sun_azimuth'][0])) }},
+              y: {{ cos(radians(timeseries['sun_azimuth'][0])) }}
+              },{
+              x: 0, y: 0
+            }],
+            borderColor: 'black', borderWidth: 1,
+            pointBackgroundColor: 'black',
+            pointBorderColor: 'black',
+            pointBorderColor: 'black',
+            backgroundColor: 'black',
+            pointRadius: 3, pointHoverRadius: 5,
+            fill: false, tension: 0, showLine: true
+
+            },{
+
+            label: 'Ship',
+            data: [{
+              x: {{ sin(radians(timeseries['ship_heading'][0])) }},
+              y: {{ cos(radians(timeseries['ship_heading'][0])) }}
+              },{
+              x: 0, y: 0
+            }],
+            borderColor: 'blue', borderWidth: 1,
+            pointBackgroundColor: 'blue',
+            pointBorderColor: 'blue',
+            backgroundColor: 'blue',
+            pointBorderColor: 'blue',
+            pointRadius: 3, pointHoverRadius: 5,
+            fill: false, tension: 0, showLine: true
+
+            },{
+
+            label: 'Sensors',
+            data: [{
+              x: {{ sin(radians(timeseries['sensoraz'][0])) }},
+              y: {{ cos(radians(timeseries['sensoraz'][0])) }}
+              },{
+              x: 0, y: 0
+            }],
+            borderColor: 'green', borderWidth: 1,
+            pointBackgroundColor: 'green',
+            pointBorderColor: 'green',
+            backgroundColor: 'green',
+            borderColor: 'green',
+            pointRadius: 3, pointHoverRadius: 5,
+            fill: false, tension: 0, showLine: true
+            },{
+
+            label: 'Optimal',
+            fill: 'origin',
+            data: [
+              {x: 0, y: 0},
+              {x: {{ 0.8*sin(radians(timeseries['sun_azimuth'][0]+130)) }},
+               y: {{ 0.8*cos(radians(timeseries['sun_azimuth'][0]+130)) }}},
+              {x: {{ 0.8*sin(radians(timeseries['sun_azimuth'][0]+140)) }},
+               y: {{ 0.8*cos(radians(timeseries['sun_azimuth'][0]+140)) }}},
+              {x: 0, y: 0},
+              {x: {{ 0.8*sin(radians(timeseries['sun_azimuth'][0]-130)) }},
+               y: {{ 0.8*cos(radians(timeseries['sun_azimuth'][0]-130)) }}},
+              {x: {{ 0.8*sin(radians(timeseries['sun_azimuth'][0]-140)) }},
+               y: {{ 0.8*cos(radians(timeseries['sun_azimuth'][0]-140)) }}},
+              {x: 0, y: 0}],
+            borderDash: [5,5],
+            borderColor: 'black', borderWidth: 1,
+            pointBackgroundColor: 'rgba(0,0,0,0)',
+            pointBorderColor: 'rgba(0,0,0,0)',
+            pointRadius: 0, pointHoverRadius: 0,
+            fill: false, tension: 0.1, showLine: true
+
+            },{
+
+            label: 'Range',
+            fill: 'origin',
+            data: [
+              {x: 0, y: 0},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0])) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0])) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.1*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.1*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.2*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.2*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.3*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.3*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.4*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.4*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.5*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.5*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.6*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.6*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.7*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.7*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.8*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.8*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.9*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
+               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.9*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
+              {x: {{ 0.6*sin(radians(timeseries['cw_limit'][0])) }},
+               y: {{ 0.6*cos(radians(timeseries['cw_limit'][0])) }}},
+              {x: 0, y: 0}
+            ],
+            borderDash: [5,5],
+            borderColor: 'green', borderWidth: 1,
+            pointBackgroundColor: 'rgba(0,0,0,0)',
+            pointBorderColor: 'rgba(0,0,0,0)',
+            pointRadius: 0, pointHoverRadius: 0,
+            fill: false, tension: 0.1, showLine: true
+          }],
+        };  
+
+        var scatterChart = new Chart(ctx,  {
+          type: "scatter",
+          data: data,
+          options: {
+            scales: {
+              x: {display: false, type: 'linear', position: {y: 0}, min: -1.25, max: 1.25, ticks: {display: false}},
+              y: {display: false, type: 'linear', position: {x: 0}, min: -1.25, max: 1.25, ticks: {display: false}}
+            },
+            responsive: false,
+            aspectRatio: 1,
+            plugins: {
+              legend: { display: true, position: 'right'},
+              trueautocolors: false,
+              annotation: {
+                annotations: {
+                  sun:  {type: 'label', content: ['Sun'], font: {size: 12},
+                    xValue: {{ 1.1*sin(radians(timeseries['sun_azimuth'][0])) }},
+                    yValue: {{ 1.1*cos(radians(timeseries['sun_azimuth'][0])) }}},
+                  ship:  {type: 'label', content: ['Ship'], font: {size: 12},
+                    xValue: {{ 1.1*sin(radians(timeseries['ship_heading'][0])) }},
+                    yValue: {{ 1.1*cos(radians(timeseries['ship_heading'][0])) }}},
+                  motor: {type: 'label', content: ['Sensors'], font: {size: 12},
+                    xValue: {{ 1.1*sin(radians(timeseries['sensoraz'][0])) }},
+                    yValue: {{ 1.1*cos(radians(timeseries['sensoraz'][0])) }}},
+                  compass: {type: 'label', content: ['N'], font: {size: 12},
+                    xValue: 0, yValue: 1.1},
+                  circle: {type: 'ellipse', xMin: -1, xMax: 1, yMin: -1, yMax: 1, backgroundColor: 'rgba(0,0,0,0)'}
+                }
+              }
+            }
+          }
+        });
+      </script>
+{% endif %}
+
+
+{% endblock %}

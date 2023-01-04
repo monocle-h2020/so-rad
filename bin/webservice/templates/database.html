@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Latest database entries</h2>
+   <table style="width:90%">
+    <tr>
+     {% for key in dbtable[0].keys() %}
+     <th> {{ key }} </th>
+     {% endfor %}
+    </tr>
+
+   {% for row in dbtable %}
+     <tr>
+      {% for val in row.values() %}
+       <td> {{ val }} </td>
+      {% endfor %}
+     </tr>
+  {% endfor %}
+   </table>
+  <br>
+
+{% endblock %}

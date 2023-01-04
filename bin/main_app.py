@@ -28,13 +28,8 @@ from functions.export_functions import run_export, update_status_parse_server, i
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-# only import RPi libraries if running on a Pi (other environments can be used for unit testing)
-try:
-    import RPi.GPIO as GPIO
-except Exception as msg:
-    print("Could not import GPIO. Functionality may be limited to system tests.\n{0}".format(msg))  #  note no log available yet
 
-__version__ = 20210723.1
+__version__ = 20230401.1
 
 
 def parse_args():
@@ -46,8 +41,9 @@ def parse_args():
     parser.add_argument('-l', '--local_config_file', required=True,
                         help="system-specific config overrides providing program settings",
                         default=u"config-local.ini")
-    parser.add_argument("--verbose", "-v", type=int, choices=[0, 1, 2, 3, 4],
-                         help="set verbosity on output", default=3)
+    parser.add_argument("--verbose", "-v", action='store_true', help="verbose output")
+    parser.add_argument("--terse", "-t", action='store_true', help="terse output")
+
     args = parser.parse_args()
 
     if not os.path.exists(args.config_file):
@@ -93,10 +89,8 @@ def init_logger(conf_log_dict):
 def init_all(conf):
     """Initialise all components"""
 
-    log = logging.getLogger()
-
+    log = logging.getLogger('init')
     db = initialisation.db_init(conf['DATABASE'])
-    initialisation.init_gpio(conf, state=0)  # set all used pins to LOW
 
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
@@ -163,9 +157,11 @@ def init_all(conf):
             radiometry_manager = Rad_manager(rad)
             time.sleep(0.1)
             rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
+            if len(radiometry_manager.sams) < rad['n_sensors']:
+                raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -173,9 +169,9 @@ def init_all(conf):
     return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=0):
     """stop all processes in case of an exception"""
-    log = logging.getLogger()
+    log = logging.getLogger('stop')
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
@@ -204,8 +200,8 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht,
         rht['manager'].stop()
 
     # Turn all GPIO pins off
-    GPIO.output(gpios, GPIO.LOW)
-    GPIO.cleanup()
+    initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
+    rad['gpio_interface'].stop()  # release gpio control
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
@@ -221,9 +217,9 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht,
     sys.exit(0)
 
 
-def update_gps_values(gps, values, tpr=None, rht=None, motor=None):
+def update_system_values(gps, values, tpr=None, rht=None, motor=None):
     """update system value dict to the latest available in the sensor managers"""
-    log = logging.getLogger()
+    log = logging.getLogger('main')
     values['lat0'] = gps['manager'].lat
     values['lon0'] = gps['manager'].lon
     values['alt0'] = gps['manager'].alt
@@ -253,7 +249,7 @@ def update_gps_values(gps, values, tpr=None, rht=None, motor=None):
 
 
 def format_log_message(counter, ready, values):
-    """construct a log message based on several system checks"""
+    """Format log messages"""
     checks = {True: "1", False: "0"}    # values to show for True/False (e.g. 1/0 or T/F)
     message = "{0} | ".format(counter)
     # handle string formatting where value may be None
@@ -267,13 +263,15 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    if values['motor_angles']['target_motor_pos_rel_az_deg'] is None:
+    if not ready['heading']:
         strdict['tar_view_az'] = "n/a"
     else:
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
 
-    message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
-    message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+    try:
+        message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
+        message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+    except: pass
 
     return message
 
@@ -291,13 +289,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     : rad                   - radiometry configuration
     : battery               - battery management configuration
     : motor                 - motor configuration
-    : pgios                 - gpio pins in use
+    : gpios                 - gpio pins in use
 
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
     """
 
-    log = logging.getLogger()
+    log = logging.getLogger('main')
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
@@ -331,7 +329,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             message = format_log_message(counter, ready, values)
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
-            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, gpios, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, rad, conf, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
@@ -344,7 +342,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         # valid positioning data is required to do anything else
-        values = update_gps_values(gps, values, tpr, rht, motor)
+        values = update_system_values(gps, values, tpr, rht, motor)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
@@ -362,14 +360,14 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 log.warning(message)
                 return trigger_id
         else:
-            # if no motor is used we'll assume the sensors are pointing in the motor home position. 
+            # if no motor is used we'll assume the sensors are pointing in the motor home position.
             values['motor_pos'] = motor['home_pos']
             try:
                 values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
             except:
                 pass
 
-        # If bearing is not fixed, fetch the calculated mean bearing using data from two GPS sensors
+        # If bearing is not fixed, fetch the calculated mean bearing using data from GPS+heading sensors
         if not bearing_fixed:
             if ready['heading']:
                 values['ship_bearing_mean'] = (gps['manager'].heading - gps['gps_heading_correction']) % 360.0
@@ -377,7 +375,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 values['ship_bearing_mean'] = None
 
         # collect latest GPS data
-        values = update_gps_values(gps, values)
+        values = update_system_values(gps, values)
 
         # Fetch sun variables and determine optimal motor pointing angles
         values['solar_az'], values['solar_el'],\
@@ -386,22 +384,33 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                   values['ship_bearing_mean'], motor,
                                                                   values['motor_pos'])
 
-        log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
+        try:
+            log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
                  .format(values['solar_az'], values['solar_el'],
                          values['motor_angles']['view_comp_ccw'], values['motor_angles']['view_comp_cw'],
                          values['motor_angles']['ach_mot_ccw'], values['motor_angles']['ach_mot_cw'],
                          values['motor_angles']['target_motor_pos_deg'],
                          values['motor_angles']['target_motor_pos_rel_az_deg'], counter))
+        except TypeError:
+            # at least one value is None
+            pass
 
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
-        # If the sun is in a suitable position but the motor is not at the required position, move the motor, unless speed criterion is not met
-        # the motor will be moved even if the radiometers are not yet ready to keep them pointed away from the sun
-        if (ready['sun'] and (abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos']) > motor['step_thresh']))\
-                                                                                                                  and (ready['speed'])\
-                                                                                                                  and (ready['heading'])\
-                                                                                                                  and (motor['used']):
+        # Move motor?
+        move_motor = False
+        # full set of criteria
+        if (ready['sun']) and (ready['speed']) and (ready['heading']) and (motor['used'])\
+            and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
+                move_motor = True
+
+        # relaxed criteria - move the motor more often as long as the heading etc are valid (set 'adjust_mode' in config file)
+        elif (ready['heading']) and (motor['used']) and (motor['adjust_mode']=='always')\
+            and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
+                move_motor = True
+
+        if move_motor:
             log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
@@ -412,16 +421,16 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
                 if moving is None:
                     moving = True
-                log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
+                log.debug("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
                 if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
-                time.sleep(2)
+                time.sleep(0.5)
 
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # collect latest GPS and TPR data now that a measurement may be triggered
-    values = update_gps_values(gps, values, tpr, rht, motor)
+    values = update_system_values(gps, values, tpr, rht, motor)
     # update viewing azimuth details
     values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], values['alt0'], values['dt'],
                                                                               values['ship_bearing_mean'], values['motor_deg'], motor)
@@ -433,7 +442,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # Collect and combine radiometry data
         spec_data = []
-        trig_id, specs, sids, itimes = radiometry_manager.sample_all(trigger_id)
+        trig_id, specs, sids, itimes, pre_incs, post_incs, temp_incs = radiometry_manager.sample_all(trigger_id['all_sensors'])
+
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
@@ -456,7 +466,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # trigger Ed
         spec_data = []
-        trig_id, specs, sids, itimes = radiometry_manager.sample_ed(trigger_id)
+        trig_id, specs, sids, itimes, pre_incs, post_incs, temp_incs = radiometry_manager.sample_ed(trigger_id['ed_sensor'])
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
@@ -494,6 +504,8 @@ def run():
     conf = cf_func.read_config(args.config_file)
     # start logging here
     log = init_logger(conf['LOGGING'])
+
+    log = logging.getLogger('main')
     log.info('\n===Started logging===\n')
 
     conf = cf_func.update_config(conf, args.local_config_file)
@@ -503,7 +515,7 @@ def run():
         db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
+        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -512,25 +524,29 @@ def run():
 
     trigger_id = {'all_sensors': datetime.datetime.now(),
                   'ed_sensor': datetime.datetime.now(),
-                  'gps_location': datetime.datetime.now()}  # stores when data were last recorded
+                  'gps_location': datetime.datetime.now()}  # stores when data were last recorded, initialise here
 
     # Repeat indefinitely until program is closed
     counter = 0
     remote_update_timer = time.perf_counter() - 290.0  # set timer to 10 seconds before next trigger
-    export_result = True
+    export_result = True  # tracks whether exporting has been succesful
 
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
         counter += 1
+        last_check_cycle_start = time.perf_counter()
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
+            log.info(f"Check cycle completed in {time.perf_counter() - last_check_cycle_start} s")
 
             use_export = conf['EXPORT'].getboolean('use_export')
             if not use_export:
-                log.info("{counter} | No data export configured")
-                time.sleep(main_check_cycle_sec)
+                log.debug("f{counter} | No data export configured")
+                time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
+                if time_to_sleep > 0:
+                    time.sleep(time_to_sleep)
                 continue
 
             # remote data store(s) operations go here, ideally within the time window where the system is idling
@@ -573,16 +589,17 @@ def run():
             else:
                 log.debug(f"{counter} | No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
 
-            time_to_sleep = main_check_cycle_sec + t0 - time.perf_counter()
+            time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
+
             if time_to_sleep > 0:
                 time.sleep(time_to_sleep)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, gpios, tpr, rht)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)
             raise
 
 if __name__ == '__main__':

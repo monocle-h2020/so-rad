@@ -25,7 +25,7 @@ def read_config(config_file, local_config_file=None):
     return config
 
 
-def update_config(config, local_config_file=None):
+def update_config(config, local_config_file=None, verbosity=True):
     """replace any default config values with local overrides"""
     log = logging.getLogger()
     if local_config_file is None:
@@ -36,13 +36,14 @@ def update_config(config, local_config_file=None):
     for section in local.sections():
         if len(local[section].items()) > 0:
             for key, val in local[section].items():
-                if section in ['EXPORT']:
+                if section in ['EXPORT', 'FLASK']:
                     # keep these values out of the log files
-                    log.info("Local config override: {0}-{1} {2}>{3}"\
+                    log.debug("Local config override: {0}-{1} {2}>{3}"\
                              .format(section, key, config[section][key], '(hidden)'))
                 else:
-                    log.info("Local config override: {0}-{1} {2}>{3}"\
-                             .format(section, key, config[section][key], val))
+                    if (val != config[section][key]) and (verbosity):
+                        log.info("Local config override: {0}-{1} {2}>{3}"\
+                                 .format(section, key, config[section][key], val))
                 config[section][key] = val
     return config
 

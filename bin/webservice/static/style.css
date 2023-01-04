@@ -16,3 +16,9 @@ h2              { font-size: 1.2em; }
 .flash          { background: #cee5F5; padding: 0.5em;
                   border: 1px solid #aacbe2; }
 .error          { background: #f0d6d6; padding: 0.5em; }
+
+table           {text-align: left; position: relative;
+                 border-collapse: collapse; background-color: #ffffff;}
+/* Spacing */
+td, th          {border: 1px solid #999; padding: 5px;}
+th              {background: #aaaaaa; color: white; border-radius: 0; position: sticky; top: 0; padding: 5px;}

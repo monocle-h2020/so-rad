@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Implements serial communication with TriOS sensors in Python\n
+Implements serial communication with TriOS sensors in Python
 
-Copyright (C) 2015  Stefan Simis, Plymouth Marine Laboratory\n
+Copyright (C) 2015  Stefan Simis, Plymouth Marine Laboratory
 Email stsi[_at_]pml .ac. uk
 
     This program is free software: you can redistribute it and/or modify
@@ -20,10 +20,7 @@ Email stsi[_at_]pml .ac. uk
 
 Note: PyTrios uses the *serial* module by Chris Liechti
 
-Tested on Python 2.7.3\n
-Last update: see __version__\n
-
-*For example use please see the enclosed PyTrios_Examples.py script.*
+Last update: see __version__
 """
 
 import sys
@@ -31,10 +28,10 @@ import time
 import struct
 import numpy as np
 import threading
-from .TClasses import TProtocolError, TPackMeasKeyError,\
+from PyTrios.TClasses import TProtocolError, TPackMeasKeyError,\
     TPacket, TSerial, TCommandSend
 
-__version__ = "2015.12.28"
+__version__ = "20230104"
 __author__ = "Stefan Simis"
 __license__ = "GPL v3"
 

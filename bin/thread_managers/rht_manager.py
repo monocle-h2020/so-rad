@@ -67,7 +67,7 @@ class Ada_dht22(object):
             self.thread.start()
             log.info("Started RHT manager")
         else:
-            log.warn("Could not start RHT manager")
+            log.warning("Could not start RHT manager")
 
     def stop(self):
         """

@@ -9,25 +9,50 @@ import os
 import time
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-from main_app import parse_args, read_config
-import RPi.GPIO as GPIO
+from main_app import parse_args
+from functions.config_functions import read_config, update_config
+from thread_managers import gpio_manager
+import logging
 
 
-def run():
-    args = parse_args()
-    conf = read_config(args.config_file)
+def run(conf):
+    rad_config = conf['RADIOMETERS']
+    rad = {}
+    if rad_config.getboolean('use_gpio_control'):
+        pin = rad_config.getint('gpio1')
+        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
+        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
+        if rad['gpio_protocol'] == 'rpi':
+            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
+        elif rad['gpio_protocol'] == 'gpiozero':
+            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
-    if conf['RADIOMETERS'].getboolean('use_gpio_control'):
-        pin = conf['RADIOMETERS'].getint('gpio1')
+        log.info(rad['gpio_interface'])
+        log.info(f"Pin {pin} status: {rad['gpio_interface'].status(pin)}")
+        log.info(f"Switching pin {pin}")
+
+        rad['gpio_interface'].off(pin)
+        log.info(f"Pin {pin} status: {rad['gpio_interface'].status(pin)}")
+        time.sleep(0.5)
+
     else:
-       print("GPIO control is not set")
+        print("GPIO control is not set")
 
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(pin, GPIO.OUT)
-    GPIO.output(pin, GPIO.LOW)
-    time.sleep(1)
-    GPIO.cleanup()
-    print("done")
 
 if __name__ == '__main__':
-    run()
+    args = parse_args()
+    conf = read_config(args.config_file)
+    # start logging to stdout
+    log = logging.getLogger()
+    handler = logging.StreamHandler(sys.stdout)
+    log.setLevel(logging.INFO)
+    handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s| %(levelname)s | %(name)s | %(message)s')
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+
+    # update config with local overrides
+    conf = update_config(conf, args.local_config_file)
+
+    run(conf)
