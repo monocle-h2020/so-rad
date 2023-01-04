@@ -62,8 +62,8 @@ class GPSSerialReader(threading.Thread):
         while not self.parent.stop_gps:
             counter +=1
             if protocol == "RTKUBX":
-                log.warning("The homebrew RTKUBX protocol will be deprecated. Please test functionality on this system with PYUPBX2")
-                pass
+                if counter<=1:
+                    log.warning("The homebrew RTKUBX protocol will be deprecated. Please test functionality on this system with PYUPBX2")
             elif protocol == "NMEA0183":
                 old_gps_time = self.parent.datetime
             elif protocol == "PYUBX2":
@@ -149,10 +149,12 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
 
     while not all([rpn_read, pvt_read]):
         (raw_data, data) = ubr.read()
-        if data is None:
+        try:
+            identity = data.identity
+        except AttributeError:
             continue
 
-        elif data.identity == 'NAV-RELPOSNED':
+        if data.identity == 'NAV-RELPOSNED':
             log.debug("RPN message")
             rpn_read = True
             dataDictionary['version'] =      data.version
@@ -1121,7 +1123,7 @@ class RTKUBX(object):
         self.relPosLength = None
 
         # Heading
-        self.relPosHeading = None 
+        self.relPosHeading = None
         self.reserved2_1 = None
         self.reserved2_2 = None
         self.reserved2_3 = None
@@ -1404,7 +1406,7 @@ class NMEA0183(object):
 
         The serial port must be an instance of serial.Serial, and the open() method must have been called.
 
-      :param serial_port: Serial object
+        :param serial_port: Serial object
         :type serial_port: serial.Serial
         """
         if not serial_port in self.serial_ports:

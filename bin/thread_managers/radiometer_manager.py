@@ -18,7 +18,6 @@ import time
 import datetime
 import logging
 import threading
-import pytrios_g2.pytrios2 as pt2
 
 log = logging.getLogger('rad')
 log.setLevel('INFO')
@@ -39,7 +38,8 @@ class TriosG2Manager(object):
     """
     def __init__(self, rad):
         # import specific library for this sensor type
-        import pytrios_g2 as pt2
+        global pt2
+        import pytrios_g2.pytrios2 as pt2
         self.sams = []
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']

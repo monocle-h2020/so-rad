@@ -20,8 +20,5 @@ Email stsi[_at_]pml .ac. uk
 
 Note: PyTrios uses the *serial* module by Chris Liechti
 
-Tested on Python 2.7.3\n
 Last update: see __version__\n
-
-*For example use please see the enclosed PyTrios_Examples.py script.*
 """

@@ -24,7 +24,7 @@ from thread_managers import gps_manager
 from thread_managers import rht_manager
 from thread_managers import gpio_manager
 from functions import db_functions
-log = logging.getLogger()   # report to root logger
+log = logging.getLogger('init')   # report to root logger
 
 
 def db_init(db_config):
@@ -102,6 +102,8 @@ def motor_init(motor_config, ports):
     motor['step_thresh_time'] = motor_config.getint('step_thresh_time')
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
+    motor['adjust_mode'] = motor_config.get('adjust_mode')
+    assert motor['adjust_mode'] in ['sampling', 'always']
 
     if not motor['used']:
         return motor

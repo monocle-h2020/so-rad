@@ -29,7 +29,7 @@ import functions.config_functions as cf_func
 from numpy import nan, max
 
 
-__version__ = 20220623.1
+__version__ = 20230401.1
 
 
 def parse_args():
@@ -89,7 +89,7 @@ def init_logger(conf_log_dict):
 def init_all(conf):
     """Initialise all components"""
 
-    log = logging.getLogger()
+    log = logging.getLogger('init')
     db = initialisation.db_init(conf['DATABASE'])
 
     # Get all comports and collect the initialisation dicts
@@ -161,7 +161,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -169,9 +169,9 @@ def init_all(conf):
     return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=0):
     """stop all processes in case of an exception"""
-    log = logging.getLogger()
+    log = logging.getLogger('stop')
 
     # Stop the radiometry manager
     log.info("Stopping radiometry manager threads")
@@ -201,7 +201,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, i
 
     # Turn all GPIO pins off
     initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
-    rad['gpio_manager'].stop()  # release gpio control
+    rad['gpio_interface'].stop()  # release gpio control
 
     # Close any lingering threads
     while len(threading.enumerate()) > 1:
@@ -219,7 +219,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, i
 
 def update_system_values(gps, values, tpr=None, rht=None, motor=None):
     """update system value dict to the latest available in the sensor managers"""
-    log = logging.getLogger()
+    log = logging.getLogger('main')
     values['lat0'] = gps['manager'].lat
     values['lon0'] = gps['manager'].lon
     values['alt0'] = gps['manager'].alt
@@ -329,7 +329,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             message = format_log_message(counter, ready, values)
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
-            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, rad, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db_dict, radiometry_manager, gps_managers, battery, bat_manager, rad, conf, idle_time=1800)  # calls sys.exit after pausing for idle_time to prevent immediate restart
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
@@ -360,7 +360,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 log.warning(message)
                 return trigger_id
         else:
-            # if no motor is used we'll assume the sensors are pointing in the motor home position. 
+            # if no motor is used we'll assume the sensors are pointing in the motor home position.
             values['motor_pos'] = motor['home_pos']
             try:
                 values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
@@ -497,6 +497,8 @@ def run():
     conf = cf_func.read_config(args.config_file)
     # start logging here
     log = init_logger(conf['LOGGING'])
+
+    log = logging.getLogger('main')
     log.info('\n===Started logging===\n')
 
     conf = cf_func.update_config(conf, args.local_config_file)
@@ -506,7 +508,7 @@ def run():
         db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht)
+        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -587,10 +589,10 @@ def run():
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)
             raise
 
 if __name__ == '__main__':
