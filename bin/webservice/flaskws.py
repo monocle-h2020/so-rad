@@ -419,7 +419,7 @@ def status():
                   'ship_heading':  [lr['ship_heading'] for lr in logvalues if 'ship_heading' in lr.keys()],
                   'relviewaz':     [lr['relviewaz'] for lr in logvalues if 'relviewaz' in lr.keys()],
                   'cw_limit':      [lr['ship_heading'] + common['home_pos'] + common['cw_limit_deg'] for lr in logvalues if 'ship_heading' in lr.keys()],
-                  'ccw_limit':     [lr['ship_heading'] + common['home_pos'] - common['cw_limit_deg'] for lr in logvalues if 'ship_heading' in lr.keys()],
+                  'ccw_limit':     [lr['ship_heading'] + common['home_pos'] - common['ccw_limit_deg'] for lr in logvalues if 'ship_heading' in lr.keys()],
                   'sensoraz':      [lr['sun_azimuth'] + lr['relviewaz'] for lr in logvalues if ('sun_azimuth' in lr.keys()) and ('relviewaz' in lr.keys())]
                   }
             for key, val in timeseries.items():
