@@ -405,7 +405,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
                 move_motor = True
 
-        # relaxed criteria - move the motor more often as long as the heading etc are valid
+        # relaxed criteria - move the motor more often as long as the heading etc are valid (set 'adjust_mode' in config file)
         elif (ready['heading']) and (motor['used']) and (motor['adjust_mode']=='always')\
             and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
                 move_motor = True
@@ -421,7 +421,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
                 if moving is None:
                     moving = True
-                log.info("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
+                log.debug("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
                 if time.time()-t0 > 5:
                     log.warning("Motor movement timed out (this is allowed)")
                 time.sleep(0.5)
