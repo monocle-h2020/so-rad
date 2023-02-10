@@ -311,12 +311,12 @@ class TriosG2Ramses(object):
 
         sleeptime = None
         t0 = time.perf_counter()
-        timeout = 10
+        timeout = 15
         log.info(f"{self.mod['port']}: checking sensor sleep state")
         while (sleeptime is None) and (time.perf_counter() - t0 < timeout):
             sleeptime = pt2.read_one_register(self.mod, 'deep_sleep_timeout')
             if sleeptime is None:
-                log.warning(f"{self.mod['port']}: failed to read sensor sleep state. Retry for {timeout - (time.perf_counter() - t0)} s")
+                log.warning(f"{self.mod['port']}: failed to read sensor sleep state. Retry for {timeout - (time.perf_counter() - t0):2.1f} s")
                 time.sleep(1.0)
             elif sleeptime > 0:
                 log.info(f"{self.mod['port']}: deep sleep status/time: {sleeptime}")

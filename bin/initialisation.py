@@ -337,7 +337,7 @@ def rad_init(rad_config, ports):
 
         rad['gpio1'] = rad_config.getint('gpio1')
         rad['gpio_interface'].on(rad['gpio1'])
-        time.sleep(1) # Wait to allow sensors to boot
+        time.sleep(2) # Wait to allow sensors to boot
 
     # Return the radiometry dict and relevant manager class
     if rad['rad_interface'] == 'pytrios':
