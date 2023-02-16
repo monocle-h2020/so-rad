@@ -400,8 +400,8 @@ def status():
                     logrow_parsed = {}  # force new instance
                     logrow_parsed = log2dict(row, logrow_parsed)
                     logvalues.append(logrow_parsed)
-            print(f"{len(logvalues)} system orientation log lines parsed")
-            print(logvalues)
+            #print(f"{len(logvalues)} system orientation log lines parsed")
+            #print(logvalues)
 
         else:
             print("Log file not found.")
@@ -411,8 +411,8 @@ def status():
         if len(logvalues) > 0:
             labels = [lrow['timestr'] for lrow in logvalues]
             print(labels)
-            for lrow in logvalues:
-                print(lrow['timestr'])
+            #for lrow in logvalues:
+            #    print(lrow['timestr'])
             timeseries = {
                   'sun_azimuth':   [lr['sun_azimuth'] for lr in logvalues if 'sun_azimuth' in lr.keys()],
                   'motor_heading': [lr['motor_heading'] for lr in logvalues if 'motor_heading' in lr.keys()],
