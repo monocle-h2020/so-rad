@@ -17,7 +17,6 @@ from main_app import parse_args
 import functions.motor_controller_functions as motor_func
 import functions.config_functions as cf
 
-
 if __name__ == '__main__':
     args = parse_args()
     conf = cf.read_config(args.config_file)
@@ -35,12 +34,20 @@ if __name__ == '__main__':
     else:
         print("Motor position: {0}".format(motor_deg_pos))
 
+    # get default motor movement instructions
+    motor_commands_dict = motor_func.commands
+    motor_commands_dict['speed_command'].value = hex(2000)[2:].zfill(8)  # default 2000
+    motor_commands_dict['accel_command'].value = hex(1500)[2:].zfill(8)  # default 1500
+    motor_commands_dict['decel_command'].value = hex(1500)[2:].zfill(8)  # default 1500
+
     if motor_deg_pos != motor['home_pos']:
         t0 = time.perf_counter()
         moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
         motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
+
         print("Homing motor.. {0} --> {1}".format(motor_deg_pos, motor['home_pos']))
-        motor_func.return_home(motor['serial'])
+        motor_func.rotate_motor(motor_commands_dict, motor['home_pos'], motor['serial'])
+
         moving = True
         while moving and (time.perf_counter()-t0<5):
             moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
@@ -51,7 +58,7 @@ if __name__ == '__main__':
             time.sleep(1)
         print("..done")
     else:
-        print("Motor in home position")
+        print("Motor in home position (not corrected for offset)")
         moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
         motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
 
