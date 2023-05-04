@@ -155,13 +155,13 @@ def init_all(conf):
         log.info("Starting radiometry manager")
         try:
             radiometry_manager = Rad_manager(rad)
-            time.sleep(0.1)
+            time.sleep(1.0)
             rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
             if len(radiometry_manager.sams) < rad['n_sensors']:
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=0)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=15)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -203,17 +203,29 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
     rad['gpio_interface'].stop()  # release gpio control
 
-    # Close any lingering threads
-    while len(threading.enumerate()) > 1:
+    # Wait for any lingering threads.
+    t0 = time.perf_counter()
+    while (threading.active_count() > 1) and ((time.perf_counter()-t0) < 10):
         for t in threading.enumerate()[1:]:
             log.info(t.ident)
-            t.join()
-        log.info("active threads = {}".format(threading.active_count()))
-        time.sleep(0.5)
+        #    t.join()
+        log.info(f"Waiting on {threading.active_count()} active threads..")
+        time.sleep(1.0)
+
+    # Kill any lingering threads.
+    t0 = time.perf_counter()
+    if threading.active_count() > 1:
+        for t in threading.enumerate()[1:]:
+            log.info(t.ident)
+            t.exit()
+
+    log.info(f"There are {threading.active_count()} active threads left.")
+    if threading.active_count() > 1:
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
     time.sleep(idle_time)
+    log.info("Exiting")
     sys.exit(0)
 
 
@@ -263,7 +275,7 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
 
-    if not ready['heading']:
+    if (not ready['heading']) or (values['motor_angles']['target_motor_pos_rel_az_deg'] is None):
         strdict['tar_view_az'] = "n/a"
     else:
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])

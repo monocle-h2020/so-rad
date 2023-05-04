@@ -76,8 +76,8 @@ class Ada_dht22(object):
         log.info("Stopping RHT manager")
         self.stop_monitor = True
         time.sleep(1*self.sleep_interval)
-        log.info(self.thread)
-        self.thread.join(2*self.sleep_interval)
+        if self.thread is not None:
+            self.thread.join(2*self.sleep_interval)
         log.info("RHT manager running = {0}".format(self.thread.is_alive()))
         self.started = False
 
