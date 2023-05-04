@@ -44,7 +44,8 @@ class TriosG2Manager(object):
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']
         self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
-        self.instruments = []  # store TriosG2Ramses instances
+        self.instruments = []  # store TriosG2Ramses instances which were succesfully started
+        self.instruments_defined = [] # store all instances on which connections may be live
         self.connect_sensors()
 
         # track reboot cycles to prevent infinite rebooting of sensors if something unexpected happens (e.g a permanent sensor failure)
@@ -66,33 +67,34 @@ class TriosG2Manager(object):
              log.warning(f"There are already {len(self.instruments)} Ramses G2 instruments connected. Operation aborted.")
              return
 
-        instruments_defined = []
+        self.instruments_defined = []
         for port in self.ports:
-            instruments_defined.append(TriosG2Ramses(port))
+            self.instruments_defined.append(TriosG2Ramses(port))
 
-        for instrument in instruments_defined:
+        for instrument in self.instruments_defined:
             instrument.start()
             instrument.connect()
             instrument.get_identity()
 
         t0 = time.perf_counter()
-        while ((time.perf_counter() - t0) < timeout) and (len(instruments_defined) > 0):
-            for instrument in instruments_defined:
+        while ((time.perf_counter() - t0) < timeout) and (len(self.instruments_defined) > 0):
+            for instrument in self.instruments_defined:
                 if (not instrument.busy) and (instrument not in self.instruments):
                     log.info(f"{instrument.mod['port']}: sensor {instrument.sam} connected.")
                     self.instruments.append(instrument)
                     self.sams.append(instrument.sam)
-                    instruments_defined.remove(instrument)
+                    #instruments_defined.remove(instrument)
             time.sleep(0.1)
 
-        for instrument in instruments_defined:
-            log.warning(f"{instrument.mod['port']}: sensor connection timed out.")
+        for instrument in self.instruments_defined:
+            if instrument not in self.instruments:
+                log.warning(f"{instrument.mod['port']}: sensor connection timed out.")
 
         self.ready = True
         self.busy = False
 
     def stop(self):
-        for instrument in self.instruments:
+        for instrument in self.instruments_defined:
             instrument.stop()
 
     def power_cycle_sensors(self):
@@ -389,11 +391,12 @@ class TriosG2Ramses(object):
         Stops the sampling thread
         """
         self.busy = True
-        log.info(f"Stopping RAMSES G2 thread on port {self.mod['port']}")
+        log.info(f"Stopping RAMSES G2 thread {self.thread.ident} on port {self.mod['port']}")
         self.stop_monitor = True
         time.sleep(1 * self.sleep_interval)
-        log.info(self.thread)
-        self.thread.join(2 * self.sleep_interval)
+        if self.thread is not None:
+            log.info(self.thread)
+            self.thread.join(2 * self.sleep_interval)
         log.info(f"RAMSES G2 thread on port {self.mod['port']} running: {self.thread.is_alive()}")
         self.started = False
         self.busy = False

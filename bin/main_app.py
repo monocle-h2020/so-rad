@@ -161,7 +161,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=15)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=15)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -174,8 +174,8 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     log = logging.getLogger('stop')
 
     # Stop the radiometry manager
-    log.info("Stopping radiometry manager threads")
     if radiometry_manager is not None:
+        log.info("Stopping radiometry manager threads")
         radiometry_manager.stop()
 
     # Stop the GPS manager
@@ -204,23 +204,22 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     rad['gpio_interface'].stop()  # release gpio control
 
     # Wait for any lingering threads.
+    log.info(f"Waiting on {threading.active_count()} active threads..")
+    for t in threading.enumerate()[1:]:
+        log.info(t.ident)
     t0 = time.perf_counter()
     while (threading.active_count() > 1) and ((time.perf_counter()-t0) < 10):
-        for t in threading.enumerate()[1:]:
-            log.info(t.ident)
-        #    t.join()
         log.info(f"Waiting on {threading.active_count()} active threads..")
         time.sleep(1.0)
 
-    # Kill any lingering threads.
+    # Join any lingering threads.
     t0 = time.perf_counter()
     if threading.active_count() > 1:
         for t in threading.enumerate()[1:]:
             log.info(t.ident)
-            t.exit()
+            t.join()
 
     log.info(f"There are {threading.active_count()} active threads left.")
-    if threading.active_count() > 1:
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
