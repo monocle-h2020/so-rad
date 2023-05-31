@@ -376,12 +376,18 @@ def control():
     elif selection == 'reboot':
         status = os.system('/usr/bin/sudo shutdown -r 1 &')
         print(status)
-        flash(f"Reboot scheduled at {datetime.datetime.utcnow().isoformat()}")
+        flash(f"Reboot scheduled one minute from {datetime.datetime.utcnow().isoformat()}")
         return render_template('control.html', common=common)
 
     elif selection == 'cancelreboot':
         status = os.system('/usr/bin/sudo shutdown -c')
         print(status)
+        return render_template('control.html', common=common)
+
+    elif selection == 'shutdown':
+        status = os.system('/usr/bin/sudo shutdown -h 1 &')
+        print(status)
+        flash(f"Shutdown scheduled 1 minute from {datetime.datetime.utcnow().isoformat()}")
         return render_template('control.html', common=common)
 
     else:
