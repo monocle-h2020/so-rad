@@ -25,7 +25,7 @@ from initialisation import db_init
 import functions.db_functions as db_func
 import functions.config_functions as cf_func
 import functions.export_functions as exp
-
+from functions.check_functions import check_remote_data_store
 
 def parse_args():
     """parse command line arguments"""
@@ -95,8 +95,10 @@ if __name__ == '__main__':
 
     n_total, n_not_inserted, all_not_inserted = exp.identify_new_local_records(db, limit=0)
     log.info(f"{n_not_inserted} records pending upload")
-
     conn.close()
+
+    can_connect = check_remote_data_store(conf)[0]
+    log.info(f"Connection to remote server: {can_connect}")
 
     if args.force_upload > 0:
         # user specified limit
