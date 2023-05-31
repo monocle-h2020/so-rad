@@ -22,7 +22,6 @@ def run_test(conf, terse=False):
     """Show GPS output stream"""
     # collect messages to return to web service
     test_duration = 60  # seconds
-    messages = []
 
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
@@ -81,7 +80,7 @@ def run_test(conf, terse=False):
         gps['manager'].stop()
         time.sleep(0.5)
 
-    return messages
+    return
 
 
 if __name__ == '__main__':
@@ -100,4 +99,4 @@ if __name__ == '__main__':
     # update config with local overrides
     conf = update_config(conf, args.local_config_file, verbosity=not args.terse)
 
-    messages = run_test(conf, args.terse)
+    run_test(conf, args.terse)

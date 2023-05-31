@@ -37,7 +37,7 @@ def parse_args():
                         help="system-specific config overrides providing program settings",
                         default=u"../config-local.ini")
     parser.add_argument('-f', '--force_upload', required=False, type=int, default=0,
-                        help="force upload of set number of records to remote server (defaults to 0)")
+                        help="force upload of set number of records to remote server (defaults to all)")
     parser.add_argument('-s', '--source', required=False, type=str, default=None,
                         help="path to a specific database file rather than the one in current use")
     parser.add_argument('-d', '--debug', required=False, action='store_true',
@@ -46,6 +46,8 @@ def parse_args():
                         help="Update remote status record")
     parser.add_argument('-v', '--version', required=False, type=float, default=None,
                         help="Specify a specific software version to use.")
+    parser.add_argument('-t', '--terse', required=False, action='store_true',
+                        help="Suppress verbose outputs")
 
 
     args = parser.parse_args()
@@ -78,24 +80,34 @@ if __name__ == '__main__':
     log.addHandler(handler)
 
     # update config with local overrides
-    conf = cf_func.update_config(conf, args.local_config_file)
+    conf = cf_func.update_config(conf, args.local_config_file, verbosity=not args.terse)
 
     if args.source is not None:
         assert os.path.exists(args.source)
         conf['DATABASE']['database_path'] = args.source
-        log.info(f"Using database file at {args.source}")
+        if not args.terse:
+            log.info(f"Using database file at {args.source}")
 
     db = db_init(conf['DATABASE'])
 
-
     conn, cur = db_func.connect_db(db)
     db_func.database_info(conn, cur)
+
+    n_total, n_not_inserted, all_not_inserted = exp.identify_new_local_records(db, limit=0)
+    log.info(f"{n_not_inserted} records pending upload")
+
     conn.close()
 
     if args.force_upload > 0:
+        # user specified limit
         limit = args.force_upload
         test_run = False
+    elif args.force_upload == -1:
+        # all remaining records
+        limit = n_not_inserted
+        test_run = False
     else:
+        # test but do not upload
         limit = 1
         test_run = True
 

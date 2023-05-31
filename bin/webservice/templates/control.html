@@ -8,6 +8,10 @@
    <form action="/control" method = "POST">
     <!-- value is the button label and dict value, name is the key in the returned dict-->
     <p>
+    Choose a command below. This will be executed immediately and the webservice will not reload until the process has finished.<br.
+    Long execution times may generate a web page timeout notification, while the command continues to run.   
+    </p>
+    <p>
       <input type = "submit" value = "Restart So-Rad service" name="restart"/>  
       <input type = "submit" value = "Stop So-Rad service" name="stop"/>
       <input type = "submit" value = "Check So-Rad service status" name="check"/>
@@ -21,7 +25,8 @@
        <input type = "submit" value = "Test GPS" name="gps_test"/>
     </p>
     <p>
-       <input type = "submit" value = "Run test 2" name="test2"/>
+       <input type = "submit" value = "Data export status" name="export_test"/>
+       <input type = "submit" value = "Upload data now" name="export_test_force"/>
     </p>
     <p>
        <input type = "submit" value = "Reboot" name="reboot"/>
@@ -32,9 +37,12 @@
   </div>
 
   <div>
+    <p>
+    Results:
+    </p>
     {% for message in messages %}
       {{ message }}<br>
-   {% endfor %}
+    {% endfor %}
   </div>
 
 {% endblock %}
