@@ -134,10 +134,20 @@ def init_all(conf):
     if motor['used']:
         # Get the current motor pos and if not at HOME move it to HOME
         motor_pos = motor_func.get_motor_pos(motor['serial'])
-        if motor_pos != motor['home_pos']:
+        motor_ready, motor_alarm = check_motor(motor)  # check for motor alarms
+        try:
+            if motor_pos is None:
+                log.warning(f"Motor position not read. Alarm status = {motor_alarm}")
+                motor_deg = None
+            motor_deg = motor_pos / motor['steps_per_degree']
+        except:
+            pass
+
+        if (motor_ready) and (motor_deg is not None) and (motor_deg + motor['home_pos'] != 0):
+            target_pos = int(-1.0 * motor['home_pos'] * motor['steps_per_degree'])
             t0 = time.time()
-            log.info("Homing motor.. {0} --> {1}".format(motor_pos, motor['home_pos']))
-            motor_func.return_home(motor['serial'])  # FIXME replace with rotate function to home pos as set in config
+            log.info(f"Homing motor.. {motor_pos} --> {target_pos}. Alarm status = {motor_alarm}")
+            motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
             moving = True
             while moving and (time.time()-t0 < 5):
                 moving = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)[0]
@@ -146,8 +156,10 @@ def init_all(conf):
                 log.info("..homing motor..")
                 time.sleep(1)
             log.info("..done")
+        elif not motor_ready:
+            log.info(f"Motor not ready. Alarm status = {motor_alarm}")
         else:
-            log.info("Motor in home position")
+            log.info("Motor in home position (corrected for offset)")
         time.sleep(0.1)
 
     # Start the radiometry manager
@@ -161,7 +173,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=15)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -202,6 +214,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     # Turn all GPIO pins off
     initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
     rad['gpio_interface'].stop()  # release gpio control
+    time.sleep(0.5)
 
     # Wait for any lingering threads.
     log.info(f"Waiting on {threading.active_count()} active threads..")
@@ -410,16 +423,17 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
 
         # Move motor?
-        move_motor = False
         # full set of criteria
-        if (ready['sun']) and (ready['speed']) and (ready['heading']) and (motor['used'])\
+        if (ready['sun']) and (ready['speed']) and (ready['heading']) and (motor['used']) and (ready['motor'])\
             and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
                 move_motor = True
 
         # relaxed criteria - move the motor more often as long as the heading etc are valid (set 'adjust_mode' in config file)
-        elif (ready['heading']) and (motor['used']) and (motor['adjust_mode']=='always')\
+        elif (ready['heading']) and (motor['used']) and (motor['adjust_mode']=='always') and (ready['motor'])\
             and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
                 move_motor = True
+        else:
+            move_motor = False
 
         if move_motor:
             log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))

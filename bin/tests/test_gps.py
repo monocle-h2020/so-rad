@@ -21,7 +21,7 @@ import logging
 def run_test(conf, terse=False):
     """Show GPS output stream"""
     # collect messages to return to web service
-    test_duration = 60  # seconds
+    test_duration = 999  # seconds
     messages = []
 
     ports = list_ports.comports()
@@ -47,7 +47,7 @@ def run_test(conf, terse=False):
     time.sleep(0.1)
 
     if terse:
-        test_duration = 1.5
+        test_duration = 999
 
     if not terse:
         log.info("Showing gps manager data for {0}s, CTRL-C to stop".format(test_duration))
@@ -65,6 +65,8 @@ def run_test(conf, terse=False):
                   gps['manager'].flags_headVehValid, gps['manager'].flag_relPosHeadingValid, gps['manager'].flags_diffSolN, gps['manager'].flags_gnssFixOK)
             log.info(header)
             log.info(vals)
+            with open('heading.csv','a') as heading_log:
+                 heading_log.write(f"{gps['manager'].last_update}\t{gps['manager'].relPosHeading}\t{gps['manager'].accHeading}\t{gps['manager'].flag_relPosHeadingValid}\n")
 
             time.sleep(1.0)
 

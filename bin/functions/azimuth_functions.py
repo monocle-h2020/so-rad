@@ -91,7 +91,7 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
     """
     Do solar and motor angle calculations
     : floats lat, lon, altitude, datetime_ from gps
-    : float ship_bearing from dual gps comparison
+    : float ship_bearing from gps heading
     : motor_dict has limit settings
     : float motor_pos_steps is current motor position in steps
     """

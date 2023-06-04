@@ -43,7 +43,8 @@ class TriosG2Manager(object):
         self.sams = []
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']
-        self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
+        #self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
+        self.ports = rad['ports']
         self.instruments = []  # store TriosG2Ramses instances which were succesfully started
         self.instruments_defined = [] # store all instances on which connections may be live
         self.connect_sensors()
@@ -73,6 +74,7 @@ class TriosG2Manager(object):
 
         for instrument in self.instruments_defined:
             instrument.start()
+            time.sleep(0.5)
             instrument.connect()
             instrument.get_identity()
 
@@ -313,25 +315,22 @@ class TriosG2Ramses(object):
 
         sleeptime = None
         t0 = time.perf_counter()
-        timeout = 15
+        timeout = 20
         log.info(f"{self.mod['port']}: checking sensor sleep state")
         while (sleeptime is None) and (time.perf_counter() - t0 < timeout):
             sleeptime = pt2.read_one_register(self.mod, 'deep_sleep_timeout')
             if sleeptime is None:
                 log.warning(f"{self.mod['port']}: failed to read sensor sleep state. Retry for {timeout - (time.perf_counter() - t0):2.1f} s")
                 time.sleep(1.0)
-            elif sleeptime > 0:
+            else:
                 log.info(f"{self.mod['port']}: deep sleep status/time: {sleeptime}")
 
         log.info(f"{self.mod['port']}: checking sensor measurement timer")
         meastime = pt2.read_one_register(self.mod, 'measurement_timeout')
         if meastime is None:
             log.warning(f"{self.mod['port']}: failed to read sensor measurement timer.")
-        elif meastime > 0:
-            #log.info("Setting integration time to auto (0)")
-            #pt2.set_integration_time(mod, inttime=0)
-            #inttime = read_one_register(mod, 'integration_time_cfg')
-            log.info(f"{self.mod['port']}: sensor measurement timer: {meastime}")
+        else:
+            log.info(f"{self.mod['port']}: Measurement timer: {meastime}")
 
         log.info(f"{self.mod['port']}: checking sensor LAN state")
         lanstate0 = pt2.get_lan_state(self.mod)
@@ -340,6 +339,15 @@ class TriosG2Ramses(object):
         elif lanstate0:
             log.info(f"{self.mod['port']}: disable LAN state.")
             pt2.set_lan_state(self.mod, False)
+        else:
+            log.info(f"{self.mod['port']}: LAN state: {lanstate0}.")
+
+        log.info(f"{self.mod['port']}: checking sensor auto-trigger setting")
+        autotrig = pt2.read_one_register(self.mod, 'self_trigger_activated')
+        if autotrig is None:
+            log.warning(f"{self.mod['port']}: failed to detect auto-trigger setting.")
+        else:
+            log.info(f"{self.mod['port']}: auto-trigger mode: {autotrig}.")
 
         log.info(f"{self.mod['port']}: checking integration time setting")
         inttime = pt2.read_one_register(self.mod, 'integration_time_cfg')
@@ -349,6 +357,8 @@ class TriosG2Ramses(object):
             log.info(f"{self.mod['port']}: setting integration time to auto (0)")
             pt2.set_integration_time(mod, inttime=0)
             inttime = read_one_register(mod, 'integration_time_cfg')
+            log.info(f"{self.mod['port']}: Integration time: {inttime}")
+        else:
             log.info(f"{self.mod['port']}: Integration time: {inttime}")
 
         self.ready = True
@@ -448,7 +458,8 @@ class TriosManager(object):
         from PyTrios import PyTrios as ps
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']
-        self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
+        #self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
+        self.ports = rad['ports']
         self.coms = ps.TMonitor(self.ports, baudrate=9600)
         self.sams = []
         self.connect_sensors()

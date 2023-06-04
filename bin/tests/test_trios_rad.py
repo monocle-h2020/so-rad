@@ -46,14 +46,14 @@ def run_test(conf, repeat=False):
 
     # set gpio
     if rad['use_gpio_control']:
-        rad['gpio_interface'].off(rad['gpio1'])
+        #rad['gpio_interface'].off(rad['gpio1'])
         time.sleep(1)
         log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
         log.info("Switch sensors ON via GPIO control")
         rad['gpio_interface'].on(rad['gpio1'])
         log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
 
-        time.sleep(2) # Wait for sensors to boot
+        time.sleep(5) # Wait for sensors to boot
 
     log.info("Starting radiometry manager")
     radiometry_manager = Rad_manager(rad)
@@ -77,9 +77,9 @@ def run_test(conf, repeat=False):
     if rad['use_gpio_control']:
         log.info("Switch off sensors via GPIO control")
         log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
-        rad['gpio_interface'].off(rad['gpio1'])
+        #rad['gpio_interface'].off(rad['gpio1'])
         log.info(f"GPIO status pin {rad['gpio1']}: {rad['gpio_interface'].status(rad['gpio1'])}")
-        rad['gpio_interface'].stop()
+        #rad['gpio_interface'].stop()
 
 
 if __name__ == '__main__':
