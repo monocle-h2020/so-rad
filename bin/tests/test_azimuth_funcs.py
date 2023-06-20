@@ -103,28 +103,7 @@ if __name__ == '__main__':
     solar_az_deg, solar_el_deg, motor_angles = az.calculate_positions(lat, lon, altitude, dt, ship_bearing, motor_dict, motor_pos_steps)
     solar_az_deg2, solar_el_deg2, motor_angles2 = az.calculate_positions2(lat, lon, altitude, dt, ship_bearing, motor_dict, motor_pos_steps)
 
-    log.info(f"solar_az_deg: {solar_az_deg:.2f} | solar_az_deg2: {solar_az_deg2:.2f}")
-    log.info(f"solar_el_deg: {solar_el_deg:.2f} | solar_el_deg2: {solar_el_deg2:.2f}\n\n")
+    log.info(f"solar_az_deg: {solar_az_deg:.2f}")
+    log.info(f"solar_el_deg: {solar_el_deg:.2f}\n")
     log.info(f"target_motor_pos_step: {motor_angles['target_motor_pos_step']} | target_motor_pos_step2: {motor_angles2['target_motor_pos_step']}")
-    log.info(f"target_motor_pos_rel_az_deg: {motor_angles['target_motor_pos_rel_az_deg']} | target_motor_pos_step2: {motor_angles2['target_motor_pos_rel_az_deg']}")
-
-
-    # overrides - debug only
-    motor_dict['cw_limit'] = -45
-    motor_dict['ccw_limit'] = -140
-    lat  = 56.16
-    lon = 10.24
-    ship_bearing = 300.0
-    motor_pos_steps = 0
-    dt = datetime.datetime(2023,6,3,15,0,0)
-
-    solar_az_deg, solar_el_deg, motor_angles = az.calculate_positions(lat, lon, altitude, dt, ship_bearing, motor_dict, motor_pos_steps)
-    solar_az_deg2, solar_el_deg2, motor_angles2 = az.calculate_positions2(lat, lon, altitude, dt, ship_bearing, motor_dict, motor_pos_steps)
-
-    log.info(f"solar_az_deg: {solar_az_deg:.2f} | solar_az_deg2: {solar_az_deg2:.2f}")
-    log.info(f"solar_el_deg: {solar_el_deg:.2f} | solar_el_deg2: {solar_el_deg2:.2f}\n\n")
-    log.info(f"target_motor_pos_step: {motor_angles['target_motor_pos_step']} | target_motor_pos_step2: {motor_angles2['target_motor_pos_step']}")
-    log.info(f"target_motor_pos_rel_az_deg: {motor_angles['target_motor_pos_rel_az_deg']} | target_motor_pos_step2: {motor_angles2['target_motor_pos_rel_az_deg']}")
-
-
-
+    log.info(f"target_motor_pos_rel_az_deg: {motor_angles['target_motor_pos_rel_az_deg']} | target_motor_pos_rel_az_deg2: {motor_angles2['target_motor_pos_rel_az_deg']}")
