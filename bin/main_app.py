@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+w#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 
@@ -407,17 +407,6 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                   values['alt0'], values['dt'],
                                                                   values['ship_bearing_mean'], motor,
                                                                   values['motor_pos'])
-
-        try:
-            log.debug("[{8}] Sun Az {0:1.0f} | El {1:1.0f} | ViewAz [{2:1.1f}|{3:1.1f}] | MotPos [{4:1.1f}|{5:1.1f}] | MotTarget {6:1.1f} ({7:1.1f})"\
-                 .format(values['solar_az'], values['solar_el'],
-                         values['motor_angles']['view_comp_ccw'], values['motor_angles']['view_comp_cw'],
-                         values['motor_angles']['ach_mot_ccw'], values['motor_angles']['ach_mot_cw'],
-                         values['motor_angles']['target_motor_pos_deg'],
-                         values['motor_angles']['target_motor_pos_rel_az_deg'], counter))
-        except TypeError:
-            # at least one value is None
-            pass
 
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
