@@ -1,4 +1,4 @@
-w#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 
@@ -173,7 +173,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=300)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -403,7 +403,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # Fetch sun variables and determine optimal motor pointing angles
         values['solar_az'], values['solar_el'],\
-            values['motor_angles'] = azi_func.calculate_positions(values['lat0'], values['lon0'],
+            values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
                                                                   values['alt0'], values['dt'],
                                                                   values['ship_bearing_mean'], motor,
                                                                   values['motor_pos'])
@@ -428,17 +428,21 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
-            motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
-            moving = True
-            t0 = time.time()  # timeout reference
-            while moving and time.time()-t0 < 5:
-                moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
-                if moving is None:
-                    moving = True
-                log.debug("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
-                if time.time()-t0 > 5:
-                    log.warning("Motor movement timed out (this is allowed)")
-                time.sleep(0.5)
+            if (target_pos > motor['cw_limit']) or (target_pos < motor['ccw_limit']):
+                log.warning(f"Illegal motor position requested: {target_pos} vs {motor['ccw_limit']} - {motor['cw_limit']}")
+                ready['motor'] = False
+            else:
+                motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
+                moving = True
+                t0 = time.time()  # timeout reference
+                while moving and time.time()-t0 < 5:
+                    moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
+                    if moving is None:
+                        moving = True
+                    log.debug("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
+                    if time.time()-t0 > 5:
+                        log.warning("Motor movement timed out (this is allowed)")
+                    time.sleep(0.5)
 
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)

@@ -252,7 +252,7 @@ def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict
 
     # compare achievable angles to sun (still in motor plane with 0 = home)
     achievable_angles_to_sun = [abs(a - sol_az_to_motor_angle) for a in angle_options]
-    achievable_angles_to_opt = [135.-a for a in achievable_angles_to_sun]
+    achievable_angles_to_opt = [abs(135.-a) for a in achievable_angles_to_sun]
     achievable_angles_sort_key = argsort(achievable_angles_to_opt)
     angle_options_sorted = array(angle_options)[achievable_angles_sort_key]  # first is best
     achievable_angles_to_sun_sorted = array(achievable_angles_to_sun)[achievable_angles_sort_key]  # first is best
@@ -281,7 +281,18 @@ def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict
     target_motor_pos_in_motor_plane_step = int(round(target_motor_pos_in_motor_plane_deg * motor_dict['steps_per_degree']))
 
     motor_angles = {'target_motor_pos_step': target_motor_pos_in_motor_plane_step,
-                    'target_motor_pos_rel_az_deg': target_motor_pos_rel_az_deg}
+                    'target_motor_pos_rel_az_deg': target_motor_pos_rel_az_deg,
+                    'sol_az_to_motor_angle': sol_az_to_motor_angle,
+                    'opt1_view_to_motor_angle': opt1_view_to_motor_angle,
+                    'opt2_view_to_motor_angle': opt2_view_to_motor_angle,
+                    'targets_in_motor_plane_deg': targets_in_motor_plane_deg,
+                    'angle_options': angle_options,
+                    'achievable_angles_to_sun': achievable_angles_to_sun,
+                    'achievable_angles_to_opt': achievable_angles_to_opt,
+                    'angle_options_sorted': angle_options_sorted,
+                    'achievable_angles_to_sun_sorted': achievable_angles_to_sun_sorted,
+                    'achievable_angles_to_opt_sorted': achievable_angles_to_opt_sorted
+                   }
 
 
     return solar_az_deg, solar_el_deg, motor_angles

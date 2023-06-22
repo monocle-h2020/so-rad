@@ -107,3 +107,7 @@ if __name__ == '__main__':
     log.info(f"solar_el_deg: {solar_el_deg:.2f}\n")
     log.info(f"target_motor_pos_step: {motor_angles['target_motor_pos_step']} | target_motor_pos_step2: {motor_angles2['target_motor_pos_step']}")
     log.info(f"target_motor_pos_rel_az_deg: {motor_angles['target_motor_pos_rel_az_deg']} | target_motor_pos_rel_az_deg2: {motor_angles2['target_motor_pos_rel_az_deg']}")
+    for key,val in motor_angles2.items():
+        log.info(f"{key}: {val}")
+
+    log.info(motor_dict['ccw_limit'] <= motor_angles2['opt1_view_to_motor_angle'] <= motor_dict['cw_limit'])
