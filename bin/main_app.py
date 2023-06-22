@@ -402,11 +402,17 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         values = update_system_values(gps, values)
 
         # Fetch sun variables and determine optimal motor pointing angles
-        values['solar_az'], values['solar_el'],\
-            values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
-                                                                  values['alt0'], values['dt'],
-                                                                  values['ship_bearing_mean'], motor,
-                                                                  values['motor_pos'])
+        try:
+            values['solar_az'], values['solar_el'],\
+                values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
+                                                                      values['alt0'], values['dt'],
+                                                                      values['ship_bearing_mean'], motor,
+                                                                      values['motor_pos'])
+        except:
+            log.warning(f"No pointing solution found. Is GPS info available?")
+            ready['motor'] = False
+            values['motor_angles']['target_motor_pos_rel_az_deg'] = None
+            values['motor_angles']['target_motor_pos_step'] = None
 
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
