@@ -173,7 +173,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=300)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
     else:
         radiometry_manager = None
 
@@ -428,8 +428,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
             # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
-            if (target_pos > motor['cw_limit']) or (target_pos < motor['ccw_limit']):
-                log.warning(f"Illegal motor position requested: {target_pos} vs {motor['ccw_limit']} - {motor['cw_limit']}")
+            target_pos_deg_in_motor_plane = target_pos / motor['steps_per_degree']
+            tolerance = 5.0
+            if (target_pos_deg_in_motor_plane > motor['cw_limit'] + tolerance) or (target_pos_deg_in_motor_plane < motor['ccw_limit'] - tolerance):
+                log.warning(f"Illegal motor position requested: {target_pos_deg_in_motor_plane} vs {motor['ccw_limit']} - {motor['cw_limit']}")
                 ready['motor'] = False
             else:
                 motor_func.rotate_motor(motor_func.commands, target_pos, motor['serial'])
