@@ -388,7 +388,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             values['motor_pos'] = motor['home_pos']
             try:
                 values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
+                ready['motor'] = True
             except:
+                ready['motor'] = False
                 pass
 
         # If bearing is not fixed, fetch the calculated mean bearing using data from GPS+heading sensors
@@ -405,7 +407,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         try:
             values['solar_az'], values['solar_el'],\
                 values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
-                                                                      values['alt0'], values['dt'],
+                                                                      0.0, values['dt'],
                                                                       values['ship_bearing_mean'], motor,
                                                                       values['motor_pos'])
         except:
@@ -413,6 +415,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             ready['motor'] = False
             values['motor_angles']['target_motor_pos_rel_az_deg'] = None
             values['motor_angles']['target_motor_pos_step'] = None
+            log.info(f"lat {values['lat0']} lon {values['lon0']} alt {values['alt0']} {values['dt']} heading {values['ship_bearing_mean']} motor {values['motor_pos']}")
 
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
@@ -422,7 +425,6 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         if (ready['sun']) and (ready['speed']) and (ready['heading']) and (motor['used']) and (ready['motor'])\
             and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
                 move_motor = True
-
         # relaxed criteria - move the motor more often as long as the heading etc are valid (set 'adjust_mode' in config file)
         elif (ready['heading']) and (motor['used']) and (motor['adjust_mode']=='always') and (ready['motor'])\
             and ( abs(values['motor_angles']['target_motor_pos_step'] - values['motor_pos'] ) > motor['step_thresh']):
@@ -431,9 +433,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             move_motor = False
 
         if move_motor:
-            log.info("{2} | Adjust motor angle ({0} --> {1})".format(values['motor_pos'], values['motor_angles']['target_motor_pos_step'], counter))
-            # Rotate the motor to the new position
             target_pos = values['motor_angles']['target_motor_pos_step']
+            log.info(f"{counter} | Adjust motor angle ({values['motor_pos']} --> {target_pos})")
+            # Rotate the motor to the new position
             target_pos_deg_in_motor_plane = target_pos / motor['steps_per_degree']
             tolerance = 5.0
             if (target_pos_deg_in_motor_plane > motor['cw_limit'] + tolerance) or (target_pos_deg_in_motor_plane < motor['ccw_limit'] - tolerance):
@@ -444,21 +446,27 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 moving = True
                 t0 = time.time()  # timeout reference
                 while moving and time.time()-t0 < 5:
-                    moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos, tolerance=300)
+                    moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos,
+                                                                          tolerance=motor['steps_per_degree']*3)
                     if moving is None:
                         moving = True
-                    log.debug("{2} | ..moving motor.. {0} --> {1} (check again in 2s)".format(values['motor_pos'], target_pos, counter))
+                    log.info(f"{counter} | ..moving motor.. {values['motor_pos']} --> {target_pos} (check again in 2s)")
                     if time.time()-t0 > 5:
                         log.warning("Motor movement timed out (this is allowed)")
-                    time.sleep(0.5)
+                    time.sleep(0.1)
 
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # collect latest GPS and TPR data now that a measurement may be triggered
     values = update_system_values(gps, values, tpr, rht, motor)
+
+    try:
+        values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
+    except:
+        pass
     # update viewing azimuth details
-    values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], values['alt0'], values['dt'],
+    values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], 0.0, values['dt'],
                                                                               values['ship_bearing_mean'], values['motor_deg'], motor)
 
     # If all checks are good, take radiometry measurements

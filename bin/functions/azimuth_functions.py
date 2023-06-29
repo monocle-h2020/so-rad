@@ -9,7 +9,8 @@ and radiometers.
 import ephem
 import math
 from numpy import argsort, array, min
-
+import logging
+log = logging.getLogger('azim')
 
 def wrap180(value):
     """
@@ -198,6 +199,25 @@ def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict,
 
 
 def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict, motor_pos_steps):
+    """
+    Do solar and motor angle calculations
+    : floats lat, lon, altitude, datetime_ from gps
+    : float ship_bearing from gps heading
+    : motor_dict has limit settings
+    : float motor_pos_steps is current motor position in steps
+    """
+    try:
+        assert lat is not None
+        assert lon is not None
+        assert altitude is not None
+        assert datetime_ is not None
+        assert ship_bearing is not None
+        assert motor_dict is not None
+        assert motor_pos_steps is not None
+
+    except AssertionError:
+        return None, None, None
+
     # Get solar angles
     solar_az_deg, solar_el_deg = solar_az_el(lat, lon, altitude, datetime_)
 
@@ -246,7 +266,7 @@ def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict
                                     if d < best_limited_angle_abs_distance_to_opt + 5.0]
 
     # the options are (some may be duplicate solutions)
-    angle_options = angle_options_outside_limits
+    angle_options = [best_limited_angle] + angle_options_outside_limits
     for i in targets_in_motor_plane_deg:
         angle_options.append(i)
 
