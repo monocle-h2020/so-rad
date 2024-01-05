@@ -38,11 +38,16 @@ def main():
     print("finished test, stopping monitor")
     camera.stop()
 
+    if save:
+        with open("test.jpg", 'wb') as testfile:
+            testfile.write(camera.last_valid_result.content)
+
 
 if __name__ == '__main__':
     #args = parse_args()
     #conf = cf.read_config(args.config_file)
     #conf = cf.update_config(conf, args.local_config_file)
     #main(conf)
+    save = True
     main()
 
