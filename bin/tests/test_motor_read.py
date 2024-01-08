@@ -28,6 +28,9 @@ if __name__ == '__main__':
     conf = cf.update_config(conf, args.local_config_file)
 
     ports = list_ports.comports()
+    for port, desc, hwid in sorted(ports):
+        print("port info: {0} {1} {2}".format(port, desc, hwid))
+
     motor = motor_init(conf['MOTOR'], ports)
     stpd = float(motor['steps_per_degree'])
 

@@ -13,8 +13,8 @@ import serial.tools.list_ports as list_ports
 from initialisation import tpr_init
 from main_app import parse_args
 import functions.config_functions as cf
-test_duration_single_reads = 1  # seconds
-test_duration_monitor_average = 10  # seconds
+test_duration_single_reads = 60  # seconds
+test_duration_monitor_average = 300  # seconds
 
 
 def main(conf):

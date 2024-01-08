@@ -93,8 +93,6 @@ def motor_init(motor_config, ports):
 
     # Get all the motor variables from the config file
     motor['used'] = motor_config.getboolean('use_motor')
-    #motor['port'] = motor_config.get('port')  # suggest to read from config first, then try to find automatically. If latter fails, we default to the config.
-    # motor['step_limit'] = motor_config.getint('step_limit')  # NOT USED
     motor['step_thresh'] = motor_config.getint('step_thresh_angle')
     motor['cw_limit'] = motor_config.getint('cw_limit_deg')
     motor['ccw_limit'] = motor_config.getint('ccw_limit_deg')
@@ -110,7 +108,6 @@ def motor_init(motor_config, ports):
 
     # If port autodetect is set look for what port has the matching identification string
     log.info("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))
-    print("connecting to motor.. autodetect={0}".format(motor_config.getboolean('port_autodetect')))
 
     if motor_config.getboolean('port_autodetect'):
         port_autodetect_string = motor_config.get('port_autodetect_string')
@@ -279,9 +276,9 @@ def rad_init(rad_config, ports):
     rad['n_sensors'] = rad_config.getint('n_sensors')
     rad['rad_interface'] = rad_config.get('rad_interface').lower()
     rad['pytrios_path'] = rad_config.get('pytrios_path')
-    rad['port1'] = rad_config.get('port1')
-    rad['port2'] = rad_config.get('port2')
-    rad['port3'] = rad_config.get('port3')
+    #rad['port1'] = rad_config.get('port1')
+    #rad['port2'] = rad_config.get('port2')
+    #rad['port3'] = rad_config.get('port3')
     rad['sampling_interval'] = rad_config.getint('sampling_interval')
     rad['ed_sampling'] = rad_config.getboolean('ed_sampling')
     rad['ed_sampling_interval'] = rad_config.getint('ed_sampling_interval')
@@ -306,22 +303,22 @@ def rad_init(rad_config, ports):
     # If port autodetect is selected look for ports with identifying strings
     # Note that no sensor communication takes place here yet, this is only looking for the serial to usb interfaces
     if rad_config.getboolean('port_autodetect'):
-        rad_ports = []
+        rad['ports'] = []
         port_autodetect_strings = rad_config.get('port_autodetect_string').split(',')
         for autodetect_string in port_autodetect_strings:
             found = False
             for port, desc, hwid in sorted(ports):
                 if autodetect_string in port+desc+hwid:
-                    rad_ports.append(port)
+                    rad['ports'].append(port)
                     found = True
             if not found:
                 log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
-        if len(rad_ports) < rad['n_sensors']:
-            log.critical(f"{len(rad_ports)} identified out of {rad['n_sensors']} expected.")
+        if len(rad['ports']) < rad['n_sensors']:
+            log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
 
-        for i, p in enumerate(rad_ports):
+        for i, p in enumerate(rad['ports']):
             rad[f'port{i+1}'] = p
-        log.info("Radiometers configured on ports: {0}".format(", ".join(rad_ports)))
+        log.info("Radiometers configured on ports: {0}".format(", ".join(rad['ports'])))
 
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers
@@ -337,7 +334,7 @@ def rad_init(rad_config, ports):
 
         rad['gpio1'] = rad_config.getint('gpio1')
         rad['gpio_interface'].on(rad['gpio1'])
-        time.sleep(2) # Wait to allow sensors to boot
+        time.sleep(5) # Wait to allow sensors to boot
 
     # Return the radiometry dict and relevant manager class
     if rad['rad_interface'] == 'pytrios':
