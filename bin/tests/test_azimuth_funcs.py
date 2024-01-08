@@ -100,6 +100,9 @@ if __name__ == '__main__':
     altitude = 0.
     motor_pos_steps = 0
 
+    solar_az, solar_el = az.solar_az_el(lat, lon, altitude, datetime_)
+    log.info(f"solar az: {solar_az}, solar el: {solar_el}")
+
     solar_az_deg, solar_el_deg, motor_angles = az.calculate_positions(lat, lon, altitude, dt, ship_bearing, motor_dict, motor_pos_steps)
     solar_az_deg2, solar_el_deg2, motor_angles2 = az.calculate_positions2(lat, lon, altitude, dt, ship_bearing, motor_dict, motor_pos_steps)
 

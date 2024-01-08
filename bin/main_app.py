@@ -592,7 +592,7 @@ def run():
             if not check_internet():
                 log.debug(f"{counter} | Internet connection timed out.")
 
-            elif (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
+            if (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
                 # update remote status at most once per minute if there are no data to upload
                 if check_remote_data_store(conf)[0]:
                     export_result, resultcode = update_status_parse_server(conf, db_dict)

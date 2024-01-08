@@ -71,8 +71,8 @@ if __name__ == '__main__':
     log.info(f"motor counter-clockwise limit: {motor['ccw_limit']}")
     log.info(f"motor clockwise limit: {motor['cw_limit']}")
 
-    angles = [0-motor['home_pos'], motor['ccw_limit'], 0-motor['home_pos'], motor['cw_limit']]
-    angles = [0, -160, 0, -40]
+    angles = [motor['ccw_limit'], motor['cw_limit']]
+    #angles = [0, motor['ccw_limit'], 0, motor['cw_limit']]
 
     # get default motor movement instructions and double speed
     motor_commands_dict = motor_func.commands
@@ -83,9 +83,9 @@ if __name__ == '__main__':
     continuous = True
     while continuous == True:
         for target_deg_pos in angles:
-            log.info("Adjust motor angle ({0:3.3f} --> {1})".format(motor_deg_pos, target_deg_pos))
-            # Rotate the motor to the new position
             target_step_pos = int(target_deg_pos * motor['steps_per_degree'])
+            log.info(f"Adjust motor angle ({motor_deg_pos:3.3f} --> {target_deg_pos}) steps: {motor_step_pos} -> {target_step_pos}")
+            # Rotate the motor to the new position
             motor_func.rotate_motor(motor_commands_dict, target_step_pos, motor['serial'])
             moving = True
             t0 = time.perf_counter()  # timeout reference
