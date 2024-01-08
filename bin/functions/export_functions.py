@@ -54,6 +54,13 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
     n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version)
     log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
+    successes = 0
+    export_result = None
+    response_code = None
+
+    if n_new == 0:
+        return export_result, response_code, successes
+
     if db['add_sample_uuid']:
         log.debug("Adding sample_uuid")
         # match records to add a single sample_uuid to records with identical metadata_id
@@ -63,10 +70,6 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
         db['header'].append('sample_uuid')
         for j, record in enumerate(records):
             records[j] = record + (sample_uuids[record[i]],)
-
-    successes = 0
-    export_result = None
-    response_code = None
 
     for i, record in enumerate(records):
         record_json = add_metadata(export_config_dict, record, db)  # add metadata and return json

@@ -287,12 +287,28 @@ def run_gps_test():
     else:
         return False, messages
 
+def run_export_test(force=False):
+    "Show data upload status and optionally force bulk upload"
+    if force:
+        command = ["/usr/bin/python", "../tests/test_export.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse", "--force_upload", "-1"]
+    else:
+        command = ["/usr/bin/python", "../tests/test_export.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse"]
+    print(command)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    status = process.wait()
+    print(status)
+    message = process.stdout.read().decode('utf-8')
+    print(message)
+    messages = message.split('\n')
+    if status == '0':
+        return True, messages
+    else:
+        return False, messages
 
 # pass math functions to jinja2
 @app.context_processor
 def utility_processor():
     return dict(cos=cos, sin=sin, radians=radians)
-
 
 ####  ROUTES  ####
 
@@ -325,7 +341,8 @@ def control():
 
     if ('test' in selection) and (common['so-rad_status']):
         print("debug checkpoint")
-        flash("Please stop the So-Rad service before running tests. If you already stopped the service, click the check button below to verify that the service has stopped.")
+        flash("Please stop the So-Rad service before running this command. If you already stopped the service, click the check button below to verify that the service has stopped.")
+        return render_template('control.html', common=common)
 
     if selection == 'restart':
         status = restart_service('so-rad')
@@ -347,21 +364,30 @@ def control():
         status, messages = run_gps_test()
         return render_template('control.html', messages=messages, common=common)
 
-    elif selection == 'test2':
-        # run a so-rad test script.
-        #messages = run_gps_test()
-        #flash(messages)
-        return render_template('control.html', common=common)
+    elif selection == 'export_test':
+        # use to check data upload status and force uploads
+        status, messages = run_export_test()
+        return render_template('control.html', messages=messages, common=common)
+    elif selection == 'export_test_force':
+        # use to check data upload status and force uploads
+        status, messages = run_export_test(force=True)
+        return render_template('control.html', messages=messages, common=common)
 
     elif selection == 'reboot':
         status = os.system('/usr/bin/sudo shutdown -r 1 &')
         print(status)
-        flash(f"Reboot scheduled at {datetime.datetime.utcnow().isoformat()}")
+        flash(f"Reboot scheduled one minute from {datetime.datetime.utcnow().isoformat()}")
         return render_template('control.html', common=common)
 
     elif selection == 'cancelreboot':
         status = os.system('/usr/bin/sudo shutdown -c')
         print(status)
+        return render_template('control.html', common=common)
+
+    elif selection == 'shutdown':
+        status = os.system('/usr/bin/sudo shutdown -h 1 &')
+        print(status)
+        flash(f"Shutdown scheduled 1 minute from {datetime.datetime.utcnow().isoformat()}")
         return render_template('control.html', common=common)
 
     else:

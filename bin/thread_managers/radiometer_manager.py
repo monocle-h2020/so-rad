@@ -355,8 +355,8 @@ class TriosG2Ramses(object):
             log.warning(f"{self.mod['port']}: failed to detect integration time setting.")
         elif inttime > 0:
             log.info(f"{self.mod['port']}: setting integration time to auto (0)")
-            pt2.set_integration_time(mod, inttime=0)
-            inttime = read_one_register(mod, 'integration_time_cfg')
+            pt2.set_integration_time(self.mod, inttime=0)
+            inttime = pt2.read_one_register(self.mod, 'integration_time_cfg')
             log.info(f"{self.mod['port']}: Integration time: {inttime}")
         else:
             log.info(f"{self.mod['port']}: Integration time: {inttime}")

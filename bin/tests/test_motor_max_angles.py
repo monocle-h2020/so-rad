@@ -44,13 +44,20 @@ if __name__ == '__main__':
     else:
         log.info("Motor position: {0}".format(motor_deg_pos))
 
+    # get default motor movement instructions
+    motor_commands_dict = motor_func.commands
+    motor_commands_dict['speed_command'].value = hex(2000)[2:].zfill(8)  # default 2000
+    motor_commands_dict['accel_command'].value = hex(1500)[2:].zfill(8)  # default 1500
+    motor_commands_dict['decel_command'].value = hex(1500)[2:].zfill(8)  # default 1500
+
     if motor_deg_pos != motor['home_pos']:
         t0 = time.perf_counter()
         moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
         motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
-        log.info("Homing motor.. {0} --> {1}".format(motor_deg_pos, motor['home_pos']))
-        motor_func.return_home(motor['serial'])
+        print("Homing motor.. {0} --> {1}".format(motor_deg_pos, motor['home_pos']))
+        motor_func.rotate_motor(motor_commands_dict, motor['home_pos'], motor['serial'])
         moving = True
+
         while moving and (time.perf_counter()-t0<5):
             moving, motor_step_pos = motor_func.motor_moving(motor['serial'], motor['home_pos'], tolerance=300)
             motor_deg_pos = float(motor_step_pos) / motor['steps_per_degree']
@@ -73,12 +80,6 @@ if __name__ == '__main__':
 
     angles = [motor['ccw_limit'], motor['cw_limit']]
     #angles = [0, motor['ccw_limit'], 0, motor['cw_limit']]
-
-    # get default motor movement instructions and double speed
-    motor_commands_dict = motor_func.commands
-    motor_commands_dict['speed_command'].value = hex(4000)[2:].zfill(8)  # default 2000
-    motor_commands_dict['accel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
-    motor_commands_dict['decel_command'].value = hex(5000)[2:].zfill(8)  # default 1500
 
     continuous = True
     while continuous == True:
