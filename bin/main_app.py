@@ -174,7 +174,12 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.exception(msg)
-            stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            try:
+                stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            except UnboundLocalError:
+                # special case for G1 sensors getting an incomplete rad manager
+                stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+
     else:
         radiometry_manager = None
 
