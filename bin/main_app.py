@@ -63,6 +63,7 @@ def init_logger(conf_log_dict):
     myFormat = '%(asctime)s | %(name)s | %(levelname)s | %(message)s'
     formatter = logging.Formatter(myFormat)
     log_filename = conf_log_dict['log_file_location']
+    print(f"Logging to {log_filename}")
     if not os.path.isdir(os.path.dirname(log_filename)):
         os.makedirs(os.path.dirname(log_filename))
 
@@ -536,13 +537,13 @@ def run():
     # Parse the command line arguments for the config file
     args = parse_args()
     conf = cf_func.read_config(args.config_file)
+    conf = cf_func.update_config(conf, args.local_config_file)
     # start logging here
     log = init_logger(conf['LOGGING'])
 
     log = logging.getLogger('main')
     log.info('\n===Started logging===\n')
 
-    conf = cf_func.update_config(conf, args.local_config_file)
 
     try:
         # Initialise everything
