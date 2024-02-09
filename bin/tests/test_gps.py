@@ -21,7 +21,7 @@ import logging
 def run_test(conf, terse=False):
     """Show GPS output stream"""
     # collect messages to return to web service
-    test_duration = 300  # seconds
+    test_duration = 999  # seconds
 
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
@@ -30,6 +30,7 @@ def run_test(conf, terse=False):
     log.info("Connecting to gps ports")
     gps = initialisation.gps_init(conf['GPS'], ports)
     log.info(gps['serial1'])
+    log.info(f"GPS protocol: {gps['protocol']}")
 
     if not terse:
         log.info("Showing a few blocks of gps data, if available")
@@ -46,7 +47,7 @@ def run_test(conf, terse=False):
     time.sleep(0.1)
 
     if terse:
-        test_duration = 999
+        test_duration = 10
 
     if not terse:
         log.info("Showing gps manager data for {0}s, CTRL-C to stop".format(test_duration))
@@ -64,10 +65,9 @@ def run_test(conf, terse=False):
                   gps['manager'].flags_headVehValid, gps['manager'].flag_relPosHeadingValid, gps['manager'].flags_diffSolN, gps['manager'].flags_gnssFixOK)
             log.info(header)
             log.info(vals)
-            with open('heading.csv','a') as heading_log:
-                 heading_log.write(f"{gps['manager'].last_update}\t{gps['manager'].relPosHeading}\t{gps['manager'].accHeading}\t{gps['manager'].flag_relPosHeadingValid}\n")
-
-            time.sleep(1.0)
+            #with open('heading.csv','a') as heading_log:
+            #     heading_log.write(f"{gps['manager'].last_update}\t{gps['manager'].relPosHeading}\t{gps['manager'].accHeading}\t{gps['manager'].flag_relPosHeadingValid}\n")
+            time.sleep(2.0)
 
         except (KeyboardInterrupt, SystemExit):
             log.info("Stopping GPS manager thread")
@@ -88,6 +88,8 @@ def run_test(conf, terse=False):
 if __name__ == '__main__':
     args = parse_args()
     conf = read_config(args.config_file)
+    # update config with local overrides
+    conf = update_config(conf, args.local_config_file, verbosity=not args.terse)
 
     # start logging to stdout
     log = logging.getLogger()
@@ -97,8 +99,5 @@ if __name__ == '__main__':
     formatter = logging.Formatter('%(asctime)s| %(levelname)s | %(name)s | %(message)s')
     handler.setFormatter(formatter)
     log.addHandler(handler)
-
-    # update config with local overrides
-    conf = update_config(conf, args.local_config_file, verbosity=not args.terse)
 
     run_test(conf, args.terse)
