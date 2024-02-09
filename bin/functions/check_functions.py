@@ -103,9 +103,10 @@ def check_heading(gps):
             return True
 
     elif gps['protocol'] == "pyubx2":
-        if (gps['manager'].flag_relPosHeadingValid == 1) and \
-           (gps['manager'].accHeading < gps['heading_accuracy_limit']) and \
-           (gps['manager'].heading is not None):
+        if (check_gps(gps)) and \
+            (gps['manager'].flag_relPosHeadingValid == 1) and \
+            (gps['manager'].accHeading < gps['heading_accuracy_limit']) and \
+            (gps['manager'].heading is not None):
             return True
 
     elif gps['protocol'] == 'nmea0183':
