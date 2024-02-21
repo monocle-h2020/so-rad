@@ -6,7 +6,7 @@ This script provides classes to interface with cameras.
 Implements a class for each type of camera supported. A class is currently provided for:
  - soradcam: A raspberry pi camera 3 (autofocus) running on a Pi Zero 2 w using the picamera2 library
 
-Plymouth Marine Laboratory
+stsi@Plymouth Marine Laboratory
 License: see README.md
 
 """
@@ -19,15 +19,18 @@ import datetime
 import requests
 import socket
 
-TIMEOUT = 10.0
+TIMEOUT = 8.0
 
 log = logging.getLogger('cam')
 
 class Soradcam(object):
     """
-    Raspberry Pi camera running on a remote Pi Zero 2 W running a flask instance with the following routes
-     -  /getpicture, returning best available resolution jpg.
+    Connecting to a remote Pi Zero 2 W running a flask instance with the following routes
+     -  /gethigh -  returning best available resolution jpg.
+     -  /getmedium - returning medium resolution jpg.
+     -  /getlow - returning low resolution jpg.
     """
+
     def __init__(self, cam=None):
         """
         Set up
@@ -44,6 +47,13 @@ class Soradcam(object):
 
         # connectivity
         self.last_api_port_response = None
+        self.camera_ip = "192.168.20.111"
+        self.camera_port = 80
+
+        # image settings
+        self.res = "full"   # low / medium / full
+
+        log.info(f"Camera request command = http://{self.camera_ip}:{self.camera_port}/get{self.res}")
 
         # thread things
         self.thread = None
@@ -57,9 +67,8 @@ class Soradcam(object):
 
         self.connected = self.check_api_port()
 
-
     def get_picture(self):
-        '''get a new picture, this function is only called from the running thread'''
+        '''get a new picture, this function is only called from the active thread'''
         if self.busy:
             log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, request ignored.")
             return
@@ -70,6 +79,7 @@ class Soradcam(object):
             self.last_valid_result = None
             self.busy = True
             self.picture_requested = True
+            log.info(f"Image requested at {self.last_request_time}")
         return
 
 
@@ -79,12 +89,9 @@ class Soradcam(object):
             log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, request ignored.")
             return
         else:
-            camera_ip = "192.168.20.111"
-            camera_port = 5000
-            camera_api = camera_ip + ":5000/test"
             try:
                 s = socket.socket()
-                s.connect((camera_ip, camera_port))
+                s.connect((self.camera_ip, self.camera_port))
 
                 self.last_api_port_response = datetime.datetime.now()
                 return True
@@ -135,20 +142,23 @@ class Soradcam(object):
             if not self.connected:
                 self.connected = self.check_api_port()
                 if not self.connected:
+                    log.warning("Camera not responding")
                     time.sleep(1)
 
             elif self.picture_requested:
                 # fetch new image from remote camera
-                # camera_url = export_config_dict.get('camera_ip')  # TODO read config
-                camera_url = "http://192.168.20.111:5000/getpicture"
-                #headers = {'content-type': 'application/html'}
+                log.info("Picture request observed")
+                camera_url = f"http://{self.camera_ip}/get{self.res}"
+                log.info(camera_url)
                 try:
                     response = requests.get(camera_url, timeout=TIMEOUT)
+                    log.info(response)
                     log.info(f"response code: {response.status_code}")
                     self.last_received_time = datetime.datetime.now() # when request was answered, irrespective of result
                     if (response.status_code >= 200) and (response.status_code < 300):
                         self.last_request_success = True
                         self.last_valid_result = response
+                        self.last_received_time = datetime.datetime.now()
                     else:
                         self.last_request_success = False
                         self.last_valid_result = None

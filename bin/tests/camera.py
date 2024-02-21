@@ -7,6 +7,7 @@ import sys
 import os
 import time
 import inspect
+import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 #from initialisation import tpr_init
 #from main_app import parse_args
@@ -23,9 +24,12 @@ def main():
 
     camera = cameras.Soradcam()
     camera.start()
+    print(f"Connected to camera: {camera.connected}")
 
     t0 = time.perf_counter()
+
     camera.get_picture()
+
     while camera.busy and time.perf_counter()-t0 < 5.0:
         time.sleep(0.1)
 
@@ -34,6 +38,8 @@ def main():
         print(f"Image taken at {camera.last_request_time.isoformat()}: {len(camera.last_valid_result.content)} bytes [{time_elapsed} s]")
     else:
         print(f"No image received, last response at {camera.last_received_time.isoformat()}")
+
+    print(camera.last_valid_result)
 
     print("finished test, stopping monitor")
     camera.stop()
@@ -47,7 +53,15 @@ if __name__ == '__main__':
     #args = parse_args()
     #conf = cf.read_config(args.config_file)
     #conf = cf.update_config(conf, args.local_config_file)
-    #main(conf)
+
+    log = logging.getLogger()
+    handler = logging.StreamHandler(sys.stdout)
+    log.setLevel(logging.INFO)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s| %(levelname)s | %(name)s | %(message)s')
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+
     save = True
     main()
 
