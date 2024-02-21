@@ -10,6 +10,7 @@ stsi@Plymouth Marine Laboratory
 License: see README.md
 
 """
+import os
 import logging
 import threading
 import sys
@@ -47,11 +48,15 @@ class Soradcam(object):
 
         # connectivity
         self.last_api_port_response = None
-        self.camera_ip = "192.168.20.111"
-        self.camera_port = 80
+        self.camera_ip = cam['ip']
+        self.camera_port = cam['port']
 
         # image settings
-        self.res = "full"   # low / medium / full
+        self.res = cam['resolution']   # low / medium / full
+
+        # storage_settings
+        self.request_label = None
+        self.storage_path = cam['storage_path']
 
         log.info(f"Camera request command = http://{self.camera_ip}:{self.camera_port}/get{self.res}")
 
@@ -67,7 +72,7 @@ class Soradcam(object):
 
         self.connected = self.check_api_port()
 
-    def get_picture(self):
+    def get_picture(self, label=datetime.datetime.now().isoformat()):
         '''get a new picture, this function is only called from the active thread'''
         if self.busy:
             log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, request ignored.")
@@ -79,6 +84,7 @@ class Soradcam(object):
             self.last_valid_result = None
             self.busy = True
             self.picture_requested = True
+            self.request_label = label
             log.info(f"Image requested at {self.last_request_time}")
         return
 
@@ -159,6 +165,8 @@ class Soradcam(object):
                         self.last_request_success = True
                         self.last_valid_result = response
                         self.last_received_time = datetime.datetime.now()
+                        with open(os.path.join(self.storage_path, f"{self.request_label}.jpg"), 'wb') as outfile:
+                            outfile.write(response.content)
                     else:
                         self.last_request_success = False
                         self.last_valid_result = None

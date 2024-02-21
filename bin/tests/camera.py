@@ -6,29 +6,28 @@ Simple test for camera connectivity
 import sys
 import os
 import time
+import datetime
 import inspect
 import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-#from initialisation import tpr_init
-#from main_app import parse_args
-#import functions.config_functions as cf
+from initialisation import camera_init
+from main_app import parse_args
+import functions.config_functions as cf
 import thread_managers.camera_manager as cameras
 
-#def main(conf):
-def main():
-    print("Start test, initialising")
-    #tpr = tpr_init(conf['TPR'])
-    #tpr_manager = tpr['manager']
-    #print("Show live data for {0} second (0.01s refresh rate)".format(test_duration_single_reads))
-    # get protocol from config
 
-    camera = cameras.Soradcam()
+def main(conf):
+    print("Start test, initialising")
+    cam = camera_init(conf['CAMERA'])
+    camera = cam['manager']
+
     camera.start()
     print(f"Connected to camera: {camera.connected}")
 
     t0 = time.perf_counter()
 
-    camera.get_picture()
+    label = f"test_{datetime.datetime.now().isoformat()}"
+    camera.get_picture(label=label)
 
     while camera.busy and time.perf_counter()-t0 < 5.0:
         time.sleep(0.1)
@@ -39,20 +38,20 @@ def main():
     else:
         print(f"No image received, last response at {camera.last_received_time.isoformat()}")
 
-    print(camera.last_valid_result)
+    outpath = os.path.join(cam['storage_path'], label+'.jpg')
+    if os.path.exists(outpath):
+        print(f"Image stored at {outpath}")
+    else:
+        print(f"Error: Image not found at {outpath}")
 
     print("finished test, stopping monitor")
     camera.stop()
 
-    if save:
-        with open("test.jpg", 'wb') as testfile:
-            testfile.write(camera.last_valid_result.content)
-
 
 if __name__ == '__main__':
-    #args = parse_args()
-    #conf = cf.read_config(args.config_file)
-    #conf = cf.update_config(conf, args.local_config_file)
+    args = parse_args()
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
 
     log = logging.getLogger()
     handler = logging.StreamHandler(sys.stdout)
@@ -62,6 +61,5 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
-    save = True
-    main()
+    main(conf)
 
