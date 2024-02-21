@@ -23,6 +23,7 @@ from thread_managers import tpr_manager
 from thread_managers import gps_manager
 from thread_managers import rht_manager
 from thread_managers import gpio_manager
+from thread_managers import camera_manager
 from functions import db_functions
 log = logging.getLogger('init')   # report to root logger
 
@@ -86,6 +87,34 @@ def db_init(db_config):
 
     return db
 
+def camera_init(camera_config):
+    """
+    Read Camera config settings and initialise camera manager
+    : camera_config is the [CAMERA] section in the config file
+    : cam is a dictionary containing the configuration and manager
+    """
+    cam = {}
+    # Get all the TPR variables from the config file
+    cam['used'] = camera_config.getboolean('use_camera')
+    cam['interface'] = camera_config.get('protocol').lower()
+    cam['manager'] = None
+    cam['ip'] = camera_config.get('camera_ip')
+    cam['port'] = camera_config.getint('camera_port')
+    cam['resolution'] = camera_config.get('resolution')
+    cam['interval'] = camera_config.getint('interval')
+    cam['storage_path'] = camera_config.get('storage_path')
+
+    if not cam['used']:
+        log.info(f"Camera disabled in config")
+        return cam
+
+    assert cam['interface'].lower() in ['soradcam', ]
+
+    # Return the configuration dict and initialise relevant manager class
+    if cam['interface'] == 'soradcam':
+        cam['manager'] = camera_manager.Soradcam(cam)
+
+    return cam
 
 def motor_init(motor_config, ports):
     """read motor configuration. Any other motor initialisation (e.g. test connection, go to home position) should be called here"""
