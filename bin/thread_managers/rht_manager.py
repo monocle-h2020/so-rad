@@ -16,13 +16,16 @@ import logging
 import threading
 import datetime
 import time
-log = logging.getLogger('rht')
 try:
     import Adafruit_DHT
-except Exception as err:
-    log.error("Module not imported - either missing or due to unsupported platform. Some functions may not work")
-    log.exception(err)
+except:
+    pass
+try:
+    import adafruit_dht
+except:
+    pass
 
+log = logging.getLogger('rht')
 
 class Ada_dht22(object):
     """
@@ -34,7 +37,9 @@ class Ada_dht22(object):
         Set up
         : rht is the [RHT] part of the config file interpreted as a dictionary in initialisation.py
         """
-        self.pin = rht['pin']
+        self.interface = rht['interface']
+
+        self.pin = rht['pin']  # an integer representing the GPIO number rather than the pin on the board.
         self.temp = None
         self.rh  = None
         self.updated = None
@@ -42,20 +47,47 @@ class Ada_dht22(object):
         self.started = False
         self.stop_monitor = False
         self.sleep_interval = 0.1
-        self.sampling_time = rht['sampling_time']  # sampling cycle (for averagin) in seconds
+        self.sampling_time = rht['sampling_time']  # sampling cycle (for averaging) in seconds
         self.update_rht_single()   # init with first reading
         self.buffer_time =  [self.updated]
         self.buffer_temp =  [self.temp]
         self.buffer_rh = [self.rh]
+        log.info("RHT sensor initialised")
 
     def update_rht_single(self):
-        '''Read Relative Humidity and Temperature once'''
-        self.rh, self.temp = Adafruit_DHT.read_retry(Adafruit_DHT.DHT22, self.pin)
+        '''Attempt to get Relative Humidity and Temperature for up to 2 seconds'''
+
         self.updated = datetime.datetime.now()
+        t0 = time.perf_counter()
+
+        try:
+            while time.perf_counter() - t0 <= 2.0:
+
+                if self.interface == 'ada_dht22':
+                    self.rh, self.temp = Adafruit_DHT.read_retry(Adafruit_DHT.DHT22, self.pin, retries=4, delay_seconds=0.5)
+
+                elif self.interface == 'ada_cp_dht':
+                    dht_device = adafruit_dht.DHT22(adafruit_dht.Pin(self.pin))
+                    self.temp = dht_device.temperature
+                    self.rh = dht_device.humidity
+                    dht_device.exit()
+
+                if (self.temp is not None) and (self.rh is not None):
+                    break
+                else:
+                    time.sleep(0.5)
+
+        except Exception as err:
+            log.warning(f"RHT reading failed: {err}")
+            self.temp = None
+            self.rh = None
+            if self.interface == 'ada_cp_dht':
+                dht_device.exit()
+
         return self.updated, self.rh, self.temp
 
     def __repr__(self):
-        return "Temp {0:0.2f}C \tRelative Humidity {1:0.2f}%".format(self.temp, self.rh)
+        return f"RH manager"
 
     def start(self):
         """
@@ -73,6 +105,9 @@ class Ada_dht22(object):
         """
         Stop the sampling thread
         """
+        if not self.started:
+            return
+
         log.info("Stopping RHT manager")
         self.stop_monitor = True
         time.sleep(1*self.sleep_interval)
@@ -123,4 +158,5 @@ class Ada_dht22(object):
             continue
 
     def __del__(self):
-        self.stop()
+        if self.started:
+            self.stop()

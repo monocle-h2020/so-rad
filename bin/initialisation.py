@@ -213,10 +213,10 @@ def rht_init(rht_config):
         log.info(f"RHT sensor disabled in config")
         return rht
 
-    assert rht['interface'].lower() in ['ada_dht22', ]
+    assert rht['interface'].lower() in ['ada_dht22', 'ada_cp_dht']
 
     # Return the configuration dict and initialise relevant manager class
-    if rht['interface'] == 'ada_dht22':
+    if rht['interface'] in ['ada_dht22', 'ada_cp_dht']:
         rht['manager'] = rht_manager.Ada_dht22(rht)
 
     return rht

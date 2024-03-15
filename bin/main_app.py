@@ -215,7 +215,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     # Stop the RHT manager
     if (rht['used']) and (rht['manager'] is not None) and (rht['manager'].started):
         log.info("Stopping RHT manager thread")
-        rht['manager'].stop()
+        #rht['manager'].stop()  # not using threading here, but it's there if we want it.
 
     # Turn all GPIO pins off
     initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
