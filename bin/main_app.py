@@ -28,8 +28,7 @@ from functions.export_functions import run_export, update_status_parse_server, i
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-
-__version__ = 20230401.1
+__version__ = 20240318.1
 
 
 def parse_args():
@@ -103,11 +102,15 @@ def init_all(conf):
     battery, bat_manager = initialisation.battery_init(conf['BATTERY'], ports)
     tpr = initialisation.tpr_init(conf['TPR'])  # tilt sensor
     rht = initialisation.rht_init(conf['RHT'])  # internal temp/rh sensor
+    power_schedule = initialisation.power_schedule_init(conf['POWER_SCHEDULE'])
 
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
     if Rad_manager is not None and rad['use_gpio_control']:
         gpios.append(rad['gpio1'])
+
+    if power_schedule['used'] and power_schedule['use_gpio_control']:
+        gpios.append(power_schedule['power_schedule_gpio1'])
 
     # start individual monitoring threads
     if battery['used']:
@@ -175,19 +178,19 @@ def init_all(conf):
         except Exception as msg:
             log.exception(msg)
             try:
-                stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+                stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
             except UnboundLocalError:
                 # special case for G1 sensors getting an incomplete rad manager
-                stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+                stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
 
     else:
         radiometry_manager = None
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, power_schedule
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger('stop')
 
@@ -217,10 +220,17 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         log.info("Stopping RHT manager thread")
         #rht['manager'].stop()  # not using threading here, but it's there if we want it.
 
-    # Turn all GPIO pins off
-    initialisation.init_gpio(conf, rad, state=0)  # set all used pins to LOW
+    # Turn radiometry power control GPIO pin off
+    rad['gpio_interface'].off(rad['gpio1'])
+    time.sleep(0.1)
     rad['gpio_interface'].stop()  # release gpio control
-    time.sleep(0.5)
+    time.sleep(0.1)
+
+    # Turn power_scheduling control GPIO pin off
+    power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
+    time.sleep(0.1)
+    power_schedule['gpio_interface'].stop()  # release gpio control
+    time.sleep(0.1)
 
     # Wait for any lingering threads.
     log.info(f"Waiting on {threading.active_count()} active threads..")
@@ -307,19 +317,25 @@ def format_log_message(counter, ready, values):
 
 
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
-                  motor, battery, bat_manager, gpios, tpr, rht, trigger_id, verbose):
+                  motor, battery, bat_manager, gpios, tpr, rht, power_schedule,
+                  trigger_id, verbose):
     """run one measurement cycle
 
     : counter               - measurement cycle number, included for logging
-    : conf                  - main configuration (parsed from file)
-    : sample                - main sampling settings configuration
-    : bat_manager           - battery manager instance
-    : gps                   - gps settings dictionary including thread manager instance
+    : conf                  - main configuration dict (parsed from file)
+    : rad                   - radiometry configuration dict
+    : sample                - main sampling settings configuration dict
+    : gps                   - gps settings dict including thread manager instance
     : radiometry_manager    - radiometry manager instance
-    : rad                   - radiometry configuration
-    : battery               - battery management configuration
-    : motor                 - motor configuration
-    : gpios                 - gpio pins in use
+    : motor                 - motor configuration dict
+    : battery               - battery management configuration dict
+    : bat_manager           - battery manager instance
+    : gpios                 - list of gpio pins in use
+    : tpr                   - tilt sensor coniguration dict
+    : rht                   - relative humidity and temperature sensor configuration dict
+    : power_schedue         - power schedule configuration dict
+    : trigger_id            - identifier of the previous measurement (a datetime object)
+    : verbose               - used to collect more verbose outputs
 
     returns:
     : trigger_id            - identifier of the last measurement (a datetime object)
@@ -368,6 +384,24 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     ready['heading'] = check_heading(gps)
     # Check radiometry / sampling conditions
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
+
+    # Consider power scheduling
+    values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
+                                                                  values['lon0'],
+                                                                  0.0, values['dt'])
+
+    if (power_schedule['used']) and (power_schedule['use_gpio_pins']):
+        if power_schedule['mode'] == 'solar_angle':
+            if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
+                # power saving is allowed now.
+                if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
+                    power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
+                    time.sleep(0.1)
+            elif (values['solar_el'] + -0.5) >= sample['solar_elevation_limit']:
+                # power saving should be cancelled now.
+                if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
+                    power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
+                    time.sleep(0.1)
 
     if ready['gps']:
         # read latest gps info and calculate angles for motor
@@ -552,10 +586,11 @@ def run():
 
     try:
         # Initialise everything
-        db_dict, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht = init_all(conf)
+        db_dict, rad, sample, gps, radiometry_manager,\
+            motor, battery, bat_manager, gpios, tpr, rht, power_schedule = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
-        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)
+        stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf, idle_time=120)
         raise
 
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -578,7 +613,8 @@ def run():
         last_check_cycle_start = time.perf_counter()
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
-                          motor, battery, bat_manager, gpios, tpr, rht, trigger_id, args.verbose)
+                          motor, battery, bat_manager, gpios, tpr, rht, power_schedule,
+                          trigger_id, args.verbose)
             log.info(f"Check cycle completed in {time.perf_counter() - last_check_cycle_start} s")
 
             use_export = conf['EXPORT'].getboolean('use_export')
@@ -636,10 +672,10 @@ def run():
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, conf, idle_time=120)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf, idle_time=120)
             raise
 
 if __name__ == '__main__':

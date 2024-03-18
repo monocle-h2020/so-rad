@@ -553,7 +553,7 @@ class TriosManager(object):
         self.busy = False
 
     def check_and_restore_sensor_number(self):
-        """check (called periodically from main app) whether the expected number of sensors are connected. 
+        """check (called periodically from main app) whether the expected number of sensors are connected.
         This will help recover from an incomplete reboot and 'tired sensor syndrome' in trios acc sensors."""
         reboot_int = self.config['minimum_reboot_interval_sec']
         time_elapsed_since_last_check = datetime.datetime.now()-self.last_connectivity_check

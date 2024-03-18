@@ -166,6 +166,37 @@ def battery_init(battery_config, ports):
     return battery, bat_manager
 
 
+def power_schedule_init(power_schedule_config):
+    """
+    Read power scheduling configuration settings.
+
+    : power_schedule_config is the [POWER_SCHEDULE] section in the config file
+    : power_schedule is a dictionary containing the configuration
+    """
+    power_schedule = {}
+    # Get all the motor variables from the config file
+    power_schedule['used'] = power_schedule_config.getboolean('use_power_schedule')
+    power_schedule['mode'] = power_schedule_config.get('solar_angle')
+    power_schedule['use_gpio_control'] = power_schedule_config.getboolean('use_gpio_control')
+
+    if not power_schedule['used']:
+        return power_schedule
+
+    if power_schedule['use_gpio_control']:
+        power_schedule['gpio_protocol'] = power_schedule_config.get('gpio_protocol')
+        assert power_schedule['gpio_protocol'] in  ['rpi', 'gpiozero']
+        if power_schedule['gpio_protocol'] == 'rpi':
+            power_schedule['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
+        elif power_schedule['gpio_protocol'] == 'gpiozero':
+            power_schedule['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
+
+        power_schedule['gpio1'] = rad_config.getint('power_schedule_gpio1')
+        power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
+        time.sleep(1)
+
+    return power_schedule
+
+
 def tpr_init(tpr_config):
     """
     Read Tilt/Pitch/Roll monitoring config settings and initialise TPR connection and monitor
