@@ -174,7 +174,8 @@ def execute_commands(commands_list, motor_serial_port):
 
 def return_home(motor_serial_port):
     """
-    Sends a pre-programmed command to the motor controller to return to its HOME position (FAST). This disregards any user configuration. On 12V systems this generates a high current draw which may trip the power supply.
+    Sends a pre-programmed command to the motor controller to return to its HOME position (FAST). This disregards any user configuration.
+    This is not the preferred way to move the motor home because it disregards normal travel speeds which may cause a significant voltage drop at 12V supply.
     """
     # Return to home operation (fast)
     home_command_start = "0106007D0010181E"
