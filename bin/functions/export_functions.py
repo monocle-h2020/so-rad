@@ -131,7 +131,7 @@ def update_local_db(db, metadata_id, export_result, record_json, test_run=False)
                 done = True
                 log.debug(f"Updated local db record {metadata_id}")
         except Exception as msg:
-            log.exception(msg)
+            log.warning(msg)
             time.sleep(0.2) * db_update_attempt**2
             db_update_attempt += 1
     conn.close()
@@ -204,7 +204,7 @@ def export_to_parse_server(export_config_dict, json_record):
         return False, None, None
     except Exception as err:
         log.warning("Unhandled exception while uploading data to remote server")
-        log.exception(err)
+        #log.exception(err)
         return False, None, None
 
 
@@ -304,7 +304,7 @@ def update_status_parse_server(conf, db):
     response = response.json()
     if len(response['results']) == 0:
         # request succeeded but no object was found (remote store was likely cleared, or this is a new platform ID). Attempt to upload a new status record.
-        export_result, resultcode = export_to_parse_server(export_config_dict, meta_json)
+        export_result, resultcode, response = export_to_parse_server(export_config_dict, meta_json)
         if not export_result:
             log.debug("Status record creation failed, try again later")
         else:

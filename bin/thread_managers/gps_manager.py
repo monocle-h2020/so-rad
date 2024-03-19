@@ -166,10 +166,17 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
             dataDictionary['relPosD'] =      data.relPosD
             dataDictionary['relPosLength'] = data.length
             dataDictionary['relPosHeading'] = data.relPosHeading
-            dataDictionary['relPosHPN'] =    data.relPosHPN
-            dataDictionary['relPosHPE'] =    data.relPosHPE
-            dataDictionary['relPosHPD'] =    data.relPosHPD
-            dataDictionary['relPosHPLength'] = data.relPosHPLength
+            #RELEASE 1.2.37. Streamline parsing of NAV messages with high precision attributes
+            # (NAV-HPPOSSEC, NAV-HPPOSLLH, NAV-RELPOSNED). High precision attributes will now
+            # be prefixed "_HP" in the payload definitions, and their scaled values will be
+            # automatically added to the corresponding standard precision attribute.
+            # The high precision attribute will be omitted from the parsed message
+            # (so, for example, the parsed NAV-RELPOSNED message will no longer include
+            # both relPosN and relPosHPN values - relPosN will include the scaled relPosHPN value).
+            #dataDictionary['relPosHPN'] =    data.relPosHPN
+            #dataDictionary['relPosHPE'] =    data.relPosHPE
+            #dataDictionary['relPosHPD'] =    data.relPosHPD
+            #dataDictionary['relPosHPLength'] = data.relPosHPLength
             dataDictionary['accN'] =         data.accN
             dataDictionary['accE'] =         data.accE
             dataDictionary['accD'] =         data.accD
@@ -821,10 +828,10 @@ class PYUBX2(object):
 
         # Heading
         self.relPosHeading = None
-        self.relPosHPN = None
-        self.relPosHPE = None
-        self.relPosHPD = None
-        self.relPosHPLength = None
+        #self.relPosHPN = None
+        #self.relPosHPE = None
+        #self.relPosHPD = None
+        #self.relPosHPLength = None
         self.accN = None
         self.accE = None
         self.accD = None
@@ -994,10 +1001,10 @@ class PYUBX2(object):
 
             # Heading
             self.relPosHeading = gps_dict['relPosHeading']
-            self.relPosHPN = gps_dict['relPosHPN']
-            self.relPosHPE = gps_dict['relPosHPE']
-            self.relPosHPD = gps_dict['relPosHPD']
-            self.relPosHPLength = gps_dict['relPosHPLength']
+            #self.relPosHPN = gps_dict['relPosHPN']
+            #self.relPosHPE = gps_dict['relPosHPE']
+            #self.relPosHPD = gps_dict['relPosHPD']
+            #self.relPosHPLength = gps_dict['relPosHPLength']
             self.accN = gps_dict['accN']
             self.accE = gps_dict['accE']
             self.accD = gps_dict['accD']
@@ -1128,10 +1135,10 @@ class RTKUBX(object):
         self.reserved2_2 = None
         self.reserved2_3 = None
         self.reserved2_4 = None
-        self.relPosHPN = None
-        self.relPosHPE = None
-        self.relPosHPD = None
-        self.relPosHPLength = None
+        #self.relPosHPN = None
+        #self.relPosHPE = None
+        #self.relPosHPD = None
+        #self.relPosHPLength = None
         self.accN = None
         self.accE = None
         self.accD = None
@@ -1318,10 +1325,10 @@ class RTKUBX(object):
             self.reserved2_2 = gps_dict['reserved2_2']
             self.reserved2_3 = gps_dict['reserved2_3']
             self.reserved2_4 = gps_dict['reserved2_4']
-            self.relPosHPN = gps_dict['relPosHPN']
-            self.relPosHPE = gps_dict['relPosHPE']
-            self.relPosHPD = gps_dict['relPosHPD']
-            self.relPosHPLength = gps_dict['relPosHPLength']
+            #self.relPosHPN = gps_dict['relPosHPN']
+            #self.relPosHPE = gps_dict['relPosHPE']
+            #self.relPosHPD = gps_dict['relPosHPD']
+            #self.relPosHPLength = gps_dict['relPosHPLength']
             self.accN = gps_dict['accN']
             self.accE = gps_dict['accE']
             self.accD = gps_dict['accD']

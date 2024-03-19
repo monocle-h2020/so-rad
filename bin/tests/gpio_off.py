@@ -28,10 +28,17 @@ def run(conf):
             rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
         log.info(rad['gpio_interface'])
+        log.info(f"Pin {pin} status: {rad['gpio_interface'].status(pin)}")
         log.info(f"Switching pin {pin}")
 
-        rad['gpio_interface'].on(pin)
-        log.info("Done")
+        rad['gpio_interface'].off(pin)
+        log.info(f"Pin {pin} status: {rad['gpio_interface'].status(pin)}")
+
+        rad['gpio_interface'].off(22)
+        log.info(f"Pin 22 status: {rad['gpio_interface'].status(22)}")
+
+        time.sleep(0.5)
+
     else:
         print("GPIO control is not set")
 

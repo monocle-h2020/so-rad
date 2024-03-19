@@ -18,6 +18,8 @@ import time
 import datetime
 import logging
 import threading
+import pytrios_g2.pytrios2 as pt2
+from PyTrios import PyTrios as ps
 
 log = logging.getLogger('rad')
 log.setLevel('INFO')
@@ -38,8 +40,6 @@ class TriosG2Manager(object):
     """
     def __init__(self, rad):
         # import specific library for this sensor type
-        global pt2
-        import pytrios_g2.pytrios2 as pt2
         self.sams = []
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']
@@ -453,9 +453,6 @@ class TriosManager(object):
     Trios G1 manager class
     """
     def __init__(self, rad):
-        # import pytrios only if used
-        global ps
-        from PyTrios import PyTrios as ps
         self.config = rad  # dictionary with radiometry settings
         self.ed_sampling = rad['ed_sampling']
         #self.ports = [self.config['port1'], self.config['port2'], self.config['port3']]  # list of strings
@@ -553,7 +550,7 @@ class TriosManager(object):
         self.busy = False
 
     def check_and_restore_sensor_number(self):
-        """check (called periodically from main app) whether the expected number of sensors are connected. 
+        """check (called periodically from main app) whether the expected number of sensors are connected.
         This will help recover from an incomplete reboot and 'tired sensor syndrome' in trios acc sensors."""
         reboot_int = self.config['minimum_reboot_interval_sec']
         time_elapsed_since_last_check = datetime.datetime.now()-self.last_connectivity_check

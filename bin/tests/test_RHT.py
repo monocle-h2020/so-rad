@@ -2,29 +2,53 @@
 
 """
 Short test to check RH&T sensor operates correctly
-Test is specifically for DHT22 RH&T sensor
 """
-import argparse
-import Adafruit_DHT
-import datetime
+
+import sys
 import os
 import time
+import inspect
+import logging
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
+import serial.tools.list_ports as list_ports
+from initialisation import rht_init
+from main_app import parse_args
+import functions.config_functions as cf
+test_duration_single_reads = 60  # seconds
 
+def test_run(conf):
+    log = logging.getLogger(__name__)
+    log.info("Start test, initialising")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-p", "--pin", type=int, default=14, help="GPIO data pin number for RHT sensor (default 14)")
-args = parser.parse_args()
+    rht = rht_init(conf['RHT'])
+    rht_manager = rht['manager']
+    log.info(rht_manager)
 
-DHT_SENSOR = Adafruit_DHT.DHT22
-DHT_PIN = args.pin
+    print("Show live data for {0} second (2s refresh rate)".format(test_duration_single_reads))
 
+    # get protocol from config
+    t1 = time.time()
+    while time.time() < t1 + test_duration_single_reads:
 
-def test_run():
-    for i in range(100):
-        humidity, temperature = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
-        print("[{0}] RH: {1}% Temperature: {2} degrees C".format(i, humidity, temperature))
-        time.sleep(0.1)
+        t_last, humidity, temperature = rht_manager.update_rht_single()
+        log.info(f"{t_last.isoformat()} \t RH: {humidity}% \t Temperature: {temperature}C")
+        time.sleep(2)
+
+    log.info("Finished test.")
 
 
 if __name__ == '__main__':
-    test_run()
+    args = parse_args()
+    conf = cf.read_config(args.config_file)
+    conf = cf.update_config(conf, args.local_config_file)
+
+    log = logging.getLogger()
+    handler = logging.StreamHandler(sys.stdout)
+    log.setLevel(logging.INFO)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s| %(levelname)s | %(name)s | %(message)s')
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+
+    test_run(conf)
+
