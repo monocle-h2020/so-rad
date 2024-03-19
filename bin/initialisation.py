@@ -190,7 +190,7 @@ def power_schedule_init(power_schedule_config):
         elif power_schedule['gpio_protocol'] == 'gpiozero':
             power_schedule['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
-        power_schedule['gpio1'] = rad_config.getint('power_schedule_gpio1')
+        power_schedule['power_schedule_gpio1'] = power_schedule_config.getint('power_schedule_gpio1')
         power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
         time.sleep(1)
 
