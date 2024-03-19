@@ -346,12 +346,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
     values = {'counter': counter, 'speed': None, 'nsat0': None, 'motor_pos': None, 'motor_deg': None, 'ship_bearing_mean': None,
-              'solar_az': None, 'solar_el': None, 'motor_angles': {}, 'rel_view_az': None, 'batt_voltage': None,
+              'solar_az': None, 'solar_el': None, 'rel_view_az': None, 'batt_voltage': None,
               'lat0': None, 'lon0': None, 'alt0': None, 'dt': None, 'nsat0': None,
               'headMot': None, 'relPosHeading': None, 'accHeading': None, 'fix': None,
               'flags_headVehValid': None, 'flags_diffSolN': None, 'flags_gnssFixOK': None,
               'tilt_avg': None, 'tilt_std': None, 'inside_temp': None, 'inside_rh': None,
-              'motor_alarm': None, 'driver_temp': None, 'motor_temp': None, 'pi_temp': None}
+              'motor_alarm': None, 'driver_temp': None, 'motor_temp': None, 'pi_temp': None,
+              'motor_angles': {'target_motor_pos_rel_az_deg': None}}
 
     use_rad = rad['n_sensors'] > 0
 
@@ -387,6 +388,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # Consider power scheduling
     values = update_system_values(gps, values)
+    power_saving_active = False
     try:
         values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
                                                                       values['lon0'],
@@ -396,29 +398,36 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             if power_schedule['mode'] == 'solar_angle':
                 if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
                     # power saving is allowed now.
+                    power_saving_active = True
                     if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
                         log.info("Start power saving mode")
                         power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
                         time.sleep(0.1)
+
                 elif (values['solar_el'] + -0.5) >= sample['solar_elevation_limit']:
                     # power saving should be cancelled now.
                     if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
                         log.info("Stop power saving mode")
                         power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
                         time.sleep(0.1)
+
     except ValueError:
         log.warning("Could not calculate solar angles yet for power scheduling")
     except Exception as err:
         log.exception(err)
 
+
     if ready['gps']:
         # read latest gps info and calculate angles for motor
         # valid positioning data is required to do anything else
-        values = update_system_values(gps, values, tpr, rht, motor)
+        if power_saving_active:
+            values = update_system_values(gps, values, tpr, rht)
+        else:
+            values = update_system_values(gps, values, tpr, rht, motor)
         ready['speed'] = check_speed(sample, gps)
 
         # read motor position to see if it is ready
-        if motor['used']:
+        if motor['used'] and not power_saving_active:
             ready['motor'], values['motor_alarm'] = check_motor(motor)  # check for motor alarms
             values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
             try:
@@ -428,8 +437,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             if values['motor_pos'] is None:
                 ready['motor'] = False
                 message = format_log_message(counter, ready, values)
-                message += "Motor position not read."
+                message += " | Motor position not read."
                 log.warning(message)
+                return trigger_id
+        elif motor['used'] and power_saving_active:
+                ready['motor'] = False
+                message = format_log_message(counter, ready, values)
+                log.info(message)
                 return trigger_id
         else:
             # if no motor is used we'll assume the sensors are pointing in the motor home position.
