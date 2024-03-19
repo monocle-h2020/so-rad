@@ -176,7 +176,7 @@ def power_schedule_init(power_schedule_config):
     power_schedule = {}
     # Get all the motor variables from the config file
     power_schedule['used'] = power_schedule_config.getboolean('use_power_schedule')
-    power_schedule['mode'] = power_schedule_config.get('solar_angle')
+    power_schedule['mode'] = power_schedule_config.get('schedule_mode')
     power_schedule['use_gpio_control'] = power_schedule_config.getboolean('use_gpio_control')
 
     if not power_schedule['used']:

@@ -176,7 +176,7 @@ def init_all(conf):
             if len(radiometry_manager.sams) < rad['n_sensors']:
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
-            log.exception(msg)
+            log.critical(msg)
             try:
                 stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
             except UnboundLocalError:
@@ -386,22 +386,30 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
 
     # Consider power scheduling
-    values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
-                                                                  values['lon0'],
-                                                                  0.0, values['dt'])
-
-    if (power_schedule['used']) and (power_schedule['use_gpio_pins']):
-        if power_schedule['mode'] == 'solar_angle':
-            if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
-                # power saving is allowed now.
-                if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
-                    power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
-                    time.sleep(0.1)
-            elif (values['solar_el'] + -0.5) >= sample['solar_elevation_limit']:
-                # power saving should be cancelled now.
-                if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
-                    power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
-                    time.sleep(0.1)
+    values = update_system_values(gps, values)
+    try:
+        values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
+                                                                      values['lon0'],
+                                                                      0.0, values['dt'])
+        log.debug(f"Solar elevation {values['solar_el']} | limit: {sample['solar_elevation_limit']}")
+        if (power_schedule['used']) and (power_schedule['use_gpio_control']):
+            if power_schedule['mode'] == 'solar_angle':
+                if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
+                    # power saving is allowed now.
+                    if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
+                        log.info("Start power saving mode")
+                        power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
+                        time.sleep(0.1)
+                elif (values['solar_el'] + -0.5) >= sample['solar_elevation_limit']:
+                    # power saving should be cancelled now.
+                    if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
+                        log.info("Stop power saving mode")
+                        power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
+                        time.sleep(0.1)
+    except ValueError:
+        log.warning("Could not calculate solar angles yet for power scheduling")
+    except Exception as err:
+        log.exception(err)
 
     if ready['gps']:
         # read latest gps info and calculate angles for motor
@@ -615,7 +623,8 @@ def run():
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, power_schedule,
                           trigger_id, args.verbose)
-            log.info(f"Check cycle completed in {time.perf_counter() - last_check_cycle_start} s")
+            if (time.perf_counter() - last_check_cycle_start) > main_check_cycle_sec:
+                log.info(f"Check cycle completed in {(time.perf_counter() - last_check_cycle_start):1.2f} s")
 
             use_export = conf['EXPORT'].getboolean('use_export')
             if not use_export:
@@ -630,7 +639,8 @@ def run():
 
             # while system idles, check how many samples need uploading, upload a batch and check again
             n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-            log.info(f"{counter} | {n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1f} s since last connection attempt")
+            if n_not_inserted > 0:
+                log.info(f"{counter} | {n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1f} s since last connection attempt")
             if not check_internet():
                 log.debug(f"{counter} | Internet connection timed out.")
 
