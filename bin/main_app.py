@@ -228,10 +228,11 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     time.sleep(0.1)
 
     # Turn power_scheduling control GPIO pin off
-    power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
-    time.sleep(0.1)
-    power_schedule['gpio_interface'].stop()  # release gpio control
-    time.sleep(0.1)
+    if power_schedule['use_gpio_control']:
+        power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
+        time.sleep(0.1)
+        power_schedule['gpio_interface'].stop()  # release gpio control
+        time.sleep(0.1)
 
     # Stop the camera manager
     if (cam['used']) and (cam['manager'] is not None) and (cam['manager'].started):
