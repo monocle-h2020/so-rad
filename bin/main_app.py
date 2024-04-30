@@ -14,6 +14,7 @@ import serial.tools.list_ports as list_ports
 import threading
 import os
 import sys
+import shutil
 import datetime
 import argparse
 import initialisation
@@ -25,6 +26,7 @@ import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling, check_internet, check_remote_data_store
 from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
+import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
@@ -187,8 +189,10 @@ def init_all(conf):
     else:
         radiometry_manager = None
 
+    redis_client = rf.init()
+
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, redis_client
 
 
 def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=0):
@@ -276,7 +280,7 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None):
     values['nsat0'] = gps['manager'].satellite_number
     values['pi_temp'] = check_pi_cpu_temperature()
     if (tpr is not None) and (tpr['manager'] is not None):
-        log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
+        log.info("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
         values['tilt_avg'] = tpr['manager'].tilt_avg
         values['tilt_std'] = tpr['manager'].tilt_std
     if (rht is not None) and (rht['manager'] is not None):
@@ -286,6 +290,7 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None):
         values['inside_rh'] =   rh
     if (motor is not None) and (motor['used']):
         values['driver_temp'], values['motor_temp'] =  motor_func.motor_temp_read(motor)
+
     return values
 
 
@@ -335,7 +340,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     : tpr                   - tilt sensor coniguration dict
     : rht                   - relative humidity and temperature sensor configuration dict
     : cam                   - Camera configuration
-    : power_schedue         - power schedule configuration dict
+    : power_schedule        - power schedule configuration dict
     : trigger_id            - identifier of the previous measurement (a datetime object)
     : verbose               - used to collect more verbose outputs
 
@@ -617,14 +622,18 @@ def run():
     try:
         # Initialise everything
         db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule = init_all(conf)
+            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, redis_client = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
                  cam, power_schedule, conf, idle_time=120)
         raise
 
+    # the main program cycle will run at the following minimum interval
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
+    # some monitoring operations are run every multiple of main_check_cycle_sec
+    slow_cycle_sec = 10 * main_check_cycle_sec
+    slow_cycle_timer = time.perf_counter() - slow_cycle_sec - 10  # armed
 
     log.info("===Initialisation complete===")
 
@@ -634,7 +643,7 @@ def run():
 
     # Repeat indefinitely until program is closed
     counter = 0
-    remote_update_timer = time.perf_counter() - 290.0  # set timer to 10 seconds before next trigger
+    remote_update_timer = time.perf_counter() - 290.0  # armed
     export_result = True  # tracks whether exporting has been succesful
 
     # TODO: replace with some sort of scheduler for better clock synchronization
@@ -642,12 +651,21 @@ def run():
     while True:
         counter += 1
         last_check_cycle_start = time.perf_counter()
+        rf.store(redis_client, 'counter', counter)
+
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule,
                           trigger_id, args.verbose)
             if (time.perf_counter() - last_check_cycle_start) > main_check_cycle_sec:
                 log.info(f"Check cycle completed in {(time.perf_counter() - last_check_cycle_start):1.2f} s")
+
+            # update system monitoring via redis
+            if (time.perf_counter() - slow_cycle_timer) > slow_cycle_sec:
+                # disk usage
+                disk_total, disk_used, disk_free = shutil.disk_usage("/")
+                rf.store(redis_client, 'disk_free_gb', disk_free // (2**30), expires=300)
+                slow_cycle_timer = time.perf_counter()
 
             use_export = conf['EXPORT'].getboolean('use_export')
             if not use_export:
@@ -667,8 +685,8 @@ def run():
             if not check_internet():
                 log.debug(f"{counter} | Internet connection timed out.")
 
-            if (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > 60):
-                # update remote status at most once per minute if there are no data to upload
+            if (n_not_inserted == 0) and (time.perf_counter() - remote_update_timer > slow_cycle_sec):
+                # update remote status at most once per slow_cycle if there are no data to upload
                 if check_remote_data_store(conf)[0]:
                     export_result, resultcode = update_status_parse_server(conf, db_dict)
                     sucorfail = {True: 'succeeded', False:'failed'}[export_result]

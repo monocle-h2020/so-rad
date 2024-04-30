@@ -10,7 +10,6 @@ import datetime
 import inspect
 import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-from initialisation import camera_init
 from main_app import parse_args
 import functions.config_functions as cf
 import functions.redis_functions as rf
