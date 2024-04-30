@@ -17,12 +17,12 @@ import functions.redis_functions as rf
 import numpy as np
 
 def main(conf):
-    print("Start test, initialising")
-    #redis = redis_init(conf['redis'])
 
-    c = rf.init(port=6379)
+    c = rf.init()
 
-    for i in [999, 999.999, '999', datetime.datetime.now(), np.nan, np.int16(999), np.int32(999), np.float16(999.999), np.float32(999.999)]:
+    for i in [999, 999.999, '999', datetime.datetime.now(), np.nan,
+              np.int16(999), np.int32(999), np.float16(999.999), np.float32(999.999),
+              [1,2,3,'a','b','c'], (1,2,3,'a','b','c'), {1:'a',2:'b',3:'c'}, 1]:
         rf.store(c, 'test', i, expires=2)
         r, u = rf.retrieve(c, 'test', freshness = 10)
         log.info(f"Stored {i} (dtype {type(i)}), retrieved {r} (dtype {type(r)}), updated: {u}")

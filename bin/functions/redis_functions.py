@@ -6,9 +6,9 @@ Monitoring system values using in-memory database
 These functions send and retrieve system information to a redis instance
 so it can be retrieved in multiple scopes.
 
-Warning: all objects are converted to str when passed to redis.
-This is not lossless. Use this for system health monitoring rather than data collection.
-
+Warning: standard objects are converted to str when passed to redis.
+This is not lossless. Use this for health monitoring rather than data collection.
+To preserve integrity, provide tuples, dicts or lists as these will be pickled/unpickled.
 """
 
 import os
@@ -17,9 +17,7 @@ import logging
 import time
 import datetime
 import redis
-
-TIMEOUT=5  # timeout for getting a response on data upload. 
-TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
+import pickle
 
 log = logging.getLogger('redis')
 #log.setLevel('DEBUG')
@@ -33,7 +31,6 @@ def nptobase(x):
     except Exception as msg:
         log.debug(msg)
         pass
-
     return x
 
 
@@ -69,9 +66,19 @@ def retrieve(client, key, freshness=30):
                  threshold for this condition may vary between uses.
     """
 
-    value = client.get(key).decode('utf-8')
-
     dtype = client.get(f"{key}_dtype").decode('utf-8')
+    value = client.get(key)
+
+    updated = client.get(f"{key}_updated").decode('utf-8')
+    updated = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S.%f")
+    expires = int(client.get(f"{key}_expires").decode('utf-8'))
+
+    log.debug(f"Freshness: {freshness} | Expiry: {expires}")
+    log.debug(f"Age in s: {(datetime.datetime.now() - updated).total_seconds()}")
+
+    if dtype in ['float', 'int', 'str', 'datetime']:
+        value = value.decode('utf-8')
+
     if dtype == "float":
         value = float(value)
     elif dtype == "int":
@@ -80,15 +87,11 @@ def retrieve(client, key, freshness=30):
         value = str(value)
     elif dtype == "datetime":
         value = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
+    elif dtype == "pickle":
+        value = pickle.loads(client.get(key))
     else:
         log.warning(f"reading dtype {dtype} not implemented")
-
-    updated = client.get(f"{key}_updated").decode('utf-8')
-    updated = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S.%f")
-    expires = int(client.get(f"{key}_expires").decode('utf-8'))
-
-    log.debug(f"Freshness: {freshness} | Expiry: {expires}")
-    log.debug(f"Age in s: {(datetime.datetime.now() - updated).total_seconds()}")
+        return None, updated
 
     if (freshness is not None) and ((datetime.datetime.now() - updated).total_seconds() > freshness):
         log.warning(f"Stale value {key} = {value} ignored.")
@@ -107,11 +110,14 @@ def store(client, key, value, expires=30):
 
     : client     Redis client configured using init function
     : key        Name of the redis object
-    : value      Value for the key, must be float, str, int or datetime or a numpy equivalent
+    : value      Value for the key, must be float, str, int, datetime or a numpy equivalent.
+                 Any other type will be pickled.
     : expires    Time in seconds to consider the value sufficiently recent.
                  Retrieving the key/value will throw a warning if this time has expired.
     """
+    # deal with any numpy dtypes
     value = nptobase(value)
+    pickleit = False
 
     if isinstance(value, float):
         client.set(f"{key}_dtype", "float")
@@ -121,11 +127,17 @@ def store(client, key, value, expires=30):
         client.set(f"{key}_dtype", "int")
     elif isinstance(value, datetime.datetime):
         client.set(f"{key}_dtype", "datetime")
+    elif (isinstance(value, list)) or (isinstance(value, tuple)) or \
+         (isinstance(value, dict)) or (isinstance(value, np.array)):
+        client.set(f"{key}_dtype", "pickle")
+        pickleit=True
     else:
         log.warning(f"Setting dtype {type(value)} not implemented")
 
     if isinstance(value, datetime.datetime):
         client.set(key, value.isoformat())
+    elif pickleit:
+        client.set(key, pickle.dumps(value))
     else:
         client.set(key, str(value))
 
