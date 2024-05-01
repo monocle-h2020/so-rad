@@ -30,8 +30,9 @@ import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-__version__ = 20240318.1
+__version__ = 20240501.1
 
+redis_client = rf.init()
 
 def parse_args():
     """parse command line arguments"""
@@ -93,6 +94,8 @@ def init_all(conf):
 
     log = logging.getLogger('init')
     db = initialisation.db_init(conf['DATABASE'])
+
+    rf.store(redis_client, 'system_status', 'starting', expires=30)
 
     # Get all comports and collect the initialisation dicts
     ports = list_ports.comports()
@@ -189,15 +192,15 @@ def init_all(conf):
     else:
         radiometry_manager = None
 
-    redis_client = rf.init()
-
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, redis_client
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule
 
 
 def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger('stop')
+
+    rf.store(redis_client, 'system_status', 'stopping', expires=30)
 
     # Stop the radiometry manager
     if radiometry_manager is not None:
@@ -254,11 +257,14 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
 
     log.info(f"There are {threading.active_count()} active threads left.")
 
+
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
     logging.shutdown()
+    rf.store(redis_client, 'system_status', 'wait_exit', expires=30)
     time.sleep(idle_time)
     log.info("Exiting")
+    rf.store(redis_client, 'system_status', 'exited', expires=30)
     sys.exit(0)
 
 
@@ -408,6 +414,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                     power_saving_active = True
                     if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
                         log.info("Start power saving mode")
+                        rf.store(redis_client, 'system_status', 'power_saving', expires=30)
                         power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
                         time.sleep(0.1)
 
@@ -415,6 +422,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                     # power saving should be cancelled now.
                     if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
                         log.info("Stop power saving mode")
+                        rf.store(redis_client, 'system_status', 'running', expires=30)
                         power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
                         time.sleep(0.1)
 
@@ -503,6 +511,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         if move_motor:
             target_pos = values['motor_angles']['target_motor_pos_step']
+            rf.store(redis_client, 'sampling_status', 'moving_motor', expires=30)
+
             log.info(f"{counter} | Adjust motor angle ({values['motor_pos']} --> {target_pos})")
             # Rotate the motor to the new position
             target_pos_deg_in_motor_plane = target_pos / motor['steps_per_degree']
@@ -523,6 +533,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                     if time.time()-t0 > 5:
                         log.warning("Motor movement timed out (this is allowed)")
                     time.sleep(0.1)
+        rf.store(redis_client, 'sampling_status', 'ready', expires=30)
 
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
@@ -541,17 +552,21 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):
         # Get the current time of the computer as a unique trigger id
+        rf.store(redis_client, 'sampling_status', 'sampling', expires=30)
         trigger_id['all_sensors'] = datetime.datetime.now()
 
         # trigger a camera image if sufficient time has passed since the last one.
         if cam['used']:
             if (cam['manager'].last_received_time is None) or \
                (cam['manager'].last_received_time <= trigger_id['all_sensors'] - datetime.timedelta(seconds=cam['interval'])):
+                rf.store(redis_client, 'sampling_status', 'imaging', expires=30)
                 cam['manager'].get_picture(label=trigger_id['all_sensors'])
+                rf.store(redis_client, 'sampling_status', 'ready', expires=30)
 
         # Collect and combine radiometry data
         spec_data = []
         trig_id, specs, sids, itimes, pre_incs, post_incs, temp_incs = radiometry_manager.sample_all(trigger_id['all_sensors'])
+        rf.store(redis_client, 'sampling_status', 'ready', expires=30)
 
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
@@ -571,11 +586,13 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # alternatively trigger just the Ed sampling, if corresponding conditions are met
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
         and (ready['ed_sampling']):
+        rf.store(redis_client, 'sampling_status', 'sampling_ed', expires=30)
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
         # trigger Ed
         spec_data = []
         trig_id, specs, sids, itimes, pre_incs, post_incs, temp_incs = radiometry_manager.sample_ed(trigger_id['ed_sensor'])
+        rf.store(redis_client, 'sampling_status', 'ready', expires=30)
         for n in range(len(sids)):
             spec_data.append([str(sids[n]),str(itimes[n]),str(specs[n])])
 
@@ -618,11 +635,10 @@ def run():
     log = logging.getLogger('main')
     log.info('\n===Started logging===\n')
 
-
     try:
         # Initialise everything
         db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, redis_client = init_all(conf)
+            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
@@ -646,13 +662,14 @@ def run():
     remote_update_timer = time.perf_counter() - 290.0  # armed
     export_result = True  # tracks whether exporting has been succesful
 
+
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
+        rf.store(redis_client, 'counter', counter)
+        rf.store(redis_client, 'system_status', 'running', expires=30)
         counter += 1
         last_check_cycle_start = time.perf_counter()
-        rf.store(redis_client, 'counter', counter)
-
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule,

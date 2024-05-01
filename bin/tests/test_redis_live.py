@@ -21,9 +21,13 @@ def main():
     c = rf.init()
     try:
         while True:
-            for k in ['counter', 'disk_free_gb']:
-                r, u = rf.retrieve(c, k, freshness = 300)
-                log.info(f"{k}:\t {r}\t updated: {u}")
+            for k in ['counter', 'disk_free_gb', 'system_status', 'sampling_status']:
+                r, u, stale = rf.retrieve(c, k, freshness = None)
+                if r is None:
+                    r = 'None'  # this is just to allow formatting
+                stale_str = {True:'STALE', False:'', None:'missing'}[stale]
+
+                log.info(f"{k:<15} {r:>20}\t updated: {u}  {stale_str}")
             time.sleep(sleep_interval)
     except KeyboardInterrupt:
         pass

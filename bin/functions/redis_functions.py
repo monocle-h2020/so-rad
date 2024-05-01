@@ -69,7 +69,7 @@ def retrieve(client, key, freshness=30):
     dtype = client.get(f"{key}_dtype")
     if dtype is None:
         log.warning(f"Key {key} not registerd in redis")
-        return None, None
+        return None, None, None
     dtype = dtype.decode('utf-8')
     value = client.get(key)
 
@@ -95,17 +95,17 @@ def retrieve(client, key, freshness=30):
         value = pickle.loads(client.get(key))
     else:
         log.warning(f"reading dtype {dtype} not implemented")
-        return None, updated
+        return None, updated, None
 
     if (freshness is not None) and ((datetime.datetime.now() - updated).total_seconds() > freshness):
-        log.warning(f"Stale value {key} = {value} ignored.")
-        return None, updated
+        log.debug(f"Stale value {key} = {value} ignored.")
+        return None, updated, True
 
     elif (freshness is None) and ((datetime.datetime.now() - updated).total_seconds() > expires):
-        log.warning(f"Stale value {key} = {value} passed because freshness threshold is not set.")
-        return value, updated
+        log.debug(f"Stale value {key} = {value} passed because freshness threshold is not set.")
+        return value, updated, True
 
-    return value, updated
+    return value, updated, False
 
 
 def store(client, key, value, expires=30):

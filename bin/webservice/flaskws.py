@@ -399,8 +399,8 @@ def live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
-        redisvals['counter'], redisvals['counter_updated'] = redis_retrieve(client, 'counter', freshness=30)
-        redisvals['disk_free_gb'], redisvals['disk_free_gb_updated'] = redis_retrieve(client, 'disk_free_gb', freshness=300)
+        for key in ['system_status', 'sampling_status', 'counter', 'disk_free_gb']:
+            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
 
