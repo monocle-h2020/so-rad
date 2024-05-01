@@ -399,7 +399,7 @@ def live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
-        for key in ['system_status', 'sampling_status', 'counter', 'disk_free_gb']:
+        for key in ['system_status', 'sampling_status', 'counter', 'disk_free_gb', 'values']:
             redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
@@ -485,7 +485,8 @@ def control():
 
 
 @app.route('/status', methods=['GET', 'POST'])
-def status():
+@app.route('/latest', methods=['GET', 'POST'])
+def latest():
     """Home page showing instrument status"""
     try:
         if request.method == 'POST':
@@ -563,7 +564,7 @@ def status():
         common['so-rad_status'], message = service_status('so-rad')
 
         try:
-            return render_template('status.html', logvalues=logvalues, dbtable=dbtable,
+            return render_template('latest.html', logvalues=logvalues, dbtable=dbtable,
                                    labels=labels, timeseries=timeseries, common=common)
         except:
             flash("Unable to load the requested page")

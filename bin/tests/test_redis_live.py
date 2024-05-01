@@ -15,19 +15,30 @@ import functions.config_functions as cf
 import functions.redis_functions as rf
 import numpy as np
 
-sleep_interval = 1
+sleep_interval = 2
 
 def main():
     c = rf.init()
     try:
         while True:
+            log.info(f"====================================================")
             for k in ['counter', 'disk_free_gb', 'system_status', 'sampling_status']:
-                r, u, stale = rf.retrieve(c, k, freshness = None)
+                r, u, stale = rf.retrieve(c, k, freshness=None)
                 if r is None:
                     r = 'None'  # this is just to allow formatting
                 stale_str = {True:'STALE', False:'', None:'missing'}[stale]
+                log.info(f"{k:<20} {r:>20}\t updated: {u}  {stale_str}")
 
-                log.info(f"{k:<15} {r:>20}\t updated: {u}  {stale_str}")
+            log.info(f"- - - - - - - - - - - - - - - - - - - - - - - - - - -")
+
+            r, u, stale = rf.retrieve(c, 'values', freshness=None)
+            for k in ['lat0', 'lon0', 'alt0', 'headMot', 'relPosHeading', 'accHeading', 'fix',
+                      'flags_headVehValid', 'flags_diffSolN', 'flags_gnssFixOK', 'speed', 'nsat0',
+                      'pi_temp', 'tilt_avg', 'tilt_std', 'inside_temp', 'inside_rh',
+                      'driver_temp', 'motor_temp']:
+                try:
+                    log.info(f"{k:<20} {r[k]:>20}\t updated: {u}  {stale_str}")
+                except: pass
             time.sleep(sleep_interval)
     except KeyboardInterrupt:
         pass

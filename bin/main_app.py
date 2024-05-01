@@ -268,7 +268,7 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     sys.exit(0)
 
 
-def update_system_values(gps, values, tpr=None, rht=None, motor=None):
+def update_system_values(gps, values, tpr=None, rht=None, motor=None, redis=False):
     """update system value dict to the latest available in the sensor managers"""
     log = logging.getLogger('main')
     values['lat0'] = gps['manager'].lat
@@ -296,6 +296,10 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None):
         values['inside_rh'] =   rh
     if (motor is not None) and (motor['used']):
         values['driver_temp'], values['motor_temp'] =  motor_func.motor_temp_read(motor)
+
+    # update redis?
+    if redis:
+        rf.store(redis_client, 'values', values, expires=30)
 
     return values
 
@@ -539,7 +543,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
     # collect latest GPS and TPR data now that a measurement may be triggered
-    values = update_system_values(gps, values, tpr, rht, motor)
+    values = update_system_values(gps, values, tpr, rht, motor, redis=True)
 
     try:
         values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']

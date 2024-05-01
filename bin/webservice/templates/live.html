@@ -25,12 +25,24 @@
          <th width=30%>Value</th>
          <th width=30%>Last update</th>
       </tr>
-      <tr>  <th>System status</th>         <td>{{ redisvals['system_status'] }}       </td>  <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
-      <tr>  <th>Sampling status</th>       <td>{{ redisvals['sampling_status'] }}     </td>  <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
-      <tr>  <th>Counter</th>               <td>{{ redisvals['counter'] }}             </td>  <td>{{ redisvals['counter_updated'] }} </td>   </tr>
-      <tr>  <th>Disk space</th>            <td>{{ redisvals['disk_free_gb'] }} GIB    </td>  <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
+      <tr>  <th>System status</th>         <td>{{ redisvals['system_status'] }}           </td>  <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
+      <tr>  <th>Sampling status</th>       <td>{{ redisvals['sampling_status'] }}         </td>  <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
+      <tr>  <th>Counter</th>               <td>{{ redisvals['counter'] }}                 </td>  <td>{{ redisvals['counter_updated'] }} </td>   </tr>
+      <tr>  <th>Disk space</th>            <td>{{ redisvals['disk_free_gb'] }} GIB        </td>  <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
+      <tr>  <th>Ship speed</th>            <td>{{ redisvals['values']['speed']}} kn   </td>  <td> </td>   </tr>
+      <tr>  <th>Latitude</th>              <td>{{ redisvals['values']['lat0']}} deg   </td>  <td> </td>   </tr>
+      <tr>  <th>Longitude</th>             <td>{{ redisvals['values']['lon0']}} deg   </td>  <td> </td>   </tr>
+      <tr>  <th>RTK heading</th>           <td>{{ redisvals['values']['relPosHeading']}} deg   </td>  <td> </td>   </tr>
+      <tr>  <th>Heading accuracy</th>      <td>{{ redisvals['values']['accHeading']}} deg   </td>  <td> </td>   </tr>
+      <tr>  <th>GPS Fix</th>               <td>{{ redisvals['values']['fix']}}   </td>  <td> </td>   </tr>
+      <tr>  <th>Satellites</th>            <td>{{ redisvals['values']['nsat0']}}   </td>  <td> </td>   </tr>
+      <tr>  <th>Tilt avg</th>              <td>{{ redisvals['values']['tilt_avg']}} +/- {{ redisvals['values']['tilt_std']}}  </td>  <td> </td>   </tr>
+      <tr>  <th>Pi temp</th>               <td>{{ redisvals['values']['pi_temp']}} C   </td>  <td> </td>   </tr>
+      <tr>  <th>Motor temp</th>            <td>{{ redisvals['values']['motor_temp']}} C   </td>  <td> </td>   </tr>
+      <tr>  <th>Driver temp</th>           <td>{{ redisvals['values']['driver_temp']}} C   </td>  <td> </td>   </tr>
+      <tr>  <th>Control unit temp</th>     <td>{{ redisvals['values']['inside_temp']}} C   </td>  <td> </td>   </tr>
+      <tr>  <th>Control unit RH</th>       <td>{{ redisvals['values']['inside_rh']}} %   </td>  <td> </td>   </tr>
   </table>
 </div>
-
 
 {% endblock %}
