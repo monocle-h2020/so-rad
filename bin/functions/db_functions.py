@@ -25,8 +25,9 @@ def connect_db(db_dict):
     """
     try:
         # connect to db file
-        conn = sqlite3.connect(db_dict['file'])
+        conn = sqlite3.connect(db_dict['file'], timeout=5)
         cur = conn.cursor()
+        cur.execute('pragma journal_mode=wal')
     except Exception as err:
         msg = "Error connecting to database file at: {0}".format(db_dict['file'])
         log.error(msg)
