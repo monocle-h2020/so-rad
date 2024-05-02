@@ -176,43 +176,6 @@
             pointBorderColor: 'rgba(0,0,0,0)',
             pointRadius: 0, pointHoverRadius: 0,
             fill: false, tension: 0.1, showLine: true
-
-            },{
-
-            label: 'Range',
-            fill: 'origin',
-            data: [
-              {x: 0, y: 0},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0])) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0])) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.1*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.1*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.2*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.2*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.3*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.3*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.4*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.4*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.5*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.5*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.6*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.6*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.7*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.7*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.8*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.8*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['ccw_limit'][0] + 0.9*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }},
-               y: {{ 0.6*cos(radians(timeseries['ccw_limit'][0] + 0.9*(timeseries['cw_limit'][0]-timeseries['ccw_limit'][0]) )) }}},
-              {x: {{ 0.6*sin(radians(timeseries['cw_limit'][0])) }},
-               y: {{ 0.6*cos(radians(timeseries['cw_limit'][0])) }}},
-              {x: 0, y: 0}
-            ],
-            borderDash: [5,5],
-            borderColor: 'green', borderWidth: 1,
-            pointBackgroundColor: 'rgba(0,0,0,0)',
-            pointBorderColor: 'rgba(0,0,0,0)',
-            pointRadius: 0, pointHoverRadius: 0,
-            fill: false, tension: 0.1, showLine: true
           }],
         };  
 
