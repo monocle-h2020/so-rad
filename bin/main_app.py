@@ -286,7 +286,7 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None, redis=Fals
     values['nsat0'] = gps['manager'].satellite_number
     values['pi_temp'] = check_pi_cpu_temperature()
     if (tpr is not None) and (tpr['manager'] is not None):
-        log.info("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
+        log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
         values['tilt_avg'] = tpr['manager'].tilt_avg
         values['tilt_std'] = tpr['manager'].tilt_std
     if (rht is not None) and (rht['manager'] is not None):
