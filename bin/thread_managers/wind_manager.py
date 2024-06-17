@@ -17,6 +17,7 @@ import serial
 import threading
 import codecs
 import sys
+import re
 
 log = logging.getLogger('wind')
 
@@ -32,6 +33,7 @@ class Gill(object):
         """
         self.config = wind
         self.lastlineread = b''
+        self.data = []
         self.wind_speed     = None
         self.wind_direction = None
         self.status         = None
@@ -76,19 +78,94 @@ class Gill(object):
         """
         Updates the fields held by this class, a lock is used to prevent corruption.
         :line: a line read on the serial port
+
+        The Gill protocol is:
+
+        <STX>Q, 229, 002.74 ,M, 00, <ETX> 16 <CR> <LF>
+         ^   ^    ^       ^  ^   ^     ^   ^
+         |   |    |       |  |   |     |   |
+         |<STX> = Start of string character (ASCII value 2)
+             |    |       |  |   |     |   |
+             |WindSonic node address = Unit identifier
+                  |       |  |   |     |   |
+                  |Wind direction = Wind Direction
+                          |  |   |     |   |
+                          |Wind speed = Wind Speed
+                             |   |     |   |
+                             |Units = Units of measure (knots, m/s etc.)
+                                 |    |    |
+                                 |Status = Anemometer status code (see Appendix J for further details)
+                                      |    |
+                                      |<ETX> = End of string character (ASCII value 3)
+                                           |
+                                           |Checksum = This is the EXCLUSIVE – OR of the bytes between (and not including) the <STX> and <ETX>characters.
+           <CR> = ASCII character
+           <LF> = ASCII character
         """
+
         self.lock.acquire(True)
         self.lastlineread = line
-        #linesplit = line.split(',')
-        #if len(linesplit) > 1 and linesplit[0] in self.vedirect.keys():
-        #    val = linesplit[1]
-        #    try:
-        #        val = float(val)
-        #    except: pass
-        #    if val is not None:
-        #        self.vedirect[linesplit[0]] = val
-        self.last_update = datetime.datetime.now()
-        self.lock.release()
+
+        STX = b'\x02'
+        ETC = b'\x03'
+
+        status_codes = {'00': 'OK',
+                        '01': 'Axis 1 failed',
+                        '02': 'Axis 2 failed',
+                        '04': 'Axis 1 and 2 failed',
+                        '08': 'NVM error',
+                        '09': 'ROM error',
+                        'A':  'NMEA data Acceptable',
+                        'V':  'NMEA data Void',
+                       }
+
+        units = {'M': 'm/s',
+                 'N': 'kn',
+                 'P': 'mph',
+                 'K': 'kph',
+                 'F': 'ft/min'
+                 }
+
+
+        if not ((STX in line) and (ETC in line)):
+            log.warning("Incomplete line received")
+            self.data = []
+            self.lock.release()
+            return
+
+
+        try:
+            checksum_sent = line[-2:].decode('ascii')
+            data_to_check = line[1:-3]
+            checksum_received = 0
+            for b in data_to_check:
+                checksum_received ^= b
+            checksum_valid = checksum_sent == hex(checksum_received)[-2:].upper()
+
+            self.data = line[1:-3].decode('ascii').split(',')
+            self.status         = status_codes[self.data[4]]
+            if (not checksum_valid) or (self.status != 'OK'):
+                 log.warning(f"Wind data error: {self.status}, checksum: {checksum_valid}")
+                 self.data = []
+                 self.wind_speed     = None
+                 self.wind_direction = None
+                 self.units          = None
+                 self.last_update    = datetime.datetime.now()
+                 self.lock.release()
+                 return
+
+            else:
+                self.wind_speed     = float(self.data[2])
+                self.wind_direction = self.data[1]
+                self.units          = units[self.data[3]]
+                self.last_update = datetime.datetime.now()
+                self.lock.release()
+
+        except Exception as err:
+            log.warning(err)
+            self.data = []
+            self.lock.release()
+
 
     def run(self):
         """
@@ -105,14 +182,15 @@ class Gill(object):
             if self.serial.inWaiting() > 10:
                 # if there is data, read it, parse it and continue immediately
                 # this will always return a line with a line ending unless the serial port timeout is reached
-                serial_string = self.serial.readline()
                 try:
+                    serial_string = self.serial.readline()
                     self.parse_line(serial_string.strip())
                 except UnicodeDecodeError:
                     pass
                     time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
-                except Exception:
-                    log.warning("Error parsing Wind string: {serial_string}")
+                except Exception as err:
+                    log.debug(f"Error parsing Wind string: {serial_string}")
+                    log.info(err)
                     time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
             else:
                 time.sleep(self.sleep_interval)

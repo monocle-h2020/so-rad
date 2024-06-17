@@ -35,43 +35,15 @@ def main(conf):
             #print(windman.windspeed)
             # Read the response
             time.sleep(1)
-            log.info(windman.lastlineread)
+            log.debug(windman.lastlineread)
+            log.info(f"Dir: {windman.wind_direction} Speed: {windman.wind_speed} {windman.units} Status: {windman.status}")
+
 
         except KeyboardInterrupt:
             log.info("finished test, stopping monitor")
             windman.stop()
             time.sleep(1)
             sys.exit()
-
-
-def parse_gill_sentence(sentence):
-    """
-    <STX>Q, 229, 002.74 ,M, 00, <ETX> 16 <CR> <LF>
-     ^   ^    ^       ^  ^   ^     ^   ^
-     |   |    |       |  |   |     |   |
-     |<STX> = Start of string character (ASCII value 2)
-         |    |       |  |   |     |   |
-         |WindSonic node address = Unit identifier
-              |       |  |   |     |   |
-              |Wind direction = Wind Direction
-                      |  |   |     |   |
-                      |Wind speed = Wind Speed
-                         |   |     |   |
-                         |Units = Units of measure (knots, m/s etc.)
-                             |    |    |
-                             |Status = Anemometer status code (see Appendix J for further details)
-                                  |    |
-                                  |<ETX> = End of string character (ASCII value 3)
-                                       |
-                                       |Checksum = This is the EXCLUSIVE – OR of the bytes between (and not including) the <STX> and <ETX>characters.
-       <CR> = ASCII character
-       <LF> = ASCII character
-    """
-    STX = '2'
-    ETC = '3'
-    #use regex
-
-    return sentence
 
 
 
