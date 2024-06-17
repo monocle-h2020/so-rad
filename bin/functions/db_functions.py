@@ -94,7 +94,9 @@ def create_tables(db_dict):
             tilt_avg float, tilt_std float,
             bearing_accuracy float, sorad_version float,
             batt_v float, inside_temp float, inside_rel_hum float, n_rad_obs integer,
-            export_success bool, export_attempts integer)"""
+            export_success bool, export_attempts integer,
+            wind_speed float,
+            wind_direction integer)"""
 
     cur.execute(sql)
 
@@ -121,13 +123,15 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data, software_versi
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
+                           wind_speed, wind_direction,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
                             values['rel_view_az'], values['pi_temp'],
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
-                            values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp']))
+                            values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'],
+                            values['wind_speed'], values['wind_direction']))
 
             sample_id = cur.lastrowid
             conn.commit()
@@ -140,6 +144,7 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data, software_versi
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
+                           wind_speed, wind_direction,
                            n_rad_obs, export_success, export_attempts)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
@@ -147,7 +152,10 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data, software_versi
                             values['rel_view_az'], values['pi_temp'],
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
-                            values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'], len(spectra_data)))
+                            values['batt_voltage'], values['inside_temp'], values['inside_rh'],
+                            values['motor_temp'], values['driver_temp'],
+                            values['wind_speed'], values['wind_direction'],
+                            len(spectra_data)))
 
             sample_id = cur.lastrowid
 
