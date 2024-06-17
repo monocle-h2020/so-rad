@@ -63,7 +63,13 @@ class Ada_adxl345(object):
         self.zindex = tpr['zindex']  # 0
         self.xindex = tpr['xindex']  # 1
         self.sampling_time = tpr['sampling_time']  # sampling cycle in seconds, default 10 seconds
-        self.update_pitch_roll_single()   # init with first reading
+        self.errorcount = 0
+        try:
+            self.update_pitch_roll_single()   # init with first reading
+        except OSError:
+            log.warning("Ignored error reading TPR sensor")
+            self.errorcount += 1
+
         self.buffer_time =  [self.updated]
         self.buffer_tilt =  [self.tilt]
         self.buffer_pitch = [self.pitch]
@@ -130,7 +136,17 @@ class Ada_adxl345(object):
         """
         log.info("Starting TPR monitor thread")
         while not self.stop_monitor:
-            timestamp, tilt, pitch, roll, x, y, z = self.update_pitch_roll_single()
+            try:
+                timestamp, tilt, pitch, roll, x, y, z = self.update_pitch_roll_single()
+            except OSError:
+                if self.errorcount < 10:
+                    log.warning("Ignored error reading TPR sensor")
+                elif self.errorcount == 10:
+                    log.warning("Ignored error reading TPR sensor - suppressing further warnings")
+                self.errorcount += 1
+                time.sleep(self.sleep_interval)
+                continue
+
             if len(self.buffer_time)<10:
                 self.buffer_time.append(timestamp)
                 self.buffer_tilt.append(tilt)
@@ -141,7 +157,6 @@ class Ada_adxl345(object):
             else:
                 # housekeeping, purge old entries from buffer
                 time_cutoff = datetime.datetime.now() - datetime.timedelta(seconds=self.sampling_time)
-
                 current_keep = argwhere(array(self.buffer_time) >= time_cutoff)
                 current_keep = array([k[0] for k in current_keep]) # flatten, not sure why this is needed
 
@@ -149,6 +164,7 @@ class Ada_adxl345(object):
                 self.buffer_tilt  = list(array(self.buffer_tilt)[current_keep])
                 self.buffer_pitch = list(array(self.buffer_pitch)[current_keep])
                 self.buffer_roll  = list(array(self.buffer_roll)[current_keep])
+
                 self.buffer_time.append(timestamp)
                 self.buffer_tilt.append(tilt)
                 self.buffer_pitch.append(pitch)
