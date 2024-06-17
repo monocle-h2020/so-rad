@@ -156,7 +156,7 @@ class Gill(object):
 
             else:
                 self.wind_speed     = float(self.data[2])
-                self.wind_direction = self.data[1]
+                self.wind_direction = int(self.data[1])
                 self.units          = units[self.data[3]]
                 self.last_update = datetime.datetime.now()
                 self.lock.release()
