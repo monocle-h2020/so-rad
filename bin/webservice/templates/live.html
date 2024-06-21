@@ -25,10 +25,13 @@
          <th width=30%>Value</th>
          <th width=30%>Last update</th>
       </tr>
-      <tr>  <th>System status</th>         <td>{{ redisvals['system_status'] }}           </td>  <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
-      <tr>  <th>Sampling status</th>       <td>{{ redisvals['sampling_status'] }}         </td>  <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
-      <tr>  <th>Counter</th>               <td>{{ redisvals['counter'] }}                 </td>  <td>{{ redisvals['counter_updated'] }} </td>   </tr>
-      <tr>  <th>Disk space</th>            <td>{{ redisvals['disk_free_gb'] }} GIB        </td>  <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
+      <tr>  <th>System status</th>          <td>{{ redisvals['system_status'] }}           </td>  <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
+      <tr>  <th>Sampling status</th>        <td>{{ redisvals['sampling_status'] }}         </td>  <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
+      <tr>  <th>Counter</th>                <td>{{ redisvals['counter'] }}                 </td>  <td>{{ redisvals['counter_updated'] }} </td>   </tr>
+      <tr>  <th>Disk space</th>             <td>{{ redisvals['disk_free_gb'] }} GIB        </td>  <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
+      <tr>  <th>Samples pending upload</th> <td>{{ redisvals['samples_pending_upload'] }}  </td>  <td>{{ redisvals['samples_pending_upload_updated'] }} </td>   </tr>
+      <tr>  <th>Upload status</th>          <td>{{ redisvals['upload_status'] }}           </td>  <td>{{ redisvals['upload_status_updated'] }} </td>   </tr>
+      <tr>  </tr>
       <tr>  <th>Ship speed</th>            <td>{{ redisvals['values']['speed']}} kn   </td>  <td> </td>   </tr>
       <tr>  <th>Latitude</th>              <td>{{ redisvals['values']['lat0']}} deg   </td>  <td> </td>   </tr>
       <tr>  <th>Longitude</th>             <td>{{ redisvals['values']['lon0']}} deg   </td>  <td> </td>   </tr>

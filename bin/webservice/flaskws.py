@@ -399,7 +399,7 @@ def live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
-        for key in ['system_status', 'sampling_status', 'counter', 'disk_free_gb', 'values']:
+        for key in ['system_status', 'sampling_status', 'counter', 'upload_status', 'samples_pending_upload', 'disk_free_gb', 'values']:
             redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
