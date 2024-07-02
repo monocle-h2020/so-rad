@@ -42,7 +42,7 @@ TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status q
 log = logging.getLogger('export')
 log.setLevel('DEBUG')
 
-def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True, fail_limit = 10):
+def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
     """
     Main function
 
