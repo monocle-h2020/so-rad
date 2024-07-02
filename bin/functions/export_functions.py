@@ -40,7 +40,7 @@ TIMEOUT=5  # timeout for getting a response on data upload.
 TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status queries
 
 log = logging.getLogger('export')
-log.setLevel('DEBUG')
+#log.setLevel('DEBUG')
 
 def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
     """
