@@ -37,7 +37,7 @@ def parse_args():
                         help="system-specific config overrides providing program settings",
                         default=u"../config-local.ini")
     parser.add_argument('-f', '--force_upload', required=False, type=int, default=0,
-                        help="force upload of set number of records to remote server (defaults to all)")
+                        help="force upload of set number of records to remote server (defaults to 1 dry run, set to -1 to process all or any positive number as limit)")
     parser.add_argument('-s', '--source', required=False, type=str, default=None,
                         help="path to a specific database file rather than the one in current use")
     parser.add_argument('-d', '--debug', required=False, action='store_true',
