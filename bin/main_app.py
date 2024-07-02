@@ -30,7 +30,7 @@ import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-__version__ = 20240610.1
+__version__ = 20240702.1
 
 redis_client = rf.init()
 
@@ -737,7 +737,7 @@ def run():
                     while ((time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
                         # upload data until this check cycle is over, or no more samples remain, or an upload fails.
                         log.debug(f"{counter} | Uploading latest 10 samples ({n_not_inserted} pending)")
-                        export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False)
+                        export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False, fail_limit=3)
                         log.info(f"{counter} | {successes} sensor records uploaded. Request completed: {export_result}")
                         if export_result:
                             rf.store(redis_client, 'upload_status', f'{successes}_samples_uploaded', expires=30)
