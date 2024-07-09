@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.0.0/chartjs-plugin-annotation.min.js"></script>
-<script>Chart.register('chartjs-plugin-annotation');</script>
+     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
 {% endblock %}
 
 {% block content %}
@@ -47,5 +47,30 @@
       <tr>  <th>Control unit RH</th>       <td>{{ redisvals['values']['inside_rh']}} %   </td>  <td> </td>   </tr>
   </table>
 </div>
+
+<br><br>
+
+<!-- leaflet -->
+<div id="map" style="width: 600px; height: 400px; margin:0 auto;"></div>
+
+<script>
+	const map = L.map('map').setView([
+                                          {{ redisvals['values']['lat0']}},
+                                          {{ redisvals['values']['lon0']}}
+                                          ],
+                                          13);
+
+	const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		maxZoom: 19,
+		attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+	}).addTo(map);
+
+        L.marker([
+                  {{ redisvals['values']['lat0']}},
+                  {{ redisvals['values']['lon0']}}
+                 ]).addTo(map)
+                .openPopup();
+
+</script>
 
 {% endblock %}
