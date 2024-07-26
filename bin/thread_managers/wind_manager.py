@@ -155,8 +155,14 @@ class Gill(object):
                  return
 
             else:
-                self.wind_speed     = float(self.data[2])
-                self.wind_direction = int(self.data[1])
+                if len(self.data[2]) > 0:
+                    self.wind_speed     = float(self.data[2])
+                else:
+                    self.wind_speed     = float(0)
+                if len(self.data[1]) > 0:
+                    self.wind_direction = int(self.data[1])
+                else:
+                    self.wind_direction = None
                 self.units          = units[self.data[3]]
                 self.last_update = datetime.datetime.now()
                 self.lock.release()
@@ -165,7 +171,6 @@ class Gill(object):
             log.warning(err)
             self.data = []
             self.lock.release()
-
 
     def run(self):
         """
@@ -181,7 +186,7 @@ class Gill(object):
                 continue
             if self.serial.inWaiting() > 10:
                 # if there is data, read it, parse it and continue immediately
-                # this will always return a line with a line ending unless the serial port timeout is reached
+                # using readline this will always return a complete record unless timeout is reached
                 try:
                     serial_string = self.serial.readline()
                     self.parse_line(serial_string.strip())
@@ -192,6 +197,8 @@ class Gill(object):
                     log.debug(f"Error parsing Wind string: {serial_string}")
                     log.info(err)
                     time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
+
+                time.sleep(self.sleep_interval)
             else:
                 time.sleep(self.sleep_interval)
                 continue

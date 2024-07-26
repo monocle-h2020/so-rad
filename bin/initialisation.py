@@ -104,7 +104,6 @@ def wind_init(wind_config, ports):
     port_autodetect = wind_config.getboolean('port_autodetect')
     port_autodetect_string = wind_config.get('port_autodetect_string')
 
-
     if not wind['used']:
         log.info(f"Anemometer disabled in config")
         return wind

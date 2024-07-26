@@ -109,7 +109,7 @@ def init_all(conf):
     rht = initialisation.rht_init(conf['RHT'])  # internal temp/rh sensor
     power_schedule = initialisation.power_schedule_init(conf['POWER_SCHEDULE'])
     cam = initialisation.camera_init(conf['CAMERA'])  # camera
-    wind = initialisation.wind_init(conf['WIND'])    # anemometer
+    wind = initialisation.wind_init(conf['WIND'], ports)    # anemometer
 
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
@@ -192,7 +192,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.critical(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, wind, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
 
     else:
         radiometry_manager = None
@@ -217,6 +217,15 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         log.info("Stopping GPS manager thread")
         gps['manager'].stop()
         time.sleep(0.5)
+
+    # Stop the wind manager
+    log.info(wind['used'])
+    log.info(wind['manager'])
+    log.info(wind['manager'].started)
+    log.info((wind['used']) and (wind['manager'] is not None) and (wind['manager'].started))
+    if (wind['used']) and (wind['manager'] is not None) and (wind['manager'].started):
+        log.info("Stopping wind manager thread")
+        wind['manager'].stop()
 
     # Stop the battery manager
     if (battery['used']) and (bat_manager is not None):
@@ -250,11 +259,6 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     if (cam['used']) and (cam['manager'] is not None) and (cam['manager'].started):
         log.info("Stopping camera manager thread")
         cam['manager'].stop()
-
-    # Stop the wind manager
-    if (wind['used']) and (wind['manager'] is not None) and (wind['manager'].started):
-        log.info("Stopping wind manager thread")
-        wind['manager'].stop()
 
     # Wait for any lingering threads.
     log.info(f"Waiting on {threading.active_count()} active threads..")
@@ -665,7 +669,7 @@ def run():
     try:
         # Initialise everything
         db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr, rht,
+            motor, battery, bat_manager, gpios, tpr, rht,\
             cam, wind, power_schedule = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")
