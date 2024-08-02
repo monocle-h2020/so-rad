@@ -140,7 +140,9 @@ class TPacket(object):
         types = ['MicroFlu', 'IOM', 'COM', 'IPS',
                  'SAMIP', 'SCM', 'SAM', 'DFM', 'ADM']
         tchannel.TInfo.TID = self.TID
-        tchannel.TInfo.serialn = str.upper(hex(serhi)[-2::]+hex(serlow)[-2::])
+        #tchannel.TInfo.serialn = str.upper(hex(serhi)[-2::]+hex(serlow)[-2::])
+        tchannel.TInfo.serialn = str.upper(f"{serhi:02x}{serlow:02x}")
+
         # module type from 5 most sign Bits
         tchannel.TInfo.ModuleType = types[vals.index(serhi >> 3)]
         tchannel.TInfo.Firmware = self.databytes[3] +\

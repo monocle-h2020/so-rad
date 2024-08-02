@@ -21,6 +21,7 @@ def single_test(radiometry_manager, ed=True):
     log.info(f"Trigger measurement on {len(radiometry_manager.sams)} sensors")
     trig_id, specs, sids, itimes, preincs, postincs, inctemps  = radiometry_manager.sample_all(datetime.datetime.now())
 
+    log.info(f"{len(sids)} measurements received")
     for sid, itime, preinc, postinc, inctemp, spec in zip(sids, itimes, preincs, postincs, inctemps, specs):
         log.info(f"Received spectrum from {sid}: {trig_id} {itime} {preinc}-{postinc}")
         log.debug(f"Spectrum:{spec}")
