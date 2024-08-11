@@ -1,9 +1,11 @@
 {% extends "layout.html" %}
 {% block scripts %}
      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-     crossorigin=""></script>
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="">
+     </script>
 {% endblock %}
+
 
 {% block content %}
 <div>
@@ -16,8 +18,14 @@
 {% endif %}
 <br>
 
+<div id="redis_live" align="center" margin-left="auto" margin-right="auto">
+  <table width=90%>
+  </table>
+</div>
 
-<!-- Redis results -->
+<br>
+<br>
+
 <div align="center" margin-left="auto" margin-right="auto">
   <table width=90%>
       <tr>
@@ -25,12 +33,12 @@
          <th width=30%>Value</th>
          <th width=30%>Last update</th>
       </tr>
-      <tr>  <th>System status</th>          <td>{{ redisvals['system_status'] }}           </td>  <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
-      <tr>  <th>Sampling status</th>        <td>{{ redisvals['sampling_status'] }}         </td>  <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
-      <tr>  <th>Counter</th>                <td>{{ redisvals['counter'] }}                 </td>  <td>{{ redisvals['counter_updated'] }} </td>   </tr>
-      <tr>  <th>Disk space</th>             <td>{{ redisvals['disk_free_gb'] }} GIB        </td>  <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
-      <tr>  <th>Samples pending upload</th> <td>{{ redisvals['samples_pending_upload'] }}  </td>  <td>{{ redisvals['samples_pending_upload_updated'] }} </td>   </tr>
-      <tr>  <th>Upload status</th>          <td>{{ redisvals['upload_status'] }}           </td>  <td>{{ redisvals['upload_status_updated'] }} </td>   </tr>
+      <tr>  <th>System status</th>          <td><span id="system_status">...</span></td>           <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
+      <tr>  <th>Sampling status</th>        <td><span id="sampling_status">...</span></td>         <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
+      <tr>  <th>Counter</th>                <td><span id="counter">...</span></td>                 <td>{{ redisvals['counter_updated'] }} </td>   </tr>
+      <tr>  <th>Disk space</th>             <td><span id="disk_free_gb">...</span> GIB</td>        <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
+      <tr>  <th>Samples pending upload</th> <td><span id="samples_pending_upload">...</span></td>  <td>{{ redisvals['samples_pending_upload_updated'] }} </td>   </tr>
+      <tr>  <th>Upload status</th>          <td><span id="upload_status">...</span></td>           <td>{{ redisvals['upload_status_updated'] }} </td>   </tr>
       <tr>  </tr>
       <tr>  <th>Ship speed</th>            <td>{{ redisvals['values']['speed']}} kn   </td>  <td> </td>   </tr>
       <tr>  <th>Latitude</th>              <td>{{ redisvals['values']['lat0']}} deg   </td>  <td> </td>   </tr>
@@ -48,11 +56,53 @@
   </table>
 </div>
 
-<br><br>
 
-<!-- leaflet -->
+<br>
+<br>
 <div id="map" style="width: 600px; height: 400px; margin:0 auto;"></div>
 
+
+<script> 
+  const redis_live_url = {{ url_for("redis_live")|tojson }}
+  const tbl = document.getElementById("redis_live")
+
+  function fetchStatus() {
+      fetch(redis_live_url)
+         .then(function (response) {
+               return response.json();
+         })
+         .then(function (data) {
+               addShow(data);
+         })
+         .catch(function (err) {
+                console.log('error: ' + err);
+         });
+  }
+
+  function addShow(data) {
+      var counter = document.getElementById("counter");
+      counter.innerText = data.counter;
+      var system_status = document.getElementById("system_status");
+      system_status.innerText = data.system_status;
+      var sampling_status = document.getElementById("sampling_status");
+      sampling_status.innerText = data.sampling_status;
+      var upload_status = document.getElementById("upload_status");
+      upload_status.innerText = data.upload_status;
+      var samples_pending_upload = document.getElementById("samples_pending_upload");
+      samples_pending_upload.innerText = data.samples_pending_upload;
+      var disk_free_gb = document.getElementById("disk_free_gb");
+      disk_free_gb.innerText = data.disk_free_gb;
+  }
+
+  window.addEventListener('load', function () {
+    var fetchInterval = 1000; // 1 seconds.
+    setInterval(fetchStatus, fetchInterval);
+  });
+
+</script>
+
+
+<!-- leaflet -->
 <script>
 	const map = L.map('map').setView([
                                           {{ redisvals['values']['lat0']}},

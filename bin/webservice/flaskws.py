@@ -4,7 +4,7 @@
 Connect to db to provide latest activity from solar tracking radiometry platform (So-Rad).
 """
 
-from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup
+from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup, jsonify
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -390,6 +390,32 @@ def index():
     return render_template('layout.html', common=common)
 
 
+@app.route('/redis_live', methods=['GET'])
+def redis_live():
+    """populate a live data section from redis"""
+    try:
+        client = redis_init()
+        if client is None:
+           raise Exception("Redis not initialised")
+
+        redisvals = {}
+        for key in ['system_status', 'sampling_status', 'counter', 'upload_status', 'samples_pending_upload', 'disk_free_gb']:
+            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+
+        # read so-rad status
+        common['so-rad_status'], message = service_status('so-rad')
+
+        try:
+            return jsonify(redisvals)
+        except Exception as err:
+            print(err)
+            flash("Unable to provide system_status")
+            return jsonify(None)
+
+    except Exception as msg:
+        return msg
+
+
 @app.route('/live', methods=['GET'])
 def live():
     """Home page showing live instrument status from redis"""
@@ -406,8 +432,9 @@ def live():
 
         try:
             return render_template('live.html', common=common, redisvals=redisvals)
-        except:
+        except Exception as err:
             flash("Unable to load the requested page")
+            flash(err)
             return render_template('layout.html', common=common)
 
     except Exception as msg:
