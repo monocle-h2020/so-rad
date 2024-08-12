@@ -33,26 +33,33 @@
          <th width=30%>Value</th>
          <th width=30%>Last update</th>
       </tr>
-      <tr>  <th>System status</th>          <td><span id="system_status">...</span></td>           <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
-      <tr>  <th>Sampling status</th>        <td><span id="sampling_status">...</span></td>         <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
-      <tr>  <th>Counter</th>                <td><span id="counter">...</span></td>                 <td>{{ redisvals['counter_updated'] }} </td>   </tr>
-      <tr>  <th>Disk space</th>             <td><span id="disk_free_gb">...</span> GIB</td>        <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
-      <tr>  <th>Samples pending upload</th> <td><span id="samples_pending_upload">...</span></td>  <td>{{ redisvals['samples_pending_upload_updated'] }} </td>   </tr>
-      <tr>  <th>Upload status</th>          <td><span id="upload_status">...</span></td>           <td>{{ redisvals['upload_status_updated'] }} </td>   </tr>
+      <tr>  <th>System status</th>          <td><span id="system_status"></span></td>
+                                            <td>{{ redisvals['system_status_updated'] }} </td>   </tr>
+      <tr>  <th>Sampling status</th>        <td><span id="sampling_status"></span></td>
+                                            <td>{{ redisvals['sampling_status_updated'] }} </td>   </tr>
+      <tr>  <th>Counter</th>                <td><span id="counter"></span></td>
+                                            <td>{{ redisvals['counter_updated'] }} </td>   </tr>
+      <tr>  <th>Disk space</th>             <td><span id="disk_free_gb"></span> GIB</td>
+                                            <td>{{ redisvals['disk_free_gb_updated'] }} </td>   </tr>
+      <tr>  <th>Samples pending upload</th> <td><span id="samples_pending_upload"></span></td>
+                                            <td>{{ redisvals['samples_pending_upload_updated'] }} </td>   </tr>
+      <tr>  <th>Upload status</th>          <td><span id="upload_status"></span></td>
+                                            <td>{{ redisvals['upload_status_updated'] }} </td>   </tr>
       <tr>  </tr>
-      <tr>  <th>Ship speed</th>            <td>{{ redisvals['values']['speed']}} kn   </td>  <td> </td>   </tr>
-      <tr>  <th>Latitude</th>              <td>{{ redisvals['values']['lat0']}} deg   </td>  <td> </td>   </tr>
-      <tr>  <th>Longitude</th>             <td>{{ redisvals['values']['lon0']}} deg   </td>  <td> </td>   </tr>
-      <tr>  <th>RTK heading</th>           <td>{{ redisvals['values']['relPosHeading']}} deg   </td>  <td> </td>   </tr>
-      <tr>  <th>Heading accuracy</th>      <td>{{ redisvals['values']['accHeading']}} deg   </td>  <td> </td>   </tr>
-      <tr>  <th>GPS Fix</th>               <td>{{ redisvals['values']['fix']}}   </td>  <td> </td>   </tr>
-      <tr>  <th>Satellites</th>            <td>{{ redisvals['values']['nsat0']}}   </td>  <td> </td>   </tr>
-      <tr>  <th>Tilt avg</th>              <td>{{ redisvals['values']['tilt_avg'] }} +/- {{ redisvals['values']['tilt_std']}}  </td>  <td> </td>   </tr>
-      <tr>  <th>Pi temp</th>               <td>{{ redisvals['values']['pi_temp']}} C   </td>  <td> </td>   </tr>
-      <tr>  <th>Motor temp</th>            <td>{{ redisvals['values']['motor_temp']}} C   </td>  <td> </td>   </tr>
-      <tr>  <th>Driver temp</th>           <td>{{ redisvals['values']['driver_temp']}} C   </td>  <td> </td>   </tr>
-      <tr>  <th>Control unit temp</th>     <td>{{ redisvals['values']['inside_temp']}} C   </td>  <td> </td>   </tr>
-      <tr>  <th>Control unit RH</th>       <td>{{ redisvals['values']['inside_rh']}} %   </td>  <td> </td>   </tr>
+      <tr>  <th>Ship speed</th>            <td><span id="speed">...</span> kn</td>           <td>    </td>   </tr>
+      <tr>  <th>Latitude</th>              <td><span id="lat0">...</span> deg</td>           <td>    </td>   </tr>
+      <tr>  <th>Longitude</th>             <td><span id="lon0">...</span> deg</td>           <td>    </td>   </tr>
+      <tr>  <th>RTK heading</th>           <td><span id="relPosHeading">...</span> deg</td>  <td>    </td>   </tr>
+      <tr>  <th>Heading accuracy</th>      <td><span id="accHeading">...</span> deg</td>     <td>    </td>   </tr>
+      <tr>  <th>GPS Fix</th>               <td><span id="fix"></span></td>                   <td>    </td>   </tr>
+      <tr>  <th>Satellites</th>            <td><span id="nsat0"></span></td>                 <td>    </td>   </tr>
+      <tr>  <th>Tilt avg</th>              <td><span id="tilt_avg">...</span> +/- 
+                                               <span id="tilt_std">...</span></td>           <td>    </td>   </tr>
+      <tr>  <th>Pi temp</th>               <td><span id="pi_temp">...</span> C</td>          <td>    </td>   </tr>
+      <tr>  <th>Motor temp</th>            <td><span id="motor_temp">...</span> C</td>       <td>    </td>   </tr>
+      <tr>  <th>Driver temp</th>           <td><span id="driver_temp">...</span> C</td>      <td>    </td>   </tr>
+      <tr>  <th>Control unit temp</th>     <td><span id="inside_temp">...</span> C</td>      <td>    </td>   </tr>
+      <tr>  <th>Control unit RH</th>       <td><span id="inside_rh">...</span> %</td>        <td>    </td>   </tr>
   </table>
 </div>
 
@@ -92,35 +99,60 @@
       samples_pending_upload.innerText = data.samples_pending_upload;
       var disk_free_gb = document.getElementById("disk_free_gb");
       disk_free_gb.innerText = data.disk_free_gb;
+      var speed = document.getElementById("speed");
+      speed.innerText = data.speed;
+      var lat0 = document.getElementById("lat0");
+      lat0.innerText = data.lat0;
+      var lon0 = document.getElementById("lon0");
+      lon0.innerText = data.lon0;
+      var relPosHeading = document.getElementById("relPosHeading");
+      relPosHeading.innerText = data.relPosHeading;
+      var accHeading = document.getElementById("accHeading");
+      accHeading.innerText = data.accHeading;
+      var fix = document.getElementById("fix");
+      fix.innerText = data.fix;
+      var nsat0 = document.getElementById("nsat0");
+      nsat0.innerText = data.nsat0;
+      var tilt_avg = document.getElementById("tilt_avg");
+      tilt_avg.innerText = data.tilt_avg;
+      var tilt_std = document.getElementById("tilt_std");
+      tilt_std.innerText = data.tilt_std;
+      var pi_temp = document.getElementById("pi_temp");
+      pi_temp.innerText = data.pi_temp;
+      var motor_temp = document.getElementById("motor_temp");
+      motor_temp.innerText = data.motor_temp;
+      var driver_temp = document.getElementById("driver_temp");
+      driver_temp.innerText = data.driver_temp;
+      var inside_temp = document.getElementById("inside_temp");
+      inside_temp.innerText = data.inside_temp;
+      var inside_rh = document.getElementById("inside_rh");
+      inside_rh.innerText = data.inside_rh;
+
   }
 
   window.addEventListener('load', function () {
-    var fetchInterval = 1000; // 1 seconds.
+    var fetchInterval = 5000; // in milliseconds
     setInterval(fetchStatus, fetchInterval);
   });
 
 </script>
 
-
-<!-- leaflet -->
 <script>
-	const map = L.map('map').setView([
-                                          {{ redisvals['values']['lat0']}},
-                                          {{ redisvals['values']['lon0']}}
-                                          ],
-                                          13);
+      // leaflet
+      const lat0 = {{ redisvals['values']['lat0'] }}
+      const lon0 = {{ redisvals['values']['lon0'] }}
 
-	const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-		maxZoom: 19,
-		attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-	}).addTo(map);
+      const map = L.map('map').setView([lat0, lon0], 13);
 
-        L.marker([
-                  {{ redisvals['values']['lat0']}},
-                  {{ redisvals['values']['lon0']}}
-                 ]).addTo(map)
-                .openPopup();
+      const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                {maxZoom: 19,
+                                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                })
+                               .addTo(map);
 
+        L.marker([lat0, lon0]).addTo(map).openPopup();
 </script>
+
+
 
 {% endblock %}
