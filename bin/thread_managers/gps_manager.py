@@ -53,7 +53,6 @@ class GPSSerialReader(threading.Thread):
         buffer_bytes_per_minute = 100
         buffer_bytes_total = 0
         buffer_bytes_from_read = 0
-        # from pymemcache.client import base
         dataDictionary = {}
         minute_start_counter = datetime.datetime.now()
 
@@ -61,16 +60,18 @@ class GPSSerialReader(threading.Thread):
 
         while not self.parent.stop_gps:
             counter +=1
+
+            # check protocol is accepted, raise deprecation warnings
             if protocol == "RTKUBX":
                 if counter<=1:
                     log.warning("The homebrew RTKUBX protocol will be deprecated. Please test functionality on this system with PYUPBX2")
             elif protocol == "NMEA0183":
                 old_gps_time = self.parent.datetime
-            elif protocol == "PYUBX2":
+            elif protocol in ["PYUBX2", "DJIM350"]:
                 pass
-
             else:
                 log.error("gps protocol '{0}' not implemented".format(protocol))
+
 
             if self.serial_port.inWaiting() > 1000:
                 # if too much data in buffer, throw it away
@@ -97,7 +98,6 @@ class GPSSerialReader(threading.Thread):
                 except UnicodeDecodeError:
                     log.warning("UnicodeDecodeError on GPS string: {0}".format(gps_string))
 
-
             elif protocol == "RTKUBX":
                 try:
                     dataDictionary, LotOfData = readFromUblox(dataDictionary, timeToSleep, serialReader, LotOfData, self, counter)
@@ -106,13 +106,13 @@ class GPSSerialReader(threading.Thread):
                 except Exception as error:
                     log.exception("Error reading from ublox 8: {}".format(error))
 
-
             elif protocol == "PYUBX2":
                 try:
                     dataDictionary = pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter)
 
                 except Exception as error:
                     log.exception("Error reading from ublox 9: {}".format(error))
+
 
             time.sleep(0.001)  # Sleep for a millisecond so that it doesn't max CPU
 
@@ -260,7 +260,6 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
 class GPSParser(object):
     """
     Class which contains a parse and checksum method for NMEA data.
-    Will parse GPGGA and HCHDG NMEA sentences.
     """
 
     @staticmethod
@@ -312,8 +311,13 @@ class GPSParser(object):
                     return GPSParser.parse_pmtk500(gps_string)
                 elif gps_string.startswith('$GPGSA') or gps_string.startswith('$GNGSA') or gps_string.startswith('$GLGSA'):
                     return GPSParser.parse_gpgsa(gps_string)
+
             except:
-                log.debug("Could not parse gps string:\n\t{0}".format(gps_string))
+                log.debug(f"Could not parse gps string: {gps_string}")
+                pass
+
+        else:
+                log.debug(f"GPS string failed checksumg: {gps_string}")
                 pass
 
         return None
@@ -374,8 +378,10 @@ class GPSParser(object):
         :rtype: dict
         """
         gps_parts = gprmc_string.split(',')[1:-1]
-        # $GPRMC,113623.12,A,5021.9979,N,00407.9635,W,0.0,358.1,310315,2.2,W,A*3A
-        #        0         1 2         3 4          5 6   7     8      9   10
+        # $GPRMC,113623.12,A,5021.9979    ,N,00407.9635    ,W,0.0  ,358.1,310315,2.2,W,A*3A
+        #        0         1 2             3 4              5 6     7     8      9   10,11
+        # $GNRMC,135502.20,A,5021.95238694,N,00408.89576858,W,0.003,86.8 ,120724,0.8,W,D,S*68'
+
         hour = int(gps_parts[0][0:2])
         mins = int(gps_parts[0][2:4])
         seconds = int(gps_parts[0][4:6])
@@ -409,10 +415,12 @@ class GPSParser(object):
             'lat': lat,
             'lon': lon,
             'speed': float(gps_parts[6]),
-            'heading': float(gps_parts[7])
+            'heading': float(gps_parts[7]),
+            'pos_mode': gps_parts[11]
         }
 
         return result
+
 
     @staticmethod
     def parse_gpvtg(gpvtg_string):
@@ -498,7 +506,8 @@ class GPSParser(object):
 
         result = {
             'type': 'gpgsa',
-            'fix': float(gps_parts[1])
+            'mode': gps_parts[0],
+            'fix': float(gps_parts[1]),
         }
 
         return result
@@ -1402,6 +1411,8 @@ class NMEA0183(object):
         self.gps_observers = []
         self.watchdog_callbacks = []
         self.last_update = datetime.datetime.now()
+        self.pos_mode = None
+
 
     def __del__(self):
         #self.disable_watchdog()
@@ -1474,26 +1485,25 @@ class NMEA0183(object):
             self.old = False
             if self.watchdog is not None:
                 self.watchdog.reset()
+
             if gps_dict['type'] == 'hchdg':
                 self.proper_compass = True
                 self.heading = gps_dict['heading']
+
             elif gps_dict['type'] == 'gpvtg':
                 # Use track made good? for heading if no proper compass
                 self.speed = gps_dict['speed']
 
                 if not self.proper_compass:
                     self.heading = gps_dict['heading']
+
             elif gps_dict['type'] == 'gpgga':
                 self.lat = gps_dict['lat']
                 self.lon = gps_dict['lon']
                 self.alt = gps_dict['alt']
-                #self.fix = gps_dict['fix']
                 self.satellite_number = gps_dict['satellite_number']
-                #if self.datetime is not None: # Doesnt get day only time so update if we have proper day (GPRMC should set that eventually)
-                #    self.datetime.replace(hour=gps_dict['hour'], minute=gps_dict['min'], second=gps_dict['seconds'])
-                #else:
-                #    self.datetime = gps_dict['date']
-            elif gps_dict['type'] == 'gprmc':
+
+            elif gps_dict['type'] in ['gprmc', 'gnrmc']:
                 self.lat = gps_dict['lat']
                 self.lon = gps_dict['lon']
                 self.datetime = gps_dict['date']
@@ -1501,12 +1511,19 @@ class NMEA0183(object):
                 # Use track made good? for heading if no proper compass
                 if not self.proper_compass:
                     self.heading = gps_dict['heading']
+                self.pos_mode = gps_dict['pos_mode']
+
             elif gps_dict['type'] == 'pmtk500':
                 self.update_rate = gps_dict['update_rate']
-            elif gps_dict['type'] == 'gpgsa':
+
+            elif gps_dict['type'] in ['gpgsa', 'gngsa']:
                 self.fix = gps_dict['fix']
-            #self.notify_observers()
+
+            else:
+                log.warning(f"gps_dict not recognised: {gps_dict}")
+
             self.last_update = datetime.datetime.now()
+
         self.gps_lock.release()
 
     def flushbuffer(self):
@@ -1520,3 +1537,144 @@ class NMEA0183(object):
         self.serial_ports[0].open()
         log.info("Reset GPS ports: {0}".format(datetime.datetime.now()))
         self.gps_lock.release()
+
+
+## DJI
+
+class DJIM350(NMEA0183):
+    """
+    Variation on the NMEA stream reader.
+    Data from DJI platform over uart at at (nominally) 5Hz, containing intermixed NMEA sentences and other objects.
+    """
+
+    def start(self):
+        """
+        Starts serial reading thread.
+        """
+        if not self.started:
+            self.started = True
+            for port in self.serial_ports:
+                new_thread = DJISerialReader(port, self)
+                new_thread.register_observer(self)
+                self.threads.append(new_thread)
+
+            for thread in self.threads:
+                thread.start()
+
+            log.info("Started GPS managers")
+
+        else:
+            log.warn("GPS manager already started")
+
+
+class DJISerialReader(threading.Thread):
+    """
+    Thread to read from DJI UART
+    """
+    def __init__(self, serial_port, parent):
+
+        threading.Thread.__init__(self)
+        self.serial_port = serial_port
+        self.parent = parent
+
+        self.observers = []
+
+        self.current_gps_dict = None
+
+        log.info("Starting GPS reader thread")
+
+    def run(self):
+        """
+        Main loop of the thread.
+
+        This will run and read from a GPS string and when it is valid and decoded it'll be passed via the
+        observer design pattern.
+        """
+
+        protocol = type(self.parent).__name__
+
+        timeToSleep = 0.01
+        dataDictionary = {}
+
+        buffer = b''
+        nmea_phrases = []
+
+        counter = 0
+
+        while not self.parent.stop_gps:
+            counter +=1
+
+            # check protocol is accepted, raise any deprecation warnings
+            if protocol == "DJIM350":
+                pass
+            else:
+                log.error("gps protocol '{0}' not implemented".format(protocol))
+
+            if self.serial_port.inWaiting() > 10000:
+                # if too much data in buffer, throw it away - this means we are not reading/parsing fast enough.
+                log.warning(">10kb in gps buffer on port {0}. Clearing buffers. Consider reducing read/parse interval or increase size of data read block.".format(self.serial_port.port))
+                self.serial_port.reset_input_buffer()
+                # we need to clear the running buffer also because we just broke the stream
+                buffer = b''
+                time.sleep(0.001)
+                continue
+
+            if self.serial_port.inWaiting() > 0:
+                buffer += self.serial_port.read(512)
+
+            else:
+                time.sleep(timeToSleep)
+                # sleep one cycle
+                continue
+
+            first_start = buffer.find(b'$G')
+            if first_start >= 0:
+                # there is incomplete data at the start of the buffer, remove it
+                buffer = buffer[first_start:]
+
+            nmea_phrases = []
+            next_start = buffer.find(b'$G')
+            while next_start >= 0:
+                buffer = buffer[next_start:]
+                next_end = buffer.find(b'\r\n')
+
+                if next_end == -1:
+                    break
+
+                slice = buffer[0:next_end+2]
+                log.debug(f"{slice} | remaining: {len(buffer)}")
+                nmea_phrases.append(slice)
+                buffer = buffer[next_end:]
+                next_start = buffer.find(b'$G')
+
+
+            for nmea_phrase in nmea_phrases:
+                log.debug(f"Parsing {len(nmea_phrases)} NMEA phrases")
+                try:
+                    self.current_gps_dict = GPSParser.parse(codecs.decode(nmea_phrase, 'utf-8'))
+                    self.notify_observers()
+                except UnicodeDecodeError:
+                    log.warning(f"Ignored a UnicodeDecodeError on GPS string")
+
+            time.sleep(timeToSleep)
+
+
+    def register_observer(self, observer):
+        """
+        Register an observer of the GPS thread.
+
+        Observers must implement a method called "update"
+        :param observer: An observer object.
+        :type observer: object
+        """
+        if not observer in self.observers:
+            self.observers.append(observer)
+
+    def notify_observers(self):
+        """
+        This pushes the GPS dict to all observers.
+        """
+        if self.current_gps_dict is not None:
+            for observer in self.observers:
+                observer.update(self.current_gps_dict)
+

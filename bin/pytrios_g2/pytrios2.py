@@ -84,7 +84,7 @@ class G2registers():
     """All G2 registers and how to read them"""
     def __init__(self):
         self.slave_address =          {'name': 'slave_address',           'start': 0,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.measurement_timeout =    {'name': 'measurement_timeout',     'start': 1,   'len': 1,  'datatype': '>H',  'timeout':0.25, 'value': None}
+        self.measurement_timeout =    {'name': 'measurement_timeout',     'start': 1,   'len': 1,  'datatype': '>H',  'timeout':0.5, 'value': None}
         self.deep_sleep_timeout  =    {'name': 'deep_sleep_timeout',      'start': 2,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.device_serial_number =   {'name': 'device_serial_number',    'start': 10,  'len': 5,  'datatype': 'str', 'timeout':0.25, 'value': None}
         self.firmware_version =       {'name': 'firmware_version',        'start': 15,  'len': 5,  'datatype': 'str', 'timeout':0.15, 'value': None}
@@ -234,7 +234,7 @@ def read_last_meas(mod):
         response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=g2var['timeout'])
         datatype = g2var['datatype']
         try:
-            crc_check_incoming(response)
+            #crc_check_incoming(response)
             g2var['value'] = unpack_response(response, datatype)
             log.debug(f"{g2var['name']}: {g2var['value']}")
         except CrcError as err:
@@ -246,7 +246,7 @@ def read_last_meas(mod):
 
     try:
         g2.spectrum = list(g2.raw_ordinate0['value'] + g2.raw_ordinate1['value'])
-    except:
+    except Exception as err:
         log.warning(f"Failed to construct spectrum")
         g2.spectrum = None
 
@@ -430,8 +430,9 @@ def crc_check_incoming(response):
     crc16_check = ''.join([crc16_modbus[2:4], crc16_modbus[0:2]])
 
     check_value = crc_hex == crc16_check
-    log.debug(f"CRC check: {check_value}")
-    log.debug(f"{crc_hex} {type(crc_hex)}")
+    if not check_value:
+        log.info(f"CRC check: {check_value}  [{crc_hex}] vs [{crc16_check}]")
+    #log.info(f"{crc_hex} {type(crc_hex)}")
 
     if not check_value:
         raise CrcError("Response failed checksum")

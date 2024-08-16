@@ -54,28 +54,44 @@ def run_test(conf, terse=False):
     log.info(f"Port used: {gps['manager'].serial_ports}")
 
     t0 = time.perf_counter()
-    while (time.perf_counter() - t0) < test_duration:
-        try:
-            header = """\nTime \t\t {0} \nLat \t\t {1} \t Lon \t {2} \nSpeed \t\t {3} \nFix \t\t {4} \t nSat {7} \t Checks: {8} \nheading \t {5} (Check: {6})""".\
-                  format(gps['manager'].last_update, gps['manager'].lat, gps['manager'].lon,
-                  gps['manager'].speed, gps['manager'].fix,
-                  gps['manager'].heading, check_heading(gps), gps['manager'].satellite_number, check_gps(gps))
-            vals = """headMot \t {0} \nrelPosHead \t {1} \nAcc \t\t {2} \nVehH valid \t {3} \nRelPosH valid\t {4} \nDiff Soln\t {5}\n GNSS fix\t {6}""".\
-                  format(gps['manager'].headMot, gps['manager'].relPosHeading, gps['manager'].accHeading,
-                  gps['manager'].flags_headVehValid, gps['manager'].flag_relPosHeadingValid, gps['manager'].flags_diffSolN, gps['manager'].flags_gnssFixOK)
-            log.info(header)
-            log.info(vals)
-            #with open('heading.csv','a') as heading_log:
-            #     heading_log.write(f"{gps['manager'].last_update}\t{gps['manager'].relPosHeading}\t{gps['manager'].accHeading}\t{gps['manager'].flag_relPosHeadingValid}\n")
-            time.sleep(2.0)
 
-        except (KeyboardInterrupt, SystemExit):
-            log.info("Stopping GPS manager thread")
-            gps['manager'].stop()
-            time.sleep(0.5)
-            sys.exit(0)
-        except Exception:
-            raise
+    try:
+        if gps['protocol'] not in ['djim350']:
+            while (time.perf_counter() - t0) < test_duration:
+                header = """\nTime \t\t {0} \nLat \t\t {1} \t Lon \t {2} \nSpeed \t\t {3} \nFix \t\t {4} \t nSat {7} \t Checks: {8} \nheading \t {5} (Check: {6})""".\
+                      format(gps['manager'].last_update, gps['manager'].lat, gps['manager'].lon,
+                      gps['manager'].speed, gps['manager'].fix,
+                      gps['manager'].heading, check_heading(gps), gps['manager'].satellite_number, check_gps(gps))
+                vals = """headMot \t {0} \nrelPosHead \t {1} \nAcc \t\t {2} \nVehH valid \t {3} \nRelPosH valid\t {4} \nDiff Soln\t {5}\n GNSS fix\t {6}""".\
+                      format(gps['manager'].headMot, gps['manager'].relPosHeading, gps['manager'].accHeading,
+                      gps['manager'].flags_headVehValid, gps['manager'].flag_relPosHeadingValid, gps['manager'].flags_diffSolN, gps['manager'].flags_gnssFixOK)
+                log.info(header)
+                log.info(vals)
+                time.sleep(2.0)
+
+        elif gps['protocol'] in ['djim350']:
+            while (time.perf_counter() - t0) < test_duration:
+                msg = f"Updated\t\t {gps['manager'].last_update}\n"
+                msg+= f"Gps time\t\t {gps['manager'].datetime}\n"
+                msg+= f"Lat\t\t {gps['manager'].lat}\n"
+                msg+= f"Lon\t\t {gps['manager'].lon}\n"
+                msg+= f"Heading\t\t {gps['manager'].heading}\n"
+                msg+= f"Fix\t\t {gps['manager'].fix}\n"
+                msg+= f"pos_mode\t\t {gps['manager'].pos_mode}\n"
+                msg+= f"check: {check_gps(gps)}\n"
+                log.info(msg)
+                time.sleep(1.0)
+
+    except (KeyboardInterrupt, SystemExit):
+        log.info("Stopping GPS manager thread")
+        gps['manager'].stop()
+        time.sleep(0.5)
+        sys.exit(0)
+
+    except Exception:
+        raise
+
+
 
     if gps['manager'] is not None:
         log.info("Stopping GPS manager thread")

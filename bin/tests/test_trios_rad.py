@@ -94,4 +94,4 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
-    run_test(conf, repeat=False)  # select repeat = True to repeat test until interrupted
+    run_test(conf, repeat=True)  # select repeat = True to repeat test until interrupted

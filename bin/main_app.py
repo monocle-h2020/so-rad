@@ -665,7 +665,7 @@ def run():
     try:
         # Initialise everything
         db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr, rht,
+            motor, battery, bat_manager, gpios, tpr, rht,\
             cam, wind, power_schedule = init_all(conf)
     except Exception:
         log.exception("Exception during initialisation")

@@ -377,6 +377,8 @@ def gps_init(gps_config, ports):
        gps['manager'] = gps_manager.NMEA0183()
     elif gps['protocol'] == 'pyubx2':
        gps['manager'] = gps_manager.PYUBX2()
+    elif gps['protocol'] == 'djim350':
+       gps['manager'] = gps_manager.DJIM350()
     else:
        log.exception("GPS protocol '{0}' is not implemented".format(gps['protocol']))
 
