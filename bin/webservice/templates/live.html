@@ -54,7 +54,8 @@
       <tr>  <th>GPS Fix</th>               <td><span id="fix"></span></td>                   <td>    </td>   </tr>
       <tr>  <th>Satellites</th>            <td><span id="nsat0"></span></td>                 <td>    </td>   </tr>
       <tr>  <th>Tilt avg</th>              <td><span id="tilt_avg">...</span> +/- 
-                                               <span id="tilt_std">...</span></td>           <td>    </td>   </tr>
+                                               <span id="tilt_std">...</span></td>
+                                           <td><span id="tilt_updated">...</span></td>                   </tr>
       <tr>  <th>Pi temp</th>               <td><span id="pi_temp">...</span> C</td>          <td>    </td>   </tr>
       <tr>  <th>Motor temp</th>            <td><span id="motor_temp">...</span> C</td>       <td>    </td>   </tr>
       <tr>  <th>Driver temp</th>           <td><span id="driver_temp">...</span> C</td>      <td>    </td>   </tr>
@@ -131,10 +132,14 @@
       fix.innerText = data.fix;
       var nsat0 = document.getElementById("nsat0");
       nsat0.innerText = data.nsat0;
+
       var tilt_avg = document.getElementById("tilt_avg");
       tilt_avg.innerText = data.tilt_avg.toFixed(2);
       var tilt_std = document.getElementById("tilt_std");
       tilt_std.innerText = data.tilt_std.toFixed(2);
+      var tilt_updated = document.getElementById("tilt_updated");
+      tilt_updated.innerText = data.tilt_updated;
+
       var pi_temp = document.getElementById("pi_temp");
       pi_temp.innerText = data.pi_temp.toFixed(1);
       var motor_temp = document.getElementById("motor_temp");
