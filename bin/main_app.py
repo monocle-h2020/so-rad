@@ -109,7 +109,7 @@ def init_all(conf):
     rht = initialisation.rht_init(conf['RHT'])  # internal temp/rh sensor
     power_schedule = initialisation.power_schedule_init(conf['POWER_SCHEDULE'])
     cam = initialisation.camera_init(conf['CAMERA'])  # camera
-    wind = initialisation.wind_init(conf['WIND'])    # anemometer
+    wind = initialisation.wind_init(conf['WIND'], ports)    # anemometer
 
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
@@ -234,10 +234,11 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         #rht['manager'].stop()  # not using threading here, but it's there if we want it.
 
     # Turn radiometry power control GPIO pin off
-    rad['gpio_interface'].off(rad['gpio1'])
-    time.sleep(0.1)
-    rad['gpio_interface'].stop()  # release gpio control
-    time.sleep(0.1)
+    if rad['use_gpio_control']:
+        rad['gpio_interface'].off(rad['gpio1'])
+        time.sleep(0.1)
+        rad['gpio_interface'].stop()  # release gpio control
+        time.sleep(0.1)
 
     # Turn power_scheduling control GPIO pin off
     if power_schedule['use_gpio_control']:
@@ -285,15 +286,25 @@ def update_system_values(gps, values, tpr=None, rht=None, wind=None, motor=None,
     values['lon0'] = gps['manager'].lon
     values['alt0'] = gps['manager'].alt
     values['dt'] = gps['manager'].datetime
-    values['headMot'] = gps['manager'].headMot
-    values['relPosHeading'] = gps['manager'].relPosHeading
-    values['accHeading'] = gps['manager'].accHeading
     values['fix'] = gps['manager'].fix
-    values['flags_headVehValid'] = gps['manager'].flags_headVehValid
-    values['flags_diffSolN'] = gps['manager'].flags_diffSolN
-    values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
+
+    if gps['protocol'] in ['pybux2', 'rtk']:
+        values['headMot'] = gps['manager'].headMot
+        values['relPosHeading'] = gps['manager'].relPosHeading
+        values['accHeading'] = gps['manager'].accHeading
+        values['flags_headVehValid'] = gps['manager'].flags_headVehValid
+        values['flags_diffSolN'] = gps['manager'].flags_diffSolN
+        values['flags_gnssFixOK'] = gps['manager'].flags_gnssFixOK
+    else:
+        values['headMot'] = None
+        values['relPosHeading'] = None
+        values['accHeading'] = None
+        values['flags_headVehValid'] = None
+        values['flags_diffSolN'] = None
+        values['flags_gnssFixOK'] = None
+
     values['pi_temp'] = check_pi_cpu_temperature()
     if (tpr is not None) and (tpr['manager'] is not None):
         log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
