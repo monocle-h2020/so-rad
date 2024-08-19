@@ -450,7 +450,7 @@ class GPSParser(object):
         """
         Parses a HCHDG sentence.
 
-        :param hchdg_string: NMEA Sentance
+        :param hchdg_string: NMEA Sentence
         :type hchdg_string: str
 
         :return: Returns a dictionary with data extracted from the string.
@@ -472,7 +472,7 @@ class GPSParser(object):
         """
         Parses a PMTK500 sentence.
 
-        :param pmtk500_string: NMEA Sentance
+        :param pmtk500_string: NMEA Sentence
         :type pmtk500_string: str
 
         :return: Returns a dictionary with data extracted from the string.
@@ -494,7 +494,7 @@ class GPSParser(object):
         """
         Parses a GPGSA sentence.
 
-        :param gpgsa_string: NMEA Sentance
+        :param gpgsa_string: NMEA Sentence
         :type gpgsa_string: str
 
         :return: Returns a dictionary with data extracted from the string.
