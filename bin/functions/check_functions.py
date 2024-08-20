@@ -109,8 +109,10 @@ def check_heading(gps):
             (gps['manager'].heading is not None):
             return True
 
-    elif gps['protocol'] == 'nmea0183':
-        if gps['manager'].speed >= gps['heading_speed_limit']:
+    elif gps['protocol'] in ['nmea0183', 'djim350']:
+        if gps['manager'].speed is None:
+            return False
+        elif gps['manager'].speed >= gps['heading_speed_limit']:
             return True
 
     return False

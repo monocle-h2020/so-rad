@@ -289,6 +289,7 @@ def update_system_values(gps, values, tpr=None, rht=None, wind=None, motor=None,
     values['fix'] = gps['manager'].fix
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
+    values['heading'] = gps['manager'].heading
 
     if gps['protocol'] in ['pybux2', 'rtk']:
         values['headMot'] = gps['manager'].headMot
@@ -437,36 +438,37 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
 
     # Consider power scheduling
-    values = update_system_values(gps, values)
     power_saving_active = False
-    try:
-        values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
-                                                                      values['lon0'],
-                                                                      0.0, values['dt'])
-        log.debug(f"Solar elevation {values['solar_el']} | limit: {sample['solar_elevation_limit']}")
-        if (power_schedule['used']) and (power_schedule['use_gpio_control']):
-            if power_schedule['mode'] == 'solar_angle':
-                if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
-                    # power saving is allowed now.
-                    power_saving_active = True
-                    if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
-                        log.info("Start power saving mode")
-                        rf.store(redis_client, 'system_status', 'power_saving', expires=30)
-                        power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
-                        time.sleep(0.1)
+    if power_schedule['used']:
+        values = update_system_values(gps, values)
+        try:
+            values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
+                                                                          values['lon0'],
+                                                                          0.0, values['dt'])
+            log.debug(f"Solar elevation {values['solar_el']} | limit: {sample['solar_elevation_limit']}")
+            if power_schedule['use_gpio_control']:
+                if power_schedule['mode'] == 'solar_angle':
+                    if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
+                        # power saving is allowed now.
+                        power_saving_active = True
+                        if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
+                            log.info("Start power saving mode")
+                            rf.store(redis_client, 'system_status', 'power_saving', expires=30)
+                            power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
+                            time.sleep(0.1)
 
-                elif (values['solar_el'] + -0.5) >= sample['solar_elevation_limit']:
-                    # power saving should be cancelled now.
-                    if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
-                        log.info("Stop power saving mode")
-                        rf.store(redis_client, 'system_status', 'running', expires=30)
-                        power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
-                        time.sleep(0.1)
+                    elif (values['solar_el'] + -0.5) >= sample['solar_elevation_limit']:
+                        # power saving should be cancelled now.
+                        if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 0:
+                            log.info("Stop power saving mode")
+                            rf.store(redis_client, 'system_status', 'running', expires=30)
+                            power_schedule['gpio_interface'].on(power_schedule['power_schedule_gpio1'])
+                            time.sleep(0.1)
 
-    except ValueError:
-        log.warning("Could not calculate solar angles yet for power scheduling")
-    except Exception as err:
-        log.exception(err)
+        except ValueError:
+            log.warning("Could not calculate solar angles yet for power scheduling")
+        except Exception as err:
+            log.exception(err)
 
 
     if ready['gps']:

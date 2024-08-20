@@ -63,6 +63,7 @@ def run_test(conf, repeat=False):
        while repeat:
            try:
                single_test(radiometry_manager, ed=False)
+               time.sleep(1)
            except KeyboardInterrupt:
                repeat = False
     else:

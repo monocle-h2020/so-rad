@@ -76,6 +76,7 @@ def run_test(conf, terse=False):
                 msg+= f"Lat\t\t {gps['manager'].lat}\n"
                 msg+= f"Lon\t\t {gps['manager'].lon}\n"
                 msg+= f"Heading\t\t {gps['manager'].heading}\n"
+                msg+= f"Speed\t\t {gps['manager'].speed}\n"
                 msg+= f"Fix\t\t {gps['manager'].fix}\n"
                 msg+= f"pos_mode\t\t {gps['manager'].pos_mode}\n"
                 msg+= f"check: {check_gps(gps)}\n"
