@@ -42,7 +42,7 @@ TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status q
 log = logging.getLogger('export')
 #log.setLevel('DEBUG')
 
-def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True):
+def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
     """
     Main function
 
@@ -55,6 +55,7 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
     log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
     successes = 0
+    failures = 0
     export_result = None
     response_code = None
 
@@ -89,13 +90,16 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
         if export_result:
             log.debug(f"{i}/{len(records)} Record {json.loads(record_json)['id_']} uploaded succesfully")
             successes += 1
+            if update_local:
+                update_local_db(db, json.loads(record_json)['id_'], export_result, record_json, test_run)
+
         else:
             log.debug("Data upload failed, try again later")
             update_local_db(db, json.loads(record_json)['id_'], export_result, record_json)
-            return export_result, response_code, successes
+            failures += 1
+            if failures >= fail_limit:
+                return export_result, response_code, successes
 
-        if update_local:
-            update_local_db(db, json.loads(record_json)['id_'], export_result, record_json, test_run)
 
     return export_result, response_code, successes
 
