@@ -203,6 +203,7 @@ def redis_live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
+
         for key in ['system_status',
                     'sampling_status',
                     'counter',
@@ -212,10 +213,14 @@ def redis_live():
                     'tilt_avg',
                     'tilt_std',
                     'tilt_updated']:
-            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            try:
+                redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            except Exception as err:
+                print(err)
+                redisvals[key], redivals[f"{key}_updated"] = None, None
 
         values, values_updated = redis_retrieve(client, 'values', freshness=None)
-        # print(values)
+
         redisvals['values_updated'] = values_updated
         for key in values.keys():
             if key in ['speed',
