@@ -353,8 +353,8 @@ def format_log_message(counter, ready, values):
         else:
             strdict[valkey] = "n/a"
     if (not ready['heading']) or \
-       (values['motor_angles'] is None) or \
-       (values['motor_angles']['target_motor_pos_rel_az_deg'] is None):
+              (values['motor_angles'] is None) or \
+              (values['motor_angles']['target_motor_pos_rel_az_deg'] is None):
         strdict['tar_view_az'] = "n/a"
     else:
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
@@ -411,7 +411,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # Check whether platform bearing is fixed (set in config) or calculated from GPS
     if conf['SAMPLING']['use_fixed_bearing'].lower() == 'true':
-        ship_bearing_mean = conf['SAMPLING'].getint('fixed_bearing_deg')
+        values['ship_bearing_mean'] = conf['SAMPLING'].getint('fixed_bearing_deg')
         bearing_fixed = True
     else:
         bearing_fixed = False
@@ -597,8 +597,11 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         pass
 
     # update viewing azimuth details
-    values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], 0.0, values['dt'],
-                                                                              values['ship_bearing_mean'], values['motor_deg'], motor)
+    values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'],
+                                                                              values['lon0'],
+                                                                              0.0, values['dt'],
+                                                                              values['ship_bearing_mean'],
+                                                                              values['motor_deg'], motor)
 
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):
