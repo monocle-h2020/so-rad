@@ -208,7 +208,7 @@ def export_to_parse_server(export_config_dict, json_record):
         return False, None, None
     except Exception as err:
         log.warning("Unhandled exception while uploading data to remote server")
-        #log.exception(err)
+        log.exception(err)
         return False, None, None
 
 

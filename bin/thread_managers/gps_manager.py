@@ -312,12 +312,13 @@ class GPSParser(object):
                 elif gps_string.startswith('$GPGSA') or gps_string.startswith('$GNGSA') or gps_string.startswith('$GLGSA'):
                     return GPSParser.parse_gpgsa(gps_string)
 
-            except:
-                log.debug(f"Could not parse gps string: {gps_string}")
+            except Exception as err:
+                log.info(f"Could not parse gps string: {gps_string}")
+                log.exception(err)
                 pass
 
         else:
-                log.debug(f"GPS string failed checksumg: {gps_string}")
+                log.info(f"GPS string failed checksumg: {gps_string}")
                 pass
 
         return None
@@ -378,9 +379,12 @@ class GPSParser(object):
         :rtype: dict
         """
         gps_parts = gprmc_string.split(',')[1:-1]
-        # $GPRMC,113623.12,A,5021.9979    ,N,00407.9635    ,W,0.0  ,358.1,310315,2.2,W,A*3A
-        #        0         1 2             3 4              5 6     7     8      9   10,11
-        # $GNRMC,135502.20,A,5021.95238694,N,00408.89576858,W,0.003,86.8 ,120724,0.8,W,D,S*68'
+        # $GPRMC,113623.12,A,5021.9979    ,N,00407.9635    ,W,0.0  ,358.1,310315,2.2,W, A  *3A
+        #        0         1 2             3 4              5 6     7     8      9   10,   11
+        # dji:
+        # $GNRMC,135502.20,A,5021.95238694,N,00408.89576858,W,0.003,86.8 ,120724,0.8,W, D,S*68'
+        # ublox rnmea:
+        # $GNRMC,121800.00,A,5021.96850,   N,00408.86153,   W,0.097,     ,260924,   , ,   A*72
 
         hour = int(gps_parts[0][0:2])
         mins = int(gps_parts[0][2:4])
@@ -397,10 +401,26 @@ class GPSParser(object):
 
         lat = int(gps_parts[2][0:2]) + (float(gps_parts[2][2:])/60.0)
         lon = int(gps_parts[4][0:3]) + (float(gps_parts[4][3:])/60.0)
+
         if gps_parts[3] == 'S':
             lat *= -1
         if gps_parts[5] == 'W':
             lon *= -1
+
+        if len(gps_parts[6]) > 0:
+            speed = float(gps_parts[6])
+        else:
+            speed = None
+
+        if len(gps_parts[7]) > 0:
+            heading = float(gps_parts[7])
+        else:
+            heading = None
+
+        if len(gps_parts) == 12:
+            pos_mode = gps_parts[11]
+        else:
+            pos_mode = None
 
         result = {
             'type': 'gprmc',
@@ -414,10 +434,11 @@ class GPSParser(object):
             'date': date,
             'lat': lat,
             'lon': lon,
-            'speed': float(gps_parts[6]),
-            'heading': float(gps_parts[7]),
-            'pos_mode': gps_parts[11]
-        }
+            'speed': speed,
+            'heading': heading,
+            'pos_mode': pos_mode
+            }
+
 
         return result
 

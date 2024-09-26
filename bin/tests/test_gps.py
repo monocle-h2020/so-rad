@@ -56,7 +56,7 @@ def run_test(conf, terse=False):
     t0 = time.perf_counter()
 
     try:
-        if gps['protocol'] not in ['djim350']:
+        if gps['protocol'] in ['pyubx2']:
             while (time.perf_counter() - t0) < test_duration:
                 header = """\nTime \t\t {0} \nLat \t\t {1} \t Lon \t {2} \nSpeed \t\t {3} \nFix \t\t {4} \t nSat {7} \t Checks: {8} \nheading \t {5} (Check: {6})""".\
                       format(gps['manager'].last_update, gps['manager'].lat, gps['manager'].lon,
@@ -69,7 +69,7 @@ def run_test(conf, terse=False):
                 log.info(vals)
                 time.sleep(2.0)
 
-        elif gps['protocol'] in ['djim350']:
+        elif gps['protocol'] in ['djim350', 'nmea0183']:
             while (time.perf_counter() - t0) < test_duration:
                 msg = f"Updated\t\t {gps['manager'].last_update}\n"
                 msg+= f"Gps time\t\t {gps['manager'].datetime}\n"
@@ -82,6 +82,9 @@ def run_test(conf, terse=False):
                 msg+= f"check: {check_gps(gps)}\n"
                 log.info(msg)
                 time.sleep(1.0)
+
+        else:
+            log.critical(f"Protocol {gps['protocol']} not implemented")
 
     except (KeyboardInterrupt, SystemExit):
         log.info("Stopping GPS manager thread")

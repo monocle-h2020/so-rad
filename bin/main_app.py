@@ -192,7 +192,7 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.critical(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, wind, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
 
     else:
         radiometry_manager = None
@@ -326,11 +326,13 @@ def update_system_values(gps, values, tpr=None, rht=None, wind=None, motor=None,
 
     # update redis?
     if redis:
-        rf.store(redis_client, 'values', values, expires=30)
-        rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
-        rf.store(redis_client, 'tilt_std', tpr['manager'].tilt_std, expires=30)
-        rf.store(redis_client, 'tilt_updated', tpr['manager'].avg_updated, expires=30)
-
+        try:
+            rf.store(redis_client, 'values', values, expires=30)
+            rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
+            rf.store(redis_client, 'tilt_std', tpr['manager'].tilt_std, expires=30)
+            rf.store(redis_client, 'tilt_updated', tpr['manager'].avg_updated, expires=30)
+        except:
+            pass
     return values
 
 
@@ -350,8 +352,9 @@ def format_log_message(counter, ready, values):
                 strdict[valkey] = "{0:.2f}".format(values[valkey])
         else:
             strdict[valkey] = "n/a"
-
-    if (not ready['heading']) or (values['motor_angles']['target_motor_pos_rel_az_deg'] is None):
+    if (not ready['heading']) or \
+       (values['motor_angles'] is None) or \
+       (values['motor_angles']['target_motor_pos_rel_az_deg'] is None):
         strdict['tar_view_az'] = "n/a"
     else:
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
@@ -407,8 +410,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     use_rad = rad['n_sensors'] > 0
 
     # Check whether platform bearing is fixed (set in config) or calculated from GPS
-    if conf['DEFAULT']['use_fixed_bearing'].lower() == 'true':
-        ship_bearing_mean = conf['DEFAULT'].getint('fixed_bearing_deg')
+    if conf['SAMPLING']['use_fixed_bearing'].lower() == 'true':
+        ship_bearing_mean = conf['SAMPLING'].getint('fixed_bearing_deg')
         bearing_fixed = True
     else:
         bearing_fixed = False
@@ -436,7 +439,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # Check positioning
     ready['gps']  = check_gps(gps)
-    ready['heading'] = check_heading(gps)
+    ready['heading'] = check_heading(gps, bearing_fixed)
     # Check radiometry / sampling conditions
     ready['rad'] = check_sensors(rad, trigger_id['all_sensors'], radiometry_manager)
 
@@ -523,18 +526,23 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         values = update_system_values(gps, values)
 
         # Fetch sun variables and determine optimal motor pointing angles
-        try:
-            values['solar_az'], values['solar_el'],\
-                values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
-                                                                      0.0, values['dt'],
-                                                                      values['ship_bearing_mean'], motor,
-                                                                      values['motor_pos'])
-        except:
-            log.warning(f"No pointing solution found. Is GPS info available?")
-            ready['motor'] = False
-            values['motor_angles']['target_motor_pos_rel_az_deg'] = None
-            values['motor_angles']['target_motor_pos_step'] = None
-            log.info(f"lat {values['lat0']} lon {values['lon0']} alt {values['alt0']} {values['dt']} heading {values['ship_bearing_mean']} motor {values['motor_pos']}")
+        if not motor['used']:
+            values['solar_az'], values['solar_el'] = azi_func.solar_az_el(values['lat0'],
+                                                                          values['lon0'],
+                                                                          0.0, values['dt'])
+        else:
+            try:
+                values['solar_az'], values['solar_el'],\
+                    values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
+                                                                           0.0, values['dt'],
+                                                                           values['ship_bearing_mean'], motor,
+                                                                           values['motor_pos'])
+            except:
+                log.warning(f"No pointing solution found. Is GPS info available?")
+                ready['motor'] = False
+                values['motor_angles']['target_motor_pos_rel_az_deg'] = None
+                values['motor_angles']['target_motor_pos_step'] = None
+                log.info(f"lat {values['lat0']} lon {values['lon0']} alt {values['alt0']} {values['dt']} heading {values['ship_bearing_mean']} motor {values['motor_pos']}")
 
         # Check if the sun is in a suitable position
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
@@ -691,7 +699,7 @@ def run():
         raise
 
     # the main program cycle will run at the following minimum interval
-    main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
+    main_check_cycle_sec = conf['BASE'].getint('main_check_cycle_sec')
     # some monitoring operations are run every multiple of main_check_cycle_sec
     slow_cycle_sec = 30 * main_check_cycle_sec
     slow_cycle_timer = time.perf_counter() - slow_cycle_sec - 10  # armed
