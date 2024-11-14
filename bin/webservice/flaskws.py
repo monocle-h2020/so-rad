@@ -4,7 +4,7 @@
 Connect to db to provide latest activity from solar tracking radiometry platform (So-Rad).
 """
 
-from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup
+from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup, jsonify
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -20,6 +20,10 @@ import datetime
 import subprocess
 import redis
 import pickle
+
+from log_functions import read_log, log2dict
+from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
+from redis_functions import redis_init, redis_retrieve
 
 
 def read_config():
@@ -154,146 +158,6 @@ def load_user(id):
 
 
 # define functions used by routes below
-def read_log(log_file_location, n=100, reverse=True):
-    """Read the last n lines from a logfile"""
-    rows = []
-
-    if not os.path.exists(log_file_location):
-        return rows
-
-    bufsize = 1024
-    fsize = os.stat(log_file_location).st_size
-
-    if (bufsize >= fsize) or n is None:
-        with open(log_file_location, 'r') as logfile:
-            rows = logfile.readlines()
-        if reverse:
-            rows.reverse()
-        return rows
-
-    if reverse:
-        with open(log_file_location, 'r+') as logfile:
-            logfile.seek(0, 2)
-            i = 0
-            while True:
-                i += 1
-                seekpos = logfile.tell() - bufsize * i
-                if seekpos < 0:
-                    seekpos = 0
-                logfile.seek(seekpos)
-                rows = logfile.readlines()
-                if len(rows) >= n or logfile.tell() == 0 or seekpos == 0:
-                    break
-        rows.reverse()
-        rows = rows[0:n]
-        return rows
-
-    else:
-        with open(log_file_location, 'r') as logfile:
-            nn=0
-            while nn < n:
-               row = logfile.readline()
-               if not row:
-                   break
-               rows.append(logfile.readline())
-               nn+=1
-    return rows
-
-
-def log2dict(line, values={}):
-    """Update a dictionary from lines in the log file. This should perhaps be threaded rather than called on request."""
-    try:
-        logtype = line.split(' ')[5]
-        if logtype not in ['INFO']:
-            return values
-        values['datestr'] =          line.split(' ')[0].strip()
-        values['timestr'] =          line.split(' ')[1].strip()
-        values['gps_ok'] =           bool(int(line.split('GPS')[1].split(' ')[1].strip()))
-        values['heading_ok'] =       bool(int(line.split('Head')[1].split(' ')[1].strip()))
-        values['rad_ok'] =           bool(int(line.split('Rad')[1].split(' ')[1].strip()))
-        values['speed_ok'] =         bool(int(line.split('Spd')[1].split(' ')[1].strip()))
-        values['speed'] =            float(line.split('Spd')[1].split(' ')[2].strip('() '))
-        values['motor_ok'] =         bool(int(line.split('Motor')[1].split(' ')[1].strip()))
-        values['motor_alarm'] =      int(line.split('Motor')[1].split(' ')[2].strip('() '))
-        values['sun_elevation_ok'] = bool(int(line.split('Sun')[1].split(' ')[1].strip()))
-        values['latitude'] =         float(line.split('loc')[1].split(' ')[1].strip())
-        values['longitude'] =        float(line.split('loc')[1].split(' ')[2].strip())
-        values['tilt'] =             float(line.split('Tilt')[1].split(' ')[1].strip())
-        values['fix'] =              int(line.split('Fix:')[1].split(' ')[1].strip())
-        values['nsat'] =             int(line.split('Fix:')[1].split(' ')[2].split('(')[1].strip())
-        values['sun_elevation'] =    float(line.split('Sun')[1].split(' ')[2].strip('() '))
-        values['sun_azimuth'] =      float(line.split('SunAz')[1].split(' ')[1].strip())
-        values['ship_heading'] =     float(line.split('Ship')[1].split(' ')[1].strip())
-        values['motor_heading'] =    float(line.split('Ship')[1].split(' ')[3].strip('|'))
-        values['relviewaz'] =        float(line.split('RelViewAz:')[1].split(' ')[1].strip())
-        values['batt_ok'] =          bool(int(line.split('Bat')[1].split(' ')[1].strip()))
-    except:
-        # probably the wrong log line, so stop parsing here
-        return values
-    return values
-
-
-def redis_init(host='localhost', port=6379):
-    """
-    Set up client to speak to Redis service
-    """
-    try:
-        client = redis.StrictRedis(host='localhost', port=port, db=0)
-        client.set("client_updated", datetime.datetime.now().isoformat())
-        client.set("client_updated_dtype", "datetime")
-
-    except Exception as msg:
-        print("Redis not available")
-        return None
-
-    return client
-
-
-def redis_retrieve(client, key, freshness=30):
-    """
-    Retrieve values from redis by key
-
-    : client     Redis client configured using init function
-    : key        Name of the redis object
-    : freshness  Time in seconds to consider the value sufficiently recent.
-                 Return None and log a warning if this window has elapsed.
-                 If freshness = None, a value will be returned if a value
-                 exist for the key. However, if the elapsed time exceeds
-                 the expires attribute, a warning will be logged.
-                 To prevent using expired values, freshness should be set
-                 regardless of what the expires attribute states, as the
-                 threshold for this condition may vary between uses.
-    """
-
-    dtype = client.get(f"{key}_dtype").decode('utf-8')
-    value = client.get(key)
-
-    updated = client.get(f"{key}_updated").decode('utf-8')
-    updated = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S.%f")
-    expires = int(client.get(f"{key}_expires").decode('utf-8'))
-
-    if dtype in ['float', 'int', 'str', 'datetime']:
-        value = value.decode('utf-8')
-
-    if dtype == "float":
-        value = float(value)
-    elif dtype == "int":
-        value = int(value)
-    elif dtype == "str":
-        value = str(value)
-    elif dtype == "datetime":
-        value = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
-    elif dtype == "pickle":
-        value = pickle.loads(client.get(key))
-    else:
-        return None, updated
-
-    if (freshness is not None) and ((datetime.datetime.now() - updated).total_seconds() > freshness):
-        return None, updated
-    elif (freshness is None) and ((datetime.datetime.now() - updated).total_seconds() > expires):
-        return value, updated
-
-    return value, updated
 
 def get_from_db(db_path, n=10):
     """return last n rows from database"""
@@ -309,66 +173,6 @@ def get_from_db(db_path, n=10):
     conn.close()
     return results
 
-def restart_service(service):
-    "restart a systemd service"
-    assert ' ' not in service  # 1 word allowed
-    status = os.system(f"/usr/bin/sudo systemctl restart {service}")
-    print(status)
-    if status == 0:
-        return True
-    elif status == 1:
-        return False
-    else:
-        return status
-
-def stop_service(service):
-    "stop a systemd service"
-    assert ' ' not in service  # 1 word allowed
-    status = os.system(f"/usr/bin/sudo systemctl stop {service}")
-    print(status)
-    return status
-
-def service_status(service):
-    "display system service status"
-    assert ' ' not in service  # 1 word allowed
-    command = ["/usr/bin/systemctl", "is-active", f"{service}"]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    status = process.wait()
-    message = process.stdout.read().decode('utf-8').strip()
-    if status == 0:
-        return True, message
-    else:
-        return False, message
-
-def run_gps_test():
-    "Run a system test: show GPS status"
-    command = ["/usr/bin/python", "../tests/test_gps.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse"]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    status = process.wait()
-    message = process.stdout.read().decode('utf-8')
-    messages = message.split('\n')
-    if status == '0':
-        return True, messages
-    else:
-        return False, messages
-
-def run_export_test(force=False):
-    "Show data upload status and optionally force bulk upload"
-    if force:
-        command = ["/usr/bin/python", "../tests/test_export.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse", "--force_upload", "-1"]
-    else:
-        command = ["/usr/bin/python", "../tests/test_export.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse"]
-    print(command)
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    status = process.wait()
-    print(status)
-    message = process.stdout.read().decode('utf-8')
-    print(message)
-    messages = message.split('\n')
-    if status == '0':
-        return True, messages
-    else:
-        return False, messages
 
 # pass math functions to jinja2
 @app.context_processor
@@ -390,6 +194,72 @@ def index():
     return render_template('layout.html', common=common)
 
 
+@app.route('/redis_live', methods=['GET'])
+def redis_live():
+    """populate a live data section from redis"""
+    try:
+        client = redis_init()
+        if client is None:
+           raise Exception("Redis not initialised")
+
+        redisvals = {}
+        for key in ['system_status',
+                    'sampling_status',
+                    'counter',
+                    'upload_status',
+                    'samples_pending_upload',
+                    'disk_free_gb',
+                    'tilt_avg',
+                    'tilt_std',
+                    'tilt_updated']:
+            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+
+        values, values_updated = redis_retrieve(client, 'values', freshness=None)
+        # print(values)
+        redisvals['values_updated'] = values_updated
+        for key in values.keys():
+            if key in ['speed',
+                       'nsat0',
+                       'motor_pos',
+                       'motor_deg',
+                       'ship_bearing_mean',
+                       'solar_az',
+                       'solar_el',
+                       'rel_view_az',
+                       'batt_voltage',
+                       'lat0',
+                       'lon0',
+                       'headMot',
+                       'relPosHeading',
+                       'accHeading',
+                       'fix',
+                       'flags_headVehValid',
+                       'flags_diffSolN',
+                       'flags_gnssFixOK',
+                       'tilt_avg',
+                       'tilt_std',
+                       'inside_temp',
+                       'inside_rh',
+                       'motor_alarm',
+                       'driver_temp',
+                       'motor_temp',
+                       'pi_temp']:
+                redisvals[key] = values[key]
+
+        # read so-rad status
+        common['so-rad_status'], message = service_status('so-rad')
+
+        try:
+            return jsonify(redisvals)
+        except Exception as err:
+            print(err)
+            flash("Unable to provide system_status")
+            return jsonify(None)
+
+    except Exception as msg:
+        return msg
+
+
 @app.route('/live', methods=['GET'])
 def live():
     """Home page showing live instrument status from redis"""
@@ -406,8 +276,9 @@ def live():
 
         try:
             return render_template('live.html', common=common, redisvals=redisvals)
-        except:
+        except Exception as err:
             flash("Unable to load the requested page")
+            flash(err)
             return render_template('layout.html', common=common)
 
     except Exception as msg:

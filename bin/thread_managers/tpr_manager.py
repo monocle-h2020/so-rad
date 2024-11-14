@@ -20,6 +20,7 @@ import datetime
 import math
 from numpy import argwhere, array, mean, std, append, nanstd, nanmean
 
+
 log = logging.getLogger('tpr')
 try:
     import board
@@ -169,5 +170,9 @@ class Ada_adxl345(object):
             time.sleep(self.sleep_interval) # sleep for a standard period, ideally close to the refresh frequency of the sensor (0.01s)
             continue
 
+
     def __del__(self):
         self.stop()
+
+
+

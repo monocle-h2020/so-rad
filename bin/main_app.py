@@ -300,6 +300,9 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None, redis=Fals
     # update redis?
     if redis:
         rf.store(redis_client, 'values', values, expires=30)
+        rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
+        rf.store(redis_client, 'tilt_std', tpr['manager'].tilt_std, expires=30)
+        rf.store(redis_client, 'tilt_updated', tpr['manager'].avg_updated, expires=30)
 
     return values
 
