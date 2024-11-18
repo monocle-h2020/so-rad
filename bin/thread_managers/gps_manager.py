@@ -225,7 +225,12 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
             dataDictionary['carrSoln'] = data.carrSoln
             dataDictionary['headVehValid'] = data.headVehValid
             dataDictionary['psmState'] = data.psmState
-            dataDictionary['diffSolN'] = data.difSoln
+            try:
+                dataDictionary['diffSolN'] = data.diffSoln
+            except errmsg:
+                log.warning("diffSoln not reported, reading difSoln for backward compatibility")
+                dataDictionary['diffSolN'] = data.difSoln
+
             dataDictionary['gnssFixOK'] = data.gnssFixOk
             dataDictionary['confirmedTime'] = data.confirmedTime
             dataDictionary['confirmedDate'] = data.confirmedDate
