@@ -46,7 +46,7 @@ class GPSSerialReader(threading.Thread):
         protocol = type(self.parent).__name__
 
         bitOfData = b''
-        timeToSleep = 0.1
+        timeToSleep = 0.05
         lineCount = 0
         serialReader = self.serial_port
         LotOfData = []
@@ -225,10 +225,10 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
             dataDictionary['carrSoln'] = data.carrSoln
             dataDictionary['headVehValid'] = data.headVehValid
             dataDictionary['psmState'] = data.psmState
+            # pyubx2 update Nov(?) 2024 has changed difSoln to diffSoln
             try:
                 dataDictionary['diffSolN'] = data.diffSoln
-            except errmsg:
-                log.warning("diffSoln not reported, reading difSoln for backward compatibility")
+            except Exception as errmsg:
                 dataDictionary['diffSolN'] = data.difSoln
 
             dataDictionary['gnssFixOK'] = data.gnssFixOk
