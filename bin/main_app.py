@@ -199,7 +199,8 @@ def init_all(conf):
 def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger('stop')
-
+    log.info("Stopping system modules")
+    print("stopping")
     rf.store(redis_client, 'system_status', 'stopping', expires=30)
 
     # Stop the radiometry manager
@@ -208,41 +209,42 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         radiometry_manager.stop()
 
     # Stop the GPS manager
-    if gps['manager'] is not None:
+    if (gps is not None) and (gps['manager'] is not None):
         log.info("Stopping GPS manager thread")
         gps['manager'].stop()
         time.sleep(0.5)
 
     # Stop the battery manager
-    if (battery['used']) and (bat_manager is not None):
+    if (battery is not None) and (battery['used']) and (bat_manager is not None):
         log.info("Stopping battery manager thread")
         bat_manager.stop()
 
     # Stop the TPR manager
-    if (tpr['used']) and (tpr['manager'] is not None):
+    if (tpr is not None) and (tpr['used']) and (tpr['manager'] is not None):
         log.info("Stopping TPR manager thread")
         tpr['manager'].stop()
 
     # Stop the RHT manager
-    if (rht['used']) and (rht['manager'] is not None) and (rht['manager'].started):
+    if (rht is not None) and (rht['used']) and (rht['manager'] is not None) and (rht['manager'].started):
         log.info("Stopping RHT manager thread")
         #rht['manager'].stop()  # not using threading here, but it's there if we want it.
 
     # Turn radiometry power control GPIO pin off
-    rad['gpio_interface'].off(rad['gpio1'])
-    time.sleep(0.1)
-    rad['gpio_interface'].stop()  # release gpio control
-    time.sleep(0.1)
+    if rad is not None:
+        rad['gpio_interface'].off(rad['gpio1'])
+        time.sleep(0.1)
+        rad['gpio_interface'].stop()  # release gpio control
+        time.sleep(0.1)
 
     # Turn power_scheduling control GPIO pin off
-    if power_schedule['use_gpio_control']:
+    if (power_schedule is not None) and (power_schedule['use_gpio_control']):
         power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
         time.sleep(0.1)
         power_schedule['gpio_interface'].stop()  # release gpio control
         time.sleep(0.1)
 
     # Stop the camera manager
-    if (cam['used']) and (cam['manager'] is not None) and (cam['manager'].started):
+    if (cam is not None) and (cam['used']) and (cam['manager'] is not None) and (cam['manager'].started):
         log.info("Stopping camera manager thread")
         cam['manager'].stop()
 
@@ -256,7 +258,6 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         time.sleep(1.0)
 
     log.info(f"There are {threading.active_count()} active threads left.")
-
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
@@ -644,13 +645,26 @@ def run():
 
     try:
         # Initialise everything
+        db_dict = None
+        rad = None
+        sample = None
+        gps = None
+        radiometry_manager = None
+        motor = None
+        battery = None
+        bat_manager = None
+        gpios = None
+        tpr = None
+        rht = None
+        cam = None
+        power_schedule = None
         db_dict, rad, sample, gps, radiometry_manager,\
             motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule = init_all(conf)
-    except Exception:
-        log.exception("Exception during initialisation")
+    except Exception as err:
+        log.critical(f"Exception during initialisation: {err}. Stopping.")
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
                  cam, power_schedule, conf, idle_time=120)
-        raise
+
 
     # the main program cycle will run at the following minimum interval
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')

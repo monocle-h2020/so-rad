@@ -130,6 +130,7 @@ def motor_init(motor_config, ports):
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
     motor['adjust_mode'] = motor_config.get('adjust_mode').lower()
+    motor['port'] = None
     assert motor['adjust_mode'] in ['sampling', 'always']
 
     if not motor['used']:
