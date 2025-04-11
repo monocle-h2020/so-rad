@@ -36,13 +36,28 @@ redis_client = rf.init()
 
 def parse_args():
     """parse command line arguments"""
+    # find config.ini
+    if os.path.isfile("config.ini"):
+        config_file = "./config.ini"
+    elif os.path.isfile("../config.ini"):
+        config_file = "../config.ini"
+    else:
+        config_file = sys.argv[1]
+    # find config-local.ini
+    if os.path.isfile("config-local.ini"):
+        local_config_file = "config-local.ini"
+    elif os.path.isfile("../config-local.ini"):
+        local_config_file = "../config-local.ini"
+    else:
+        local_config_file = sys.argv[2]
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config_file', required=True,
+    parser.add_argument('-c', '--config_file', required=False,
                         help="config file providing program settings",
-                        default=u"config.ini")
-    parser.add_argument('-l', '--local_config_file', required=True,
+                        default=config_file)
+    parser.add_argument('-l', '--local_config_file', required=False,
                         help="system-specific config overrides providing program settings",
-                        default=u"config-local.ini")
+                        default=local_config_file)
     parser.add_argument("--verbose", "-v", action='store_true', help="verbose output")
     parser.add_argument("--terse", "-t", action='store_true', help="terse output")
 

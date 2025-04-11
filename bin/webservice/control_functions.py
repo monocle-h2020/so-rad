@@ -41,7 +41,7 @@ def service_status(service):
 
 def run_gps_test():
     "Run a system test: show GPS status"
-    command = ["/usr/bin/python", "../tests/test_gps.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse"]
+    command = ["/usr/bin/python", "../tests/test_gps.py", "--terse"]
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     status = process.wait()
     message = process.stdout.read().decode('utf-8')
@@ -54,9 +54,9 @@ def run_gps_test():
 def run_export_test(force=False):
     "Show data upload status and optionally force bulk upload"
     if force:
-        command = ["/usr/bin/python", "../tests/test_export.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse", "--force_upload", "-1"]
+        command = ["/usr/bin/python", "../tests/test_export.py", "--terse", "--force_upload", "-1"]
     else:
-        command = ["/usr/bin/python", "../tests/test_export.py", "-c", f"{config_file}", "-l", f"{local_config_file}", "--terse"]
+        command = ["/usr/bin/python", "../tests/test_export.py", "--terse"]
     print(command)
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     status = process.wait()
