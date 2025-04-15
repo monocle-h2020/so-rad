@@ -416,9 +416,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 if (values['solar_el'] + 1.2) < sample['solar_elevation_limit']:
                     # power saving is allowed now.
                     power_saving_active = True
+                    rf.store(redis_client, 'system_status', 'power_saving', expires=30)
                     if power_schedule['gpio_interface'].status(power_schedule['power_schedule_gpio1']) == 1:
                         log.info("Start power saving mode")
-                        rf.store(redis_client, 'system_status', 'power_saving', expires=30)
                         power_schedule['gpio_interface'].off(power_schedule['power_schedule_gpio1'])
                         time.sleep(0.1)
 

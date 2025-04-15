@@ -646,8 +646,8 @@ def collect_settings_formdata():
                                   'setting':   int(conf['GPS']['gps_heading_correction']),
                                   'postlabel': 'degrees',
                                   'comment':   'normally 0 or 90',
-                                  'min':       -180,
-                                  'max':       180},
+                                  'min':       -181,
+                                  'max':       181},
                 'sampling_speed_limit':
                                   {'label':    'Minimum speed to allow sampling',
                                   'setting':   float(conf['SAMPLING']['sampling_speed_limit']),
