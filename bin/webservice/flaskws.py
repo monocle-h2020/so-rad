@@ -212,7 +212,10 @@ def redis_live():
                     'tilt_avg',
                     'tilt_std',
                     'tilt_updated']:
-            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            try:
+                redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            except:
+                redisvals[key] = ''
 
         values, values_updated = redis_retrieve(client, 'values', freshness=None)
         # print(values)
@@ -270,7 +273,10 @@ def live():
 
         redisvals = {}
         for key in ['system_status', 'sampling_status', 'counter', 'upload_status', 'samples_pending_upload', 'disk_free_gb', 'values']:
-            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            try:
+                redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            except AttributeError:
+                redisvals[key] = ''
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
 
