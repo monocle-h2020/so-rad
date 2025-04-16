@@ -75,7 +75,7 @@ class Soradcam(object):
     def get_picture(self, label=datetime.datetime.now().isoformat()):
         '''get a new picture, this function is only called from the active thread'''
         if self.busy:
-            log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, request ignored.")
+            log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, new request ignored.")
             return
         else:
             self.last_request_time = datetime.datetime.now()
@@ -99,7 +99,7 @@ class Soradcam(object):
                 s = socket.socket()
                 s.connect((self.camera_ip, self.camera_port))
 
-                self.last_api_port_response = datetime.datetime.now()
+                self.last_received_time = datetime.datetime.now()
                 return True
 
             except ConnectionRefusedError:

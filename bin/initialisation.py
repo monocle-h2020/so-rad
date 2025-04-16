@@ -109,6 +109,7 @@ def camera_init(camera_config):
         return cam
 
     assert cam['interface'].lower() in ['soradcam', ]
+    assert os.path.exists(cam['storage_path'])
 
     # Return the configuration dict and initialise relevant manager class
     if cam['interface'] == 'soradcam':

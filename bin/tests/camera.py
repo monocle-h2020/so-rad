@@ -15,6 +15,14 @@ from main_app import parse_args
 import functions.config_functions as cf
 import thread_managers.camera_manager as cameras
 
+import functions.redis_functions as rf
+
+# connect to redis
+redis_client = rf.init()
+
+# hardcoded timeout on API request
+request_timeout = cameras.TIMEOUT
+
 
 def main(conf):
     print("Start test, initialising")
@@ -29,7 +37,8 @@ def main(conf):
     label = f"test_{datetime.datetime.now().isoformat()}"
     camera.get_picture(label=label)
 
-    while camera.busy and time.perf_counter()-t0 < 5.0:
+    while camera.busy and time.perf_counter()-t0 < (request_timeout + 1):
+        log.debug("Camera busy..")
         time.sleep(0.1)
 
     if camera.last_request_success:
@@ -41,6 +50,7 @@ def main(conf):
     outpath = os.path.join(cam['storage_path'], label+'.jpg')
     if os.path.exists(outpath):
         print(f"Image stored at {outpath}")
+        rf.store(redis_client, 'last_picam_image', outpath)
     else:
         print(f"Error: Image not found at {outpath}")
 

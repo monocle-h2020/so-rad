@@ -20,6 +20,7 @@ import datetime
 import subprocess
 import redis
 import pickle
+from PIL import Image
 
 from log_functions import read_log, log2dict
 from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
@@ -77,6 +78,8 @@ def update_common_items():
     common['cw_limit_deg'] = float(conf['MOTOR']['cw_limit_deg'])
     common['ccw_limit_deg'] = float(conf['MOTOR']['ccw_limit_deg'])
     common['nrows'] = 100
+    common['use_camera'] = conf['CAMERA']['use_camera']
+    print(common['use_camera'])
     return
 
 update_common_items()
@@ -102,7 +105,6 @@ def save_updates_to_local_config(updates):
         except Exception as err:
             flash(f"Failed to write local config file: {err}")
 
-    # need to re-read config file somehow and make conf global
     update_config()
     update_common_items()
     return
@@ -196,7 +198,7 @@ def index():
 
 @app.route('/redis_live', methods=['GET'])
 def redis_live():
-    """populate a live data section from redis"""
+    """populate a live data section from redis and display as json object"""
     try:
         client = redis_init()
         if client is None:
@@ -276,6 +278,49 @@ def live():
 
         try:
             return render_template('live.html', common=common, redisvals=redisvals)
+        except Exception as err:
+            flash("Unable to load the requested page")
+            flash(err)
+            return render_template('layout.html', common=common)
+
+    except Exception as msg:
+        return msg
+
+
+@app.route('/camera', methods=['GET'])
+def camera():
+    """
+    Show latest camera image if a camera is present/active
+    """
+    try:
+        client = redis_init()
+        if client is None:
+           raise Exception("Redis not initialised")
+
+        camera_vals = {}
+        try:
+            camera_vals['last_picam_path'], camera_vals['last_picam_updated'] = redis_retrieve(client, 'last_picam_image', freshness=None)
+        except Exception as err:
+            camera_vals['last_picam_path'] = camera_vals['last_picam_updated'] = ""
+            print(err)
+
+        if (len(camera_vals['last_picam_path']) > 0) and (os.path.exists(camera_vals['last_picam_path'])):
+
+            dest = os.path.join('.','static','latest_image_full.jpg')
+
+            if (not os.path.exists(dest)) or (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
+                if os.path.exists(dest):
+                    os.remove(dest)
+
+                os.symlink(camera_vals['last_picam_path'], dest)
+                # scale down the image
+                im = Image.open(dest)
+                im.thumbnail((500,500))
+                im.save(dest.replace('_full', ''))
+                print("updated image")
+
+        try:
+            return render_template('camera.html', common=common, camera_vals=camera_vals)
         except Exception as err:
             flash("Unable to load the requested page")
             flash(err)

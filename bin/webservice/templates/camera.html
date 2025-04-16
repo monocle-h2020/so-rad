@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+{% block content %}
+<div>
+  <h2>So-Rad Camera</h2>
+</div>
+{% if common['so-rad_status']==true %}
+  <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
+{% else %}
+  <div style="color:#000000;background-color:#ee1111;font-weight:bold">So-Rad service is not running</div>
+{% endif %}
+<br>
+
+<style>
+img {
+     max-width: 25%;
+     height: auto;
+    }
+</style>
+
+
+{% if common['use_camera'] %}
+<div>
+Camera connected<br>
+
+  {% set pathlength = camera_vals['last_picam_path']|length %}
+  {%if pathlength > 0 %}
+    <div>
+    Latest image: {{ camera_vals['last_picam_path'] }} <br>
+    500x500 pixel preview:<br>
+    <br>
+    <img src="/static/latest_image.jpg" width="500">
+    <br>
+    <a href="/static/latest_image_full.jpg">Download full size</a>
+    </div>
+
+  {% else %}
+    <div>
+    No images acquired.
+    </div>
+  {% endif %}
+
+{% else %}
+<div>
+No camera connected
+</div>
+{% endif %}
+
+
+{% endblock %}

@@ -584,6 +584,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                (cam['manager'].last_received_time <= trigger_id['all_sensors'] - datetime.timedelta(seconds=cam['interval'])):
                 rf.store(redis_client, 'sampling_status', 'imaging', expires=30)
                 cam['manager'].get_picture(label=trigger_id['all_sensors'])
+                rf.store(redis_client, 'last_picam_image',
+                         f"{os.path.join(cam['storage_path'], trigger_id['all_sensors'])}.jpg",
+                         expires=None)
                 rf.store(redis_client, 'sampling_status', 'ready', expires=30)
 
         # Collect and combine radiometry data
