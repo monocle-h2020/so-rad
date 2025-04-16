@@ -51,11 +51,12 @@
       <tr>  <th>Longitude</th>             <td><span id="lon0">...</span> deg</td>           <td>    </td>   </tr>
       <tr>  <th>RTK heading</th>           <td><span id="relPosHeading">...</span> deg</td>  <td>    </td>   </tr>
       <tr>  <th>Heading accuracy</th>      <td><span id="accHeading">...</span> deg</td>     <td>    </td>   </tr>
+      <tr>  <th>Corrected heading</th>     <td><span id="ship_bearing_mean">...</span> deg</td><td>  </td>   </tr>
       <tr>  <th>GPS Fix</th>               <td><span id="fix"></span></td>                   <td>    </td>   </tr>
       <tr>  <th>Satellites</th>            <td><span id="nsat0"></span></td>                 <td>    </td>   </tr>
       <tr>  <th>Tilt avg</th>              <td><span id="tilt_avg">...</span> +/- 
                                                <span id="tilt_std">...</span></td>
-                                           <td><span id="tilt_updated">...</span></td>                   </tr>
+                                           <td><span id="tilt_updated">...</span></td>                       </tr>
       <tr>  <th>Pi temp</th>               <td><span id="pi_temp">...</span> C</td>          <td>    </td>   </tr>
       <tr>  <th>Motor temp</th>            <td><span id="motor_temp">...</span> C</td>       <td>    </td>   </tr>
       <tr>  <th>Driver temp</th>           <td><span id="driver_temp">...</span> C</td>      <td>    </td>   </tr>
@@ -124,10 +125,14 @@
       lat0.innerText = data.lat0;
       var lon0 = document.getElementById("lon0");
       lon0.innerText = data.lon0;
+
       var relPosHeading = document.getElementById("relPosHeading");
       relPosHeading.innerText = data.relPosHeading.toFixed(2);
       var accHeading = document.getElementById("accHeading");
       accHeading.innerText = data.accHeading.toFixed(4);
+      var ship_bearing_mean = document.getElementById("ship_bearing_mean");
+      ship_bearing_mean.innerText = data.ship_bearing_mean.toFixed(2);
+
       var fix = document.getElementById("fix");
       fix.innerText = data.fix;
       var nsat0 = document.getElementById("nsat0");
