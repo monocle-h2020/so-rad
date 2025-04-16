@@ -2,6 +2,9 @@
 instance/
 .webassets-cache
 
+# camera images
+*.jpg
+
 *.py[cod]
 #local config
 config-local.ini
@@ -9,4 +12,5 @@ config-local.ini
 
 #temporary
 __pycache__
+*.save
 
