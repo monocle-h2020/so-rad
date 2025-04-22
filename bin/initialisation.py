@@ -103,6 +103,8 @@ def camera_init(camera_config):
     cam['resolution'] = camera_config.get('resolution')
     cam['interval'] = camera_config.getint('interval')
     cam['storage_path'] = camera_config.get('storage_path')
+    cam['max_storage_gb'] = float(camera_config.get('max_storage_gb'))
+    cam['storage_protocol'] = camera_config.get('storage_protocol')
 
     if not cam['used']:
         log.info(f"Camera disabled in config")

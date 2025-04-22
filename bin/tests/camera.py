@@ -30,7 +30,7 @@ def main(conf):
     camera = cam['manager']
 
     camera.start()
-    print(f"Connected to camera: {camera.connected}")
+    log.info(f"Connected to camera: {camera.connected}")
 
     t0 = time.perf_counter()
 

@@ -19,6 +19,8 @@ import numpy as np
 import datetime
 import requests
 import socket
+import glob
+from numpy import argsort, array
 
 TIMEOUT = 8.0
 
@@ -57,8 +59,14 @@ class Soradcam(object):
         # storage_settings
         self.request_label = None
         self.storage_path = cam['storage_path']
+        self.max_storage = cam['max_storage_gb']
+        self.stored_gb = None
+        self.last_storage_check = None
+        self.storage_check_interval_sec = 3600  # check once every hour
+        self.storage_protocol = cam['storage_protocol']
 
-        log.info(f"Camera request command = http://{self.camera_ip}:{self.camera_port}/get{self.res}")
+        #
+        log.debug(f"Camera request command = http://{self.camera_ip}:{self.camera_port}/get{self.res}")
 
         # thread things
         self.thread = None
@@ -87,6 +95,47 @@ class Soradcam(object):
             self.request_label = label
             log.info(f"Image requested at {self.last_request_time}")
         return
+
+    def check_storage(self):
+        '''
+        Check storage volume
+        '''
+        total_bytes = 0
+        for file in os.listdir(self.storage_path):
+            filepath = os.path.join(self.storage_path, file)
+            if not os.path.islink(filepath):
+                total_bytes += os.path.getsize(filepath)
+        total_mb = total_bytes / 1024**2
+        self.stored_gb = total_bytes / 1024**3
+        self.last_storage_check = datetime.datetime.now()
+
+        log.info(f"Total image storage volume {self.stored_gb:.3f} Gb ({total_mb:.3f} Mb)")
+
+    def limit_storage(self):
+        '''
+        Limit used storage.
+        Several methods may be implemented here.
+        Currently we use a rolling archive: remove a number of files as needed to bring stored volume back below threshold, oldest files first.
+        '''
+        if self.storage_protocol == 'rolling_archive':
+            filelist = array(glob.glob(os.path.join(self.storage_path, '*.jpg')))
+            filedates = array([os.stat(f).st_mtime for f in filelist])
+            filesizes = array([os.stat(f).st_size for f in filelist])
+
+            filesizes_sorted = filesizes[argsort(filedates)]
+            filelist_sorted = filelist[argsort(filedates)]
+
+            excess_gb = self.stored_gb - self.max_storage
+            removed_gb = 0
+
+            for f, s in zip(filelist_sorted, filesizes_sorted):
+                removed_gb += s/1024**3
+                log.info(f"Removing {f} to reduce stored image volume by {s/1024**3:.3f}Gb")
+                os.remove(f)
+                if removed_gb >= excess_gb:
+                    break
+
+            self.check_storage()
 
 
     def check_api_port(self):
@@ -153,7 +202,7 @@ class Soradcam(object):
 
             elif self.picture_requested:
                 # fetch new image from remote camera
-                log.info("Picture request observed")
+                log.info("Picture requested from camera manager")
                 camera_url = f"http://{self.camera_ip}/get{self.res}"
                 log.info(camera_url)
                 try:
@@ -183,6 +232,16 @@ class Soradcam(object):
                 # return to normal state
                 self.busy = False
                 self.picture_requested = False
+
+            # check and adjust stored image volume periodically (when camera is idle)
+            elif (self.last_storage_check is None) or \
+                (self.last_storage_check < (datetime.datetime.now() -datetime.timedelta(seconds=self.storage_check_interval_sec))):
+
+                self.check_storage()
+
+                if self.stored_gb > self.max_storage:
+                    log.info(f"Camera image stored volume {self.stored_gb:.3f} Gb exceeds {self.max_storage:.3f} limit. Starting maintenance.")
+                    self.limit_storage()
 
             # sleep for a short standard period
             time.sleep(self.sleep_interval)
