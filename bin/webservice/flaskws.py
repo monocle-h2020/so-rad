@@ -220,7 +220,7 @@ def redis_live():
                 redisvals[key] = ''
 
         values, values_updated = redis_retrieve(client, 'values', freshness=None)
-        # print(values)
+
         redisvals['values_updated'] = values_updated
         for key in values.keys():
             if key in ['speed',
@@ -310,20 +310,39 @@ def camera():
             camera_vals['last_picam_path'] = camera_vals['last_picam_updated'] = ""
             print(err)
 
+        dest = os.path.join('.','static','latest_image_full.jpg')
+        if os.path.islink(dest) and not os.path.exists(dest):
+            # link points to purged file
+            try:
+                os.remove(dest)
+                os.remove(dest.replace('_full', ''))
+            except: pass
+
+        # is a camera image available according to redis?
         if (len(camera_vals['last_picam_path']) > 0) and (os.path.exists(camera_vals['last_picam_path'])):
 
-            dest = os.path.join('.','static','latest_image_full.jpg')
+            # are existing files/links different?
+            if (not os.path.exists(dest)) or \
+               (not os.path.exists(dest.replace('_full', ''))) or \
+               (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
 
-            if (not os.path.exists(dest)) or (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
-                if os.path.exists(dest):
-                    os.remove(dest)
+                if os.path.islink(dest) or os.path.exists(dest):
+                    # remove existing link/thumbnail
+                    try:
+                        os.remove(dest)
+                        os.remove(dest.replace('_full', ''))
+                    except: pass
 
+                print(camera_vals['last_picam_path'])
+                print(os.path.exists(camera_vals['last_picam_path']))
                 os.symlink(camera_vals['last_picam_path'], dest)
                 # scale down the image
                 im = Image.open(dest)
                 im.thumbnail((500,500))
                 im.save(dest.replace('_full', ''))
-                print("updated image")
+
+        else:
+            camera_vals['last_picam_path'] = ''
 
         try:
             return render_template('camera.html', common=common, camera_vals=camera_vals)
