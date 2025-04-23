@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
 Autonomous operation of hyperspectral radiometers with optional rotating measurement platform, solar power supply and remote connectivity
 
 Plymouth Marine Laboratory
 
-License: under development, please contact stsi at pml*ac*uk
-
+License: CC-BY-NC International 4.0 (Attribution-NonCommercial-ShareAlike 4.0 International)
+For additional information please contact stsi at pml*ac*uk
 """
+
 import time
 import serial.tools.list_ports as list_ports
 import threading
@@ -24,14 +24,19 @@ import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
 import functions.gps_functions as gps_func
 import functions.azimuth_functions as azi_func
-from functions.check_functions import check_gps, check_motor, check_sensors, check_sun, check_battery, check_speed, check_heading, check_pi_cpu_temperature, check_ed_sampling, check_internet, check_remote_data_store
+from functions.check_functions import check_gps, check_motor, check_sensors, \
+                                      check_sun, check_battery, check_speed, \
+                                      check_heading, check_pi_cpu_temperature, \
+                                      check_ed_sampling, check_internet, check_remote_data_store
 from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
 import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-__version__ = 20240702.1
+__version__ = 20250423.1
 
+
+# initiate redis connection
 redis_client = rf.init()
 
 def parse_args():
@@ -532,6 +537,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         else:
             move_motor = False
 
+        # get motor into position
         if move_motor:
             target_pos = values['motor_angles']['target_motor_pos_step']
             rf.store(redis_client, 'sampling_status', 'moving_motor', expires=30)
@@ -564,11 +570,11 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # collect latest GPS and TPR data now that a measurement may be triggered
     values = update_system_values(gps, values, tpr, rht, motor, redis=True)
 
+    # update viewing azimuth details
     try:
         values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
     except:
         pass
-    # update viewing azimuth details
     values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], 0.0, values['dt'],
                                                                               values['ship_bearing_mean'], values['motor_deg'], motor)
 

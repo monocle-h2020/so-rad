@@ -4,7 +4,9 @@
 Connect to db to provide latest activity from solar tracking radiometry platform (So-Rad).
 """
 
-from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup, jsonify
+from flask import Flask, render_template, abort, \
+                  flash, redirect, url_for, request,\
+                  Markup, jsonify, send_file
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -21,6 +23,7 @@ import subprocess
 import redis
 import pickle
 from PIL import Image
+import glob
 
 from log_functions import read_log, log2dict
 from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
@@ -137,11 +140,6 @@ class User(UserMixin):
 admin_hash = conf['FLASK']['admin_hash']
 users = {'admin': User('admin', 'bosh', admin_hash)}
 
-
-# to generate the password hash with a new installation do:
-# from werkzeug.security import generate_password_hash
-# generate_password_hash(pw)  #  where pw is the password provided to the operator.
-# then add this to the FLASK section of config-local.ini
 
 # define app
 app = Flask(__name__)
@@ -293,17 +291,58 @@ def live():
         return msg
 
 
-@app.route('/camera', methods=['GET'])
+@app.route('/camera', methods=['GET', 'POST'])
 def camera():
     """
     Show latest camera image if a camera is present/active
     """
+
+    camera_vals = {'n_images_shown': 100,
+                   'max_storage_gb': conf['CAMERA']['max_storage_gb']}
+
+    filelist = glob.glob(os.path.join(conf['CAMERA']['storage_path'], '*.jpg'))
+
+    # get image store size
+    total_bytes = 0
+    filesizes = []
+    for file in filelist:
+        filesizes.append(os.path.getsize(file))
+    camera_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
+
+    try:
+        if request.method == 'POST':
+            camera_vals['n_images_shown'] = int(request.form['n_images_shown'])
+            if 'All' in request.form.keys():
+                camera_vals['n_images_shown'] = len(filelist)
+            elif '100' in request.form.keys():
+                camera_vals['n_images_shown'] = 100
+            else:
+                for key in request.form.keys():
+                    if 'download_' in key:
+                        filepath = os.path.join(conf['CAMERA']['storage_path'], '_'.join(key.split('_')[1:]))
+                        if os.path.exists(filepath):
+                            return send_file(filepath)
+                        else:
+                            break
+
+        camera_vals['n_images'] = len(filelist)
+        if len(filelist) < camera_vals['n_images_shown']:
+            camera_vals['n_images_shown'] = len(filelist)
+
+        filelist = [os.path.basename(f) for f in filelist]
+        filelist.sort()
+        filelist.reverse()
+        camera_vals['image_list'] = filelist[0:camera_vals['n_images_shown']]
+        camera_vals['image_sizes'] = [os.path.getsize(os.path.join(conf['CAMERA']['storage_path'],file))/1024. for file in filelist]
+
+    except Exception as err:
+        return f"An unexpected error occurred handling a /camera request: {err}"
+
     try:
         client = redis_init()
         if client is None:
            raise Exception("Redis not initialised")
 
-        camera_vals = {}
         try:
             camera_vals['last_picam_path'], camera_vals['last_picam_updated'] = redis_retrieve(client, 'last_picam_image', freshness=None)
         except Exception as err:
@@ -323,30 +362,36 @@ def camera():
 
             # are existing files/links different?
             if (not os.path.exists(dest)) or \
-               (not os.path.exists(dest.replace('_full', ''))) or \
+               (not os.path.exists(dest.replace('_full', '_thumbnail'))) or \
                (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
 
                 if os.path.islink(dest) or os.path.exists(dest):
                     # remove existing link/thumbnail
                     try:
                         os.remove(dest)
-                        os.remove(dest.replace('_full', ''))
+                        os.remove(dest.replace('_full', '_thumbnail'))
                     except: pass
 
-                print(camera_vals['last_picam_path'])
-                print(os.path.exists(camera_vals['last_picam_path']))
                 os.symlink(camera_vals['last_picam_path'], dest)
                 # scale down the image
                 im = Image.open(dest)
                 im.thumbnail((500,500))
-                im.save(dest.replace('_full', ''))
+                im.save(dest.replace('_full', '_thumbnail'))
+
+            # download full version of latest image using send_file
+            if (request.method == 'POST') and ('download-latest' in request.form.keys()):
+                return send_file(dest, as_attachment=True)
 
         else:
             camera_vals['last_picam_path'] = ''
 
         try:
-            return render_template('camera.html', common=common, camera_vals=camera_vals)
+            return render_template('camera.html',
+                                   common=common,
+                                   camera_vals=camera_vals,
+                                   zip=zip)
         except Exception as err:
+            return err
             flash("Unable to load the requested page")
             flash(err)
             return render_template('layout.html', common=common)

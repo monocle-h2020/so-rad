@@ -2,6 +2,7 @@
 {% block content %}
 <div>
   <h2>So-Rad Camera</h2>
+<br>
 </div>
 {% if common['so-rad_status']==true %}
   <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
@@ -17,33 +18,47 @@ img {
     }
 </style>
 
-
 {% if common['use_camera'] %}
-<div>
-Camera connected<br>
+<p>Camera is configured for use</p>
+{% else %}
+<p>No camera configured for use</p>
+{% endif %}
 
-  {% set pathlength = camera_vals['last_picam_path']|length %}
-  {%if pathlength > 0 %}
-    <div>
-    Latest image: {{ camera_vals['last_picam_path'] }} <br>
-    500x500 pixel preview:<br>
-    <br>
-    <img src="/static/latest_image.jpg" width="500">
-    <br>
-    <a href="/static/latest_image_full.jpg">Download full size</a>
-    </div>
+<p>{{ camera_vals['stored_gb'] }} Gb stored out of {{ camera_vals['max_storage_gb'] }} Gb allocated.</p>
+
+{% set pathlength = camera_vals['last_picam_path']|length %}
+
+{%if pathlength > 0 %}
+
+  <form action="/camera" method = "POST">
+    <p>Latest image {{ camera_vals['image_list'][0] }} - 500x500 pixel preview:</p>
+    <p><img src="/static/latest_image_thumbnail.jpg" width="500"></p>
+
+    <input type = "submit" value = "Download full size image" name = "download-latest">
+    <p> {{ camera_vals['n_images'] }} Images available. List:
+      <input type = "number" value = {{ camera_vals['n_images_shown'] }} name = "n_images_shown" /> 
+      <input type = "submit" value = "Confirm"/> or: 
+      <input type = "submit" value = "Show all" name="All"/>
+      <input type = "submit" value = "Show 100 most recent" name="100"/>
+    </p>
+
+    <table>
+    {% for m, s in zip(camera_vals['image_list'], camera_vals['image_sizes']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} kb </td>
+        <td> <input type = "submit" value = "Download full size image" name = "download_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+
+  </form>
+
 
   {% else %}
     <div>
-    No images acquired.
+    No images available.
     </div>
   {% endif %}
-
-{% else %}
-<div>
-No camera connected
-</div>
-{% endif %}
 
 
 {% endblock %}
