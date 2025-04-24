@@ -36,20 +36,48 @@ img {
 
     <input type = "submit" value = "Download full size image" name = "download-latest">
     <p> {{ camera_vals['n_images'] }} Images available. List:
-      <input type = "number" value = {{ camera_vals['n_images_shown'] }} name = "n_images_shown" /> 
+      <input type = "number" value = {{ camera_vals['n_images_shown'] }} name = "n_images_shown" size="6"/> 
       <input type = "submit" value = "Confirm"/> or: 
       <input type = "submit" value = "Show all" name="All"/>
       <input type = "submit" value = "Show 100 most recent" name="100"/>
     </p>
+    <p>
+    Prepare zip image archive for download for period starting <br>
+    <input type = "string" value = "FIRST or YYYY-MM-DDTHH:MM:SS" name = "start_dt" size="28"/> 
+    and ending  <input type = "string" value = "LAST or YYYY-MM-DDTHH:MM:SS" name = "end_dt" size="28"/> 
+    <input type = "submit" value = "Confirm" name = "makezip" /><br>
+    Note: for large archives your web session may time out while the request completes.
 
+    <p>
+    Available zip archives:
+    <table>
+    {% for m, s in zip(camera_vals['zip_list'], camera_vals['zip_sizes']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} Mb </td>
+        <td> <input type = "submit" value = "Download zip archive" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+    <p>
+    Individual image files:
+    <br>
+    <input type = "submit" value = "Delete all stored images" name = "clear_storage">
+    <br>
     <table>
     {% for m, s in zip(camera_vals['image_list'], camera_vals['image_sizes']) %}
       <tr>
         <td align="left"> {{ m }} </td>
         <td align="right"> {{ '%0d' %s }} kb </td>
         <td> <input type = "submit" value = "Download full size image" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
       </tr>
     {% endfor %}
+    </table>
+    </p>
 
   </form>
 

@@ -24,11 +24,14 @@ import redis
 import pickle
 from PIL import Image
 import glob
-
+import threading
+import zipfile
 from log_functions import read_log, log2dict
 from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
 from redis_functions import redis_init, redis_retrieve
+from camera_functions import camera_main, get_latest_image
 
+# TODO: check safe_join
 
 def read_config():
     """uses local conf and global config_file objects"""
@@ -211,7 +214,8 @@ def redis_live():
                     'disk_free_gb',
                     'tilt_avg',
                     'tilt_std',
-                    'tilt_updated']:
+                    'tilt_updated',
+                    'last_picam_image']:
             try:
                 redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
             except:
@@ -272,13 +276,23 @@ def live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
-        for key in ['system_status', 'sampling_status', 'counter', 'upload_status', 'samples_pending_upload', 'disk_free_gb', 'values']:
+        for key in ['system_status',
+                    'sampling_status',
+                    'counter',
+                    'upload_status',
+                    'samples_pending_upload',
+                    'disk_free_gb',
+                    'last_picam_image',
+                    'values']:
             try:
                 redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
             except AttributeError:
                 redisvals[key] = ''
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
+
+        # update latest camera image (can we just put the latest image in redis?)
+        get_latest_image({})
 
         try:
             return render_template('live.html', common=common, redisvals=redisvals)
@@ -292,112 +306,9 @@ def live():
 
 
 @app.route('/camera', methods=['GET', 'POST'])
+@login_required
 def camera():
-    """
-    Show latest camera image if a camera is present/active
-    """
-
-    camera_vals = {'n_images_shown': 100,
-                   'max_storage_gb': conf['CAMERA']['max_storage_gb']}
-
-    filelist = glob.glob(os.path.join(conf['CAMERA']['storage_path'], '*.jpg'))
-
-    # get image store size
-    total_bytes = 0
-    filesizes = []
-    for file in filelist:
-        filesizes.append(os.path.getsize(file))
-    camera_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
-
-    try:
-        if request.method == 'POST':
-            camera_vals['n_images_shown'] = int(request.form['n_images_shown'])
-            if 'All' in request.form.keys():
-                camera_vals['n_images_shown'] = len(filelist)
-            elif '100' in request.form.keys():
-                camera_vals['n_images_shown'] = 100
-            else:
-                for key in request.form.keys():
-                    if 'download_' in key:
-                        filepath = os.path.join(conf['CAMERA']['storage_path'], '_'.join(key.split('_')[1:]))
-                        if os.path.exists(filepath):
-                            return send_file(filepath)
-                        else:
-                            break
-
-        camera_vals['n_images'] = len(filelist)
-        if len(filelist) < camera_vals['n_images_shown']:
-            camera_vals['n_images_shown'] = len(filelist)
-
-        filelist = [os.path.basename(f) for f in filelist]
-        filelist.sort()
-        filelist.reverse()
-        camera_vals['image_list'] = filelist[0:camera_vals['n_images_shown']]
-        camera_vals['image_sizes'] = [os.path.getsize(os.path.join(conf['CAMERA']['storage_path'],file))/1024. for file in filelist]
-
-    except Exception as err:
-        return f"An unexpected error occurred handling a /camera request: {err}"
-
-    try:
-        client = redis_init()
-        if client is None:
-           raise Exception("Redis not initialised")
-
-        try:
-            camera_vals['last_picam_path'], camera_vals['last_picam_updated'] = redis_retrieve(client, 'last_picam_image', freshness=None)
-        except Exception as err:
-            camera_vals['last_picam_path'] = camera_vals['last_picam_updated'] = ""
-            print(err)
-
-        dest = os.path.join('.','static','latest_image_full.jpg')
-        if os.path.islink(dest) and not os.path.exists(dest):
-            # link points to purged file
-            try:
-                os.remove(dest)
-                os.remove(dest.replace('_full', ''))
-            except: pass
-
-        # is a camera image available according to redis?
-        if (len(camera_vals['last_picam_path']) > 0) and (os.path.exists(camera_vals['last_picam_path'])):
-
-            # are existing files/links different?
-            if (not os.path.exists(dest)) or \
-               (not os.path.exists(dest.replace('_full', '_thumbnail'))) or \
-               (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
-
-                if os.path.islink(dest) or os.path.exists(dest):
-                    # remove existing link/thumbnail
-                    try:
-                        os.remove(dest)
-                        os.remove(dest.replace('_full', '_thumbnail'))
-                    except: pass
-
-                os.symlink(camera_vals['last_picam_path'], dest)
-                # scale down the image
-                im = Image.open(dest)
-                im.thumbnail((500,500))
-                im.save(dest.replace('_full', '_thumbnail'))
-
-            # download full version of latest image using send_file
-            if (request.method == 'POST') and ('download-latest' in request.form.keys()):
-                return send_file(dest, as_attachment=True)
-
-        else:
-            camera_vals['last_picam_path'] = ''
-
-        try:
-            return render_template('camera.html',
-                                   common=common,
-                                   camera_vals=camera_vals,
-                                   zip=zip)
-        except Exception as err:
-            return err
-            flash("Unable to load the requested page")
-            flash(err)
-            return render_template('layout.html', common=common)
-
-    except Exception as msg:
-        return msg
+    return camera_main(common, conf)
 
 
 @app.route('/control', methods=['GET', 'POST'])
@@ -728,4 +639,5 @@ def log():
 
 
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    # run single-threaded (requests do not form new threads) to prevent child process being terminated
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=False)
