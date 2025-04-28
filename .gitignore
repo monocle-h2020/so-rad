@@ -1,7 +1,7 @@
 #flask
 instance/
 .webassets-cache
-.zip
+*.zip
 
 # camera images
 *.jpg
