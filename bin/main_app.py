@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3 -*- coding: utf-8 -*-
 """
 Autonomous operation of hyperspectral radiometers with optional rotating measurement platform, solar power supply and remote connectivity
 
@@ -588,11 +587,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         if cam['used']:
             if (cam['manager'].last_received_time is None) or \
                (cam['manager'].last_received_time <= trigger_id['all_sensors'] - datetime.timedelta(seconds=cam['interval'])):
+
                 rf.store(redis_client, 'sampling_status', 'imaging', expires=30)
-                cam['manager'].get_picture(label=trigger_id['all_sensors'])
+                cam['manager'].get_picture(label=trigger_id['all_sensors'].isoformat())
                 rf.store(redis_client, 'last_picam_image',
-                         f"{os.path.join(cam['storage_path'], trigger_id['all_sensors'])}.jpg",
-                         expires=None)
+                         f"{os.path.join(cam['storage_path'], trigger_id['all_sensors'].isoformat())}.jpg",
+                         expires=30)
                 rf.store(redis_client, 'sampling_status', 'ready', expires=30)
 
         # Collect and combine radiometry data

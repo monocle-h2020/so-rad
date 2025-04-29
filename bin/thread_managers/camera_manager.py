@@ -21,8 +21,12 @@ import requests
 import socket
 import glob
 from numpy import argsort, array
+import functions.redis_functions as rf
 
-TIMEOUT = 8.0
+# initiate redis connection
+redis_client = rf.init()
+
+TIMEOUT = 12.0
 
 log = logging.getLogger('cam')
 
@@ -45,11 +49,11 @@ class Soradcam(object):
         self.last_valid_result = None
         # last request success
         self.last_request_success = False
-        # last time a request was answered (good or bad)
+        # last time a request to the camera was answered
         self.last_received_time = None
 
         # connectivity
-        self.last_api_port_response = None
+        # self.last_api_port_response = None
         self.camera_ip = cam['ip']
         self.camera_port = cam['port']
 
@@ -80,21 +84,22 @@ class Soradcam(object):
 
         self.connected = self.check_api_port()
 
-    def get_picture(self, label=datetime.datetime.now().isoformat()):
-        '''get a new picture, this function is only called from the active thread'''
-        if self.busy:
-            log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, new request ignored.")
-            return
-        else:
-            self.last_request_time = datetime.datetime.now()
-            self.last_received_time = None
-            self.last_request_success = False
-            self.last_valid_result = None
-            self.busy = True
-            self.picture_requested = True
-            self.request_label = label
-            log.info(f"Image requested at {self.last_request_time}")
-        return
+    def update_redis(self):
+        """
+        Reflect the state of the Soradcam instance in a redis dictionary
+        """
+        camdict = {'last_request_time': self.last_request_time,
+                   'last_valid_result': self.last_valid_result,
+                   'last_request_success': self.last_request_success,
+                   'last_received_time': self.last_received_time,
+                   'resolution': self.res,
+                   'storage_path': self.storage_path,
+                   'max_storage': self.max_storage,
+                   'stored_db': self.stored_gb,
+                   'last_storage_check': self.last_storage_check,
+                   'storage_check_interval_sec': self.storage_check_interval_sec,
+                  }
+        rf.store(redis_client, 'camera_dict', camdict, expires=30)
 
     def check_storage(self):
         '''
@@ -108,8 +113,8 @@ class Soradcam(object):
         total_mb = total_bytes / 1024**2
         self.stored_gb = total_bytes / 1024**3
         self.last_storage_check = datetime.datetime.now()
-
         log.info(f"Total image storage volume {self.stored_gb:.3f} Gb ({total_mb:.3f} Mb)")
+        self.update_redis()
 
     def limit_storage(self):
         '''
@@ -187,6 +192,23 @@ class Soradcam(object):
         log.info("Camera manager running = {0}".format(self.thread.is_alive()))
         self.started = False
 
+    def get_picture(self, label=datetime.datetime.now().isoformat()):
+        '''get a new picture, this function is only called from the active thread'''
+        if self.busy:
+            log.warning(f"Camera manager is busy handling request from {self.last_request_time.isoformat()}, new request ignored.")
+            return
+        else:
+            self.last_request_time = datetime.datetime.now()
+            #self.last_received_time = None
+            #self.last_request_success = False
+            #self.last_valid_result = None
+            self.busy = True
+            self.picture_requested = True
+            self.request_label = label
+            log.info(f"Image requested at {self.last_request_time}")
+            self.update_redis()
+        return
+
     def run(self):
         """
         Main loop of the thread.
@@ -207,8 +229,7 @@ class Soradcam(object):
                 log.info(camera_url)
                 try:
                     response = requests.get(camera_url, timeout=TIMEOUT)
-                    log.info(response)
-                    log.info(f"response code: {response.status_code}")
+                    log.info(f"Camera request response code: {response.status_code}")
                     self.last_received_time = datetime.datetime.now() # when request was answered, irrespective of result
                     if (response.status_code >= 200) and (response.status_code < 300):
                         self.last_request_success = True
@@ -218,7 +239,7 @@ class Soradcam(object):
                             outfile.write(response.content)
                     else:
                         self.last_request_success = False
-                        self.last_valid_result = None
+                        # self.last_valid_result = None
 
                 except requests.exceptions.ReadTimeout:
                     log.warning("Timeout on camera request")
@@ -232,6 +253,8 @@ class Soradcam(object):
                 # return to normal state
                 self.busy = False
                 self.picture_requested = False
+                self.update_redis()
+
 
             # check and adjust stored image volume periodically (when camera is idle)
             elif (self.last_storage_check is None) or \
@@ -245,7 +268,7 @@ class Soradcam(object):
 
             # sleep for a short standard period
             time.sleep(self.sleep_interval)
-            continue
+
 
     def __del__(self):
         self.stop()

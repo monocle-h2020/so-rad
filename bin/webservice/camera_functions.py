@@ -132,14 +132,17 @@ def camera_main(common, conf):
             else:
                 for key in request.form.keys():
                     if 'download_' in key:
-                        fileselected = key.split('_')[1:]
-                        if os.path.basename[-3:] == 'jpg':
+                        fileselected = '_'.join(key.split('_')[1:])
+                        if os.path.basename(fileselected)[-3:] == 'jpg':
                             rootpath = conf['CAMERA']['storage_path']
-                        elif os.path.basename[-3:] == 'zip':
+                        elif os.path.basename(fileselected)[-3:] == 'zip':
                             rootpath = './static'
+                        else:
+                            print(f"Unknown download request for {fileselected}")
+                            break
                         filepath = os.path.join(rootpath, fileselected)
                         if os.path.exists(filepath):
-                            return send_file(filepath, as_attachment=True, mimetype='jpg')
+                            return send_file(filepath, as_attachment=True, mimetype='zip')
                         else:
                             break
 
