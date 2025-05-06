@@ -89,7 +89,6 @@ class Soradcam(object):
         Reflect the state of the Soradcam instance in a redis dictionary
         """
         camdict = {'last_request_time': self.last_request_time,
-                   'last_valid_result': self.last_valid_result,
                    'last_request_success': self.last_request_success,
                    'last_received_time': self.last_received_time,
                    'resolution': self.res,
@@ -99,7 +98,9 @@ class Soradcam(object):
                    'last_storage_check': self.last_storage_check,
                    'storage_check_interval_sec': self.storage_check_interval_sec,
                   }
+
         rf.store(redis_client, 'camera_dict', camdict, expires=30)
+        rf.store(redis_client, 'camera_last_image', self.last_valid_result, expires=30)
 
     def check_storage(self):
         '''

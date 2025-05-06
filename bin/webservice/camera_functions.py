@@ -12,6 +12,7 @@ import os
 import datetime
 import redis
 from PIL import Image
+from io import BytesIO
 import glob
 import zipfile
 from redis_functions import redis_init, redis_retrieve
@@ -63,13 +64,20 @@ def camera_main(common, conf):
     Show latest camera image if a camera is present/active
     """
     try:
+        client = redis_init()
+        if client is None:
+           raise Exception("Redis not initialised")
+        camera_dict, u = redis_retrieve(client, 'camera_dict', freshness=None)
+
         camera_vals = {'n_images_shown': 100,
-                       'max_storage_gb': conf['CAMERA']['max_storage_gb']}
+                       'max_storage_gb': conf['CAMERA']['max_storage_gb'],
+                       'redis_camera_dict': camera_dict}
 
         filelist, filesizes, filetimes, zip_archives = get_file_lists(conf)
         camera_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
 
         if request.method == 'POST':
+
             camera_vals['n_images_shown'] = int(request.form['n_images_shown'])
             if 'All' in request.form.keys():
                 camera_vals['n_images_shown'] = len(filelist)
@@ -161,7 +169,6 @@ def camera_main(common, conf):
                         else:
                             break
 
-
         camera_vals['n_images'] = len(filelist)
         if len(filelist) < camera_vals['n_images_shown']:
             camera_vals['n_images_shown'] = len(filelist)
@@ -174,7 +181,7 @@ def camera_main(common, conf):
         camera_vals['zip_list'] = [os.path.basename(z) for z in zip_archives]
         camera_vals['zip_sizes'] = [os.path.getsize(z)/1024.**2 for z in zip_archives]
 
-        camera_vals = get_latest_image(camera_vals)
+        # camera_vals = get_latest_image(camera_vals)
 
         dest = os.path.join('.','static','latest_image_full.jpg')
         # download full version of latest image using send_file
@@ -186,6 +193,7 @@ def camera_main(common, conf):
                                    common=common,
                                    camera_vals=camera_vals,
                                    zip=zip)
+
         except Exception as err:
             return err
             flash("Unable to load the requested page")
@@ -196,50 +204,28 @@ def camera_main(common, conf):
         return msg
 
 
-def get_latest_image(camera_vals):
+def latest_image(quality):
     """
-    generate/update thumbnail for latest image
-    """
-    client = redis_init()
-    if client is None:
-       return "Redis not initialised"
+    send latest image from redis
+    param quality: 1-100 jpg compression quality
+    type quality:  int
 
+    Can be embedded in html tags e.g. <img src="{{ url_for('latest_image', quality=10) }} />
+    """
     try:
-        camera_vals['last_picam_path'], camera_vals['last_picam_updated'] = redis_retrieve(client, 'last_picam_image', freshness=None)
+        client = redis_init()
+        if client is None:
+           raise Exception("Redis not initialised")
+        camera_dict, u = redis_retrieve(client, 'camera_dict', freshness=None)
+        camera_response, u = redis_retrieve(client, 'camera_last_image', freshness=None)
+        print(camera_response)
+        if camera_response is None:
+            return ''
+        img = camera_response.content
+        img_io = BytesIO()
+        pil_img = Image.open(BytesIO(img))
+        pil_img.save(img_io, 'JPEG', quality=int(quality))
+        img_io.seek(0)
     except Exception as err:
-        camera_vals['last_picam_path'] = camera_vals['last_picam_updated'] = ""
-        print(err)
-
-    dest = os.path.join('.','static','latest_image_full.jpg')
-    if os.path.islink(dest) and not os.path.exists(dest):
-        # link points to purged file
-        try:
-            os.remove(dest)
-            os.remove(dest.replace('_full', ''))
-        except: pass
-
-    # is a camera image available according to redis?
-    if (len(camera_vals['last_picam_path']) > 0) and (os.path.exists(camera_vals['last_picam_path'])):
-
-        # are existing files/links different?
-        if (not os.path.exists(dest)) or \
-           (not os.path.exists(dest.replace('_full', '_thumbnail'))) or \
-           (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
-
-            if os.path.islink(dest) or os.path.exists(dest):
-                # remove existing link/thumbnail
-                try:
-                    os.remove(dest)
-                    os.remove(dest.replace('_full', '_thumbnail'))
-                except: pass
-
-            os.symlink(camera_vals['last_picam_path'], dest)
-            # scale down the image
-            im = Image.open(dest)
-            im.thumbnail((500,500))
-            im.save(dest.replace('_full', '_thumbnail'))
-
-    else:
-        camera_vals['last_picam_path'] = ''
-
-    return camera_vals
+        return f"Error serving latest image:\n{err}"
+    return send_file(img_io, mimetype='image/jpeg')

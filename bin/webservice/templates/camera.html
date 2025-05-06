@@ -26,13 +26,9 @@ img {
 
 <p>{{ camera_vals['stored_gb'] }} Gb stored out of {{ camera_vals['max_storage_gb'] }} Gb allocated.</p>
 
-{% set pathlength = camera_vals['last_picam_path']|length %}
-
-{%if pathlength > 0 %}
-
   <form action="/camera" method = "POST">
-    <p>Latest image {{ camera_vals['image_list'][0] }} - 500x500 pixel preview:</p>
-    <p><img src="/static/latest_image_thumbnail.jpg" width="500"></p>
+    <p>Latest image {{ camera_vals['image_list'][0] }} preview:</p>
+    <p><img src="{{ url_for('serve_img', quality=50) }}" width="500"></p>
 
     <input type = "submit" value = "Download full size image" name = "download-latest">
     <p> {{ camera_vals['n_images'] }} Images available. List:
@@ -81,12 +77,6 @@ img {
 
   </form>
 
-
-  {% else %}
-    <div>
-    No images available.
-    </div>
-  {% endif %}
 
 
 {% endblock %}

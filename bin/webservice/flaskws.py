@@ -22,14 +22,13 @@ import datetime
 import subprocess
 import redis
 import pickle
-from PIL import Image
 import glob
 import threading
 import zipfile
 from log_functions import read_log, log2dict
 from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
 from redis_functions import redis_init, redis_retrieve
-from camera_functions import camera_main, get_latest_image
+import camera_functions
 
 # TODO: check safe_join
 
@@ -291,9 +290,6 @@ def live():
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
 
-        # update latest camera image (can we just put the latest image in redis?)
-        get_latest_image({})
-
         try:
             return render_template('live.html', common=common, redisvals=redisvals)
         except Exception as err:
@@ -304,11 +300,17 @@ def live():
     except Exception as msg:
         return msg
 
+# serve image directly from redis
+@app.route('/camera_live/<int:quality>', methods=['GET'])
+@app.route("/camera_live/", defaults={"quality": 50})
+def serve_img(quality):
+    return camera_functions.latest_image(quality)
+
 
 @app.route('/camera', methods=['GET', 'POST'])
 @login_required
 def camera():
-    return camera_main(common, conf)
+    return camera_functions.camera_main(common, conf)
 
 
 @app.route('/control', methods=['GET', 'POST'])
