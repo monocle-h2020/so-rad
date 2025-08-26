@@ -82,7 +82,15 @@ class Ada_dht22(object):
             self.temp = None
             self.rh = None
             if self.interface == 'ada_cp_dht':
-                dht_device.exit()
+                try:
+                    dht_device.exit()
+                except UnboundLocalError:
+                    log.warning("RHT device was not reachable")
+                    pass
+                except Exception as err:
+                    log.warning("Unhandled error in RHT manager")
+                    log.exception(err)
+                    pass
 
         return self.updated, self.rh, self.temp
 
