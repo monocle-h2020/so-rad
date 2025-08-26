@@ -92,7 +92,7 @@ def init_logger(conf_log_dict):
     maxBytes = 2 * 1024 ** 2 # 100MB
     filehandler = logging.handlers.RotatingFileHandler(log_filename, mode='a',
                                                        maxBytes=maxBytes,
-                                                       backupCount=10)
+                                                       backupCount=50)
     # set the logger verbosity
     filehandler.setFormatter(formatter)
     filehandler.setLevel(console_log_level)
