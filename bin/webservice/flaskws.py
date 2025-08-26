@@ -78,8 +78,12 @@ def update_common_items():
     common['cw_limit_deg'] = float(conf['MOTOR']['cw_limit_deg'])
     common['ccw_limit_deg'] = float(conf['MOTOR']['ccw_limit_deg'])
     common['nrows'] = 100
-    common['use_camera'] = conf['CAMERA']['use_camera']
-    print(common['use_camera'])
+    camera_str = conf['CAMERA']['use_camera']
+    if camera_str.lower() == 'true':
+        common['use_camera'] = True
+    else:
+        common['use_camera'] = False
+    print(f"Camera in use: {common['use_camera']} ({type(common['use_camera'])})")
     return
 
 update_common_items()
