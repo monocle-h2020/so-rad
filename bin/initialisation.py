@@ -270,6 +270,7 @@ def rht_init(rht_config):
     rht['pin'] = rht_config.getint('pin')
     rht['sampling_time'] = rht_config.getint('sampling_time')
     rht['manager'] = None
+    rht['update_interval'] = rht_config.getint('update_interval')
 
     if not rht['used']:
         log.info(f"RHT sensor disabled in config")

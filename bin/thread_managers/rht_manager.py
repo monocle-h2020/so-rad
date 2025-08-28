@@ -52,6 +52,12 @@ class Ada_dht22(object):
         self.buffer_time =  [self.updated]
         self.buffer_temp =  [self.temp]
         self.buffer_rh = [self.rh]
+
+        if self.interface == 'ada_cp_dht':
+            self.dht_device = adafruit_dht.DHT22(adafruit_dht.Pin(self.pin))
+        else:
+            self.dht_device = None
+
         log.info("RHT sensor initialised")
 
     def update_rht_single(self):
@@ -67,10 +73,8 @@ class Ada_dht22(object):
                     self.rh, self.temp = Adafruit_DHT.read_retry(Adafruit_DHT.DHT22, self.pin, retries=4, delay_seconds=0.5)
 
                 elif self.interface == 'ada_cp_dht':
-                    dht_device = adafruit_dht.DHT22(adafruit_dht.Pin(self.pin))
-                    self.temp = dht_device.temperature
-                    self.rh = dht_device.humidity
-                    dht_device.exit()
+                    self.temp = self.dht_device.temperature
+                    self.rh = self.dht_device.humidity
 
                 if (self.temp is not None) and (self.rh is not None):
                     break
@@ -81,16 +85,6 @@ class Ada_dht22(object):
             log.warning(f"RHT reading failed: {err}")
             self.temp = None
             self.rh = None
-            if self.interface == 'ada_cp_dht':
-                try:
-                    dht_device.exit()
-                except UnboundLocalError:
-                    log.warning("RHT device was not reachable")
-                    pass
-                except Exception as err:
-                    log.warning("Unhandled error in RHT manager")
-                    log.exception(err)
-                    pass
 
         return self.updated, self.rh, self.temp
 
@@ -168,3 +162,5 @@ class Ada_dht22(object):
     def __del__(self):
         if self.started:
             self.stop()
+        if self.interface == 'ada_cp_dht':
+            self.dht_device.exit()
