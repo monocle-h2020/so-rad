@@ -18,6 +18,7 @@ import time
 import datetime
 import redis
 import pickle
+import numpy as np
 
 log = logging.getLogger('redis')
 #log.setLevel('DEBUG')
@@ -132,7 +133,7 @@ def store(client, key, value, expires=30):
     elif isinstance(value, datetime.datetime):
         client.set(f"{key}_dtype", "datetime")
     elif (isinstance(value, list)) or (isinstance(value, tuple)) or \
-         (isinstance(value, dict)) or (isinstance(value, np.array)):
+         (isinstance(value, dict)) or (isinstance(value, np.ndarray)):
         client.set(f"{key}_dtype", "pickle")
         pickleit=True
     else:
