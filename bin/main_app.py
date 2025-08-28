@@ -305,12 +305,12 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None, redis=Fals
         log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
         values['tilt_avg'] = tpr['manager'].tilt_avg
         values['tilt_std'] = tpr['manager'].tilt_std
-    if (rht is not None) and (rht['manager'] is not None) and \
-         (rht['manager'].updated + datetime.timedelta(seconds=rht['update_interval']) > datetime.datetime.now()):
-        rh_time, rh, temp = rht['manager'].update_rht_single()
-        log.debug("Temp: {0}C RH: {1}%".format(temp, rh))
-        values['inside_temp'] = temp
-        values['inside_rh'] =   rh
+    if (rht is not None) and (rht['manager'] is not None):
+        if rht['manager'].updated + datetime.timedelta(seconds=rht['update_interval']) < datetime.datetime.now():
+            rh_time, rh, temp = rht['manager'].update_rht_single()
+            log.debug("Temp: {0}C RH: {1}%".format(temp, rh))
+            values['inside_temp'] = temp
+            values['inside_rh'] =   rh
     if (motor is not None) and (motor['used']):
         values['driver_temp'], values['motor_temp'] =  motor_func.motor_temp_read(motor)
 
