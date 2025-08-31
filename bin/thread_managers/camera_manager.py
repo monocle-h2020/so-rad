@@ -225,7 +225,7 @@ class Soradcam(object):
                     time.sleep(1)
 
             elif self.busy:
-                if self.last_request_time + datetime.timedelta(seconds=FORCED_TIMEOUT) > datetime.datetime.now():
+                if self.last_request_time + datetime.timedelta(seconds=FORCED_TIMEOUT) < datetime.datetime.now():
                     log.info(f"Force timeout, allow new image request")
                     self.last_request_success = False
                     self.busy = False
