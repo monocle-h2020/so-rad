@@ -137,7 +137,9 @@ def store(client, key, value, expires=30):
         client.set(f"{key}_dtype", "pickle")
         pickleit=True
     else:
-        log.warning(f"Setting dtype {type(value)} not implemented")
+        log.warning(f"Setting dtype {type(value)} not implemented, using pickle")
+        client.set(f"{key}_dtype", "pickle")
+        pickleit=True
 
     if isinstance(value, datetime.datetime):
         client.set(key, value.isoformat())

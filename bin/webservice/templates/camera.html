@@ -2,6 +2,7 @@
 {% block content %}
 <div>
   <h2>So-Rad Camera</h2>
+<br>
 </div>
 {% if common['so-rad_status']==true %}
   <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
@@ -12,38 +13,70 @@
 
 <style>
 img {
-     max-width: 25%;
+     max-width: 90%;
      height: auto;
     }
 </style>
 
-
 {% if common['use_camera'] %}
-<div>
-Camera connected<br>
-
-  {% set pathlength = camera_vals['last_picam_path']|length %}
-  {%if pathlength > 0 %}
-    <div>
-    Latest image: {{ camera_vals['last_picam_path'] }} <br>
-    500x500 pixel preview:<br>
-    <br>
-    <img src="/static/latest_image.jpg" width="500">
-    <br>
-    <a href="/static/latest_image_full.jpg">Download full size</a>
-    </div>
-
-  {% else %}
-    <div>
-    No images acquired.
-    </div>
-  {% endif %}
-
+<p>Camera is configured for use</p>
 {% else %}
-<div>
-No camera connected
-</div>
+<p>No camera configured for use</p>
 {% endif %}
+
+<p>{{ camera_vals['stored_gb'] }} Gb stored out of {{ camera_vals['max_storage_gb'] }} Gb allocated.</p>
+
+  <form action="/camera" method = "POST">
+    <p>Latest image {{ camera_vals['image_list'][0] }} preview:</p>
+    <p><img src="{{ url_for('serve_img', quality=50) }}" width="500"></p>
+
+    <input type = "submit" value = "Download full size image" name = "download-latest">
+    <p> {{ camera_vals['n_images'] }} Images available. List:
+      <input type = "number" value = {{ camera_vals['n_images_shown'] }} name = "n_images_shown" size="6"/> 
+      <input type = "submit" value = "Confirm"/> or: 
+      <input type = "submit" value = "Show all" name="All"/>
+      <input type = "submit" value = "Show 100 most recent" name="100"/>
+    </p>
+    <p>
+    Prepare zip image archive for download for period starting <br>
+    <input type = "string" value = "FIRST or YYYY-MM-DDTHH:MM:SS" name = "start_dt" size="28"/> 
+    and ending  <input type = "string" value = "LAST or YYYY-MM-DDTHH:MM:SS" name = "end_dt" size="28"/> 
+    <input type = "submit" value = "Confirm" name = "makezip" /><br>
+    Note: for large archives your web session may time out while the request completes.
+
+    <p>
+    Available zip archives:
+    <table>
+    {% for m, s in zip(camera_vals['zip_list'], camera_vals['zip_sizes']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} Mb </td>
+        <td> <input type = "submit" value = "Download zip archive" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+    <p>
+    Individual image files:
+    <br>
+    <input type = "submit" value = "Delete all stored images" name = "clear_storage">
+    <br>
+    <table>
+    {% for m, s in zip(camera_vals['image_list'], camera_vals['image_sizes']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} kb </td>
+        <td> <input type = "submit" value = "Download full size image" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+  </form>
+
 
 
 {% endblock %}

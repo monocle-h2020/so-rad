@@ -33,35 +33,28 @@ def main(conf):
     log.info(f"Connected to camera: {camera.connected}")
 
 
-
-    try:
-        while True:
-            label = f"test_{datetime.datetime.now().isoformat()}"
+    image_requests = []
+    for i in range(20):
+        log.info(f"{i+1}/20 Requesting an image every second (stress testing)")
+        label = f"test_{datetime.datetime.now().isoformat()}"
+        if not camera.busy:
             camera.get_picture(label=label)
             t0 = time.perf_counter()
+            image_requests.append(label)
+            camdict, u, s = rf.retrieve(redis_client, 'camera_dict', freshness=None)
+            for key, val in camdict.items():
+                log.info(f"{key}: {val}")
 
-            while camera.busy and time.perf_counter()-t0 < (request_timeout + 1):
-                log.debug("Camera busy..")
-                time.sleep(0.1)
+        time.sleep(1)
 
-            if camera.last_request_success:
-                time_elapsed = (camera.last_received_time - camera.last_request_time).total_seconds()
-                print(f"Image taken at {camera.last_request_time.isoformat()}: {len(camera.last_valid_result.content)} bytes [{time_elapsed} s]")
-            else:
-                print(f"No image received, last response at {camera.last_received_time.isoformat()}")
+    for f in image_requests:
+        outpath = os.path.join(cam['storage_path'], f+'.jpg')
+        if os.path.exists(outpath):
+            print(f"Image stored at {outpath}")
+        else:
+            print(f"Error: Image not found at {outpath}")
 
-            outpath = os.path.join(cam['storage_path'], label+'.jpg')
-            if os.path.exists(outpath):
-                print(f"Image stored at {outpath}")
-                rf.store(redis_client, 'last_picam_image', outpath)
-            else:
-                print(f"Error: Image not found at {outpath}")
-
-            time.sleep(1)
-
-    except:
-        print("finished test, stopping monitor")
-
+    print("finished test, stopping monitor")
     camera.stop()
 
 

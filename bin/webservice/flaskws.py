@@ -4,7 +4,9 @@
 Connect to db to provide latest activity from solar tracking radiometry platform (So-Rad).
 """
 
-from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup, jsonify
+from flask import Flask, render_template, abort, \
+                  flash, redirect, url_for, request,\
+                  Markup, jsonify, send_file
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -20,12 +22,15 @@ import datetime
 import subprocess
 import redis
 import pickle
-from PIL import Image
-
+import glob
+import threading
+import zipfile
 from log_functions import read_log, log2dict
 from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
 from redis_functions import redis_init, redis_retrieve
+import camera_functions
 
+# TODO: check safe_join
 
 def read_config():
     """uses local conf and global config_file objects"""
@@ -142,11 +147,6 @@ admin_hash = conf['FLASK']['admin_hash']
 users = {'admin': User('admin', 'bosh', admin_hash)}
 
 
-# to generate the password hash with a new installation do:
-# from werkzeug.security import generate_password_hash
-# generate_password_hash(pw)  #  where pw is the password provided to the operator.
-# then add this to the FLASK section of config-local.ini
-
 # define app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = conf['FLASK']['key1'] or str(uuid.uuid1())
@@ -217,14 +217,15 @@ def redis_live():
                     'disk_free_gb',
                     'tilt_avg',
                     'tilt_std',
-                    'tilt_updated']:
+                    'tilt_updated',
+                    'last_picam_image']:
             try:
                 redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
             except:
                 redisvals[key] = ''
 
         values, values_updated = redis_retrieve(client, 'values', freshness=None)
-        # print(values)
+
         redisvals['values_updated'] = values_updated
         for key in values.keys():
             if key in ['speed',
@@ -278,7 +279,14 @@ def live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
-        for key in ['system_status', 'sampling_status', 'counter', 'upload_status', 'samples_pending_upload', 'disk_free_gb', 'values']:
+        for key in ['system_status',
+                    'sampling_status',
+                    'counter',
+                    'upload_status',
+                    'samples_pending_upload',
+                    'disk_free_gb',
+                    'last_picam_image',
+                    'values']:
             try:
                 redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
             except AttributeError:
@@ -296,48 +304,17 @@ def live():
     except Exception as msg:
         return msg
 
+# serve image directly from redis
+@app.route('/camera_live/<int:quality>', methods=['GET'])
+@app.route("/camera_live/", defaults={"quality": 50})
+def serve_img(quality):
+    return camera_functions.latest_image(quality)
 
-@app.route('/camera', methods=['GET'])
+
+@app.route('/camera', methods=['GET', 'POST'])
+@login_required
 def camera():
-    """
-    Show latest camera image if a camera is present/active
-    """
-    try:
-        client = redis_init()
-        if client is None:
-           raise Exception("Redis not initialised")
-
-        camera_vals = {}
-        try:
-            camera_vals['last_picam_path'], camera_vals['last_picam_updated'] = redis_retrieve(client, 'last_picam_image', freshness=None)
-        except Exception as err:
-            camera_vals['last_picam_path'] = camera_vals['last_picam_updated'] = ""
-            print(err)
-
-        if (len(camera_vals['last_picam_path']) > 0) and (os.path.exists(camera_vals['last_picam_path'])):
-
-            dest = os.path.join('.','static','latest_image_full.jpg')
-
-            if (not os.path.exists(dest)) or (os.stat(dest).st_mtime != os.stat(camera_vals['last_picam_path']).st_mtime):
-                if os.path.exists(dest):
-                    os.remove(dest)
-
-                os.symlink(camera_vals['last_picam_path'], dest)
-                # scale down the image
-                im = Image.open(dest)
-                im.thumbnail((500,500))
-                im.save(dest.replace('_full', ''))
-                print("updated image")
-
-        try:
-            return render_template('camera.html', common=common, camera_vals=camera_vals)
-        except Exception as err:
-            flash("Unable to load the requested page")
-            flash(err)
-            return render_template('layout.html', common=common)
-
-    except Exception as msg:
-        return msg
+    return camera_functions.camera_main(common, conf)
 
 
 @app.route('/control', methods=['GET', 'POST'])
@@ -668,4 +645,5 @@ def log():
 
 
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    # run single-threaded (requests do not form new threads) to prevent child process being terminated
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=False)
