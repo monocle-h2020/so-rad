@@ -123,7 +123,7 @@ def camera_main(common, conf):
 
                  else:
                      label = f"{filetimes[filelist_start].isoformat()}-{filetimes[filelist_end].isoformat()}"
-                     zipresult = camera_zip(filelist,label)  # replace with selection
+                     zipresult = camera_zip(filelist[filelist_start:filelist_end],label)
                      if zipresult:
                          flash(f"Created image archive {label}.zip")
                      else:

@@ -27,6 +27,7 @@ import functions.redis_functions as rf
 redis_client = rf.init()
 
 TIMEOUT = 12.0
+FORCED_TIMEOUT = 30.0
 
 log = logging.getLogger('cam')
 
@@ -222,6 +223,12 @@ class Soradcam(object):
                 if not self.connected:
                     log.warning("Camera not responding")
                     time.sleep(1)
+
+            elif self.busy:
+                if self.last_request_time + datetime.timedelta(seconds=FORCED_TIMEOUT) > datetime.datetime.now():
+                    log.info(f"Force timeout, allow new image request")
+                    self.last_request_success = False
+                    self.busy = False
 
             elif self.picture_requested:
                 # fetch new image from remote camera
