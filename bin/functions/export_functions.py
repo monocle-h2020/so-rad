@@ -42,7 +42,7 @@ TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status q
 log = logging.getLogger('export')
 #log.setLevel('DEBUG')
 
-def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
+def run_export(export_config_dict, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
     """
     Main function
 
@@ -50,7 +50,6 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
     :version float:  will limit activity to data associated with a specific sorad_version in the db
     :update_local bool: update the local db file with the export status (success/fail) and number of attempts to export
     """
-    export_config_dict = conf['EXPORT']
     n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version)
     log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
@@ -235,9 +234,8 @@ def update_on_parse_server(export_config_dict, json_record, objectId):
         return False, None
 
 
-def update_status_parse_server(conf, db):
+def update_status_parse_server(export_config_dict, db):
     "Update latest status update on Parse server. A status update has the 'content' field set to 'status' and only contains a metadata record"
-    export_config_dict = conf['EXPORT']
 
     parse_app_url = export_config_dict.get('parse_url')  # something like https://1.2.3.4:port/parse/classes/sorad
     parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini

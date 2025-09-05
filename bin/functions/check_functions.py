@@ -29,9 +29,8 @@ import logging
 log = logging.getLogger('checks')
 
 
-def check_remote_data_store(conf):
+def check_remote_data_store(export_config_dict):
     "Check for response from remote Parse server. Look for last logged/updated record from this instrument. Return connection status and time of last update"
-    export_config_dict = conf['EXPORT']
     parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
     parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
     platform_id = export_config_dict.get('platform_id')

@@ -27,12 +27,12 @@ from functions.check_functions import check_gps, check_motor, check_sensors, \
                                       check_sun, check_battery, check_speed, \
                                       check_heading, check_pi_cpu_temperature, \
                                       check_ed_sampling, check_internet, check_remote_data_store
-from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
 import functions.redis_functions as rf
 import functions.config_functions as cf_func
+from thread_managers.export_manager import ParseExportManager
 from numpy import nan, max
 
-__version__ = 20250423.1
+__version__ = 20250905.1
 
 
 # initiate redis connection
@@ -690,6 +690,15 @@ def run():
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
                  cam, power_schedule, conf, idle_time=120)
 
+    # set up data export(s)
+    export_dict = conf['EXPORT']
+    use_export = export_dict.getboolean('use_export')
+    if not use_export:
+        log.debug("f{counter} | No data export configured")
+        rf.store(redis_client, 'upload_status', 'disabled', expires=30)
+    else:
+        pem = ParseExportManager(export_dict, db_dict)
+        pem.start()
 
     # the main program cycle will run at the following minimum interval
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -705,10 +714,6 @@ def run():
 
     # Repeat indefinitely until program is closed
     counter = 0
-    remote_update_timer = time.perf_counter() - 60.0  # armed
-    export_result = True  # tracks whether exporting has been succesful
-
-
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
     while True:
@@ -733,81 +738,19 @@ def run():
             else:
                 run_slow_cycle_actions = False
 
-            use_export = conf['EXPORT'].getboolean('use_export')
-            if not use_export:
-                log.debug("f{counter} | No data export configured")
-                rf.store(redis_client, 'upload_status', 'disabled', expires=30)
-
-                time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
-                if time_to_sleep > 0:
-                    time.sleep(time_to_sleep)
-                continue
-
-            # remote data store(s) operations go here, ideally within the time window where the system is idling
-            t0 = time.perf_counter() # start of data upload operations this cycle.
-
-            # while system idles, check how many samples need uploading, upload a batch and check again
-            n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-            if n_not_inserted > 0:
-                log.info(f"{counter} | {n_not_inserted} samples pending upload. Waited {time.perf_counter() - remote_update_timer:4.1f} s since last connection attempt")
-                rf.store(redis_client, 'samples_pending_upload', n_not_inserted, expires=30)
-
-            if not check_internet():
-                log.debug(f"{counter} | Internet connection timed out.")
-                rf.store(redis_client, 'upload_status', 'no_connection', expires=30)
-                connected = False
-            else:
-                connected = True
-
-            if run_slow_cycle_actions and ((time.perf_counter() - remote_update_timer) > 60.0):
-                if check_remote_data_store(conf)[0]:
-                    export_result, resultcode = update_status_parse_server(conf, db_dict)
-                    sucorfail = {True: 'succeeded', False:'failed'}[export_result]
-                    log.info(f"{counter} | Instrument status update on remote server {sucorfail}")
-                    if export_result:
-                        rf.store(redis_client, 'upload_status', 'remote_status_updated', expires=30)
-                    remote_update_timer = time.perf_counter()  # reset timer regardless of result (don't spam the server)
-                else:
-                    log.debug(f"{counter} | No connection to remote server to update instrument status")
-                    rf.store(redis_client, 'upload_status', 'no_connection', expires=30)
-
-
-            if (n_not_inserted > 0) and ((export_result) or (time.perf_counter() - remote_update_timer > 300)):
-                # if data are pending upload and connection was already good or 5 minutes have passed, try uploading data
-                export_result = True
-                if check_remote_data_store(conf)[0]:
-                    while ((time.perf_counter() - t0 < main_check_cycle_sec) and n_not_inserted > 0) and (export_result):
-                        # upload data until this check cycle is over, or no more samples remain, or an upload fails.
-                        log.debug(f"{counter} | Uploading latest 10 samples ({n_not_inserted} pending)")
-                        export_result, resultcode, successes = run_export(conf, db_dict, limit=10, test_run=False, fail_limit=3)
-                        log.info(f"{counter} | {successes} sensor records uploaded. Request completed: {export_result}")
-                        if export_result:
-                            rf.store(redis_client, 'upload_status', f'{successes}_samples_uploaded', expires=30)
-                        n_total, n_not_inserted, all_not_inserted = identify_new_local_records(db_dict, limit=0)  # just checking local db
-                        rf.store(redis_client, 'samples_pending_upload', n_not_inserted, expires=30)
-                        time.sleep(0.05)
-                    remote_update_timer = time.perf_counter()  # reset timer
-                else:
-                    log.debug(f"{counter} | No connection to remote server")
-                    rf.store(redis_client, 'upload_status', 'no_connection', expires=30)
-                    export_result = False
-                    remote_update_timer = time.perf_counter()  # reset timer to try again in 5 minutes
-
-            else:
-                log.debug(f"{counter} | No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
-                rf.store(redis_client, 'upload_status', 'idle', expires=30)
-
+            # idle until next cycle
             time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
-
             if time_to_sleep > 0:
                 time.sleep(time_to_sleep)
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
             stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf)
+            pem.stop()
         except Exception:
             log.exception("Unhandled Exception")
             stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=120)
+            pem.stop()
             raise
 
 if __name__ == '__main__':
