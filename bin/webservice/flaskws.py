@@ -592,6 +592,13 @@ def collect_settings_formdata():
                                   'comment':   'normally 30. Allowed range [-90, 90]',
                                   'min':       -90,
                                   'max':       90},
+                'relative_azimuth_target':
+                                  {'label':    'Target viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['relative_azimuth_target']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'normally 135. Allowed range [0, 180]',
+                                  'min':       0,
+                                  'max':       180},
                 'operator_contact':
                                   {'label':    'Operator contact email address',
                                   'setting':   conf['EXPORT']['operator_contact'],
@@ -632,10 +639,12 @@ def settings():
                 forminput['home_pos']                  = int(request.form['home_pos'])
                 forminput['gps_heading_correction']    = int(request.form['gps_heading_correction'])
                 forminput['sampling_speed_limit']      = float(request.form['sampling_speed_limit'])
-                forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
                 forminput['sampling_interval']         = int(request.form['sampling_interval'])
+                forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
+                forminput['relative_azimuth_target']   = float(request.form['relative_azimuth_target'])
                 forminput['operator_contact']          = request.form['operator_contact']
                 forminput['owner_contact']             = request.form['owner_contact']
+
             except Exception:
                 raise
 
@@ -643,7 +652,7 @@ def settings():
             updates = {}
             for key, val in forminput.items():
                 if forminput[key] != formdata[key]['setting']:
-                    print(f"{key} form input {forminput[key]} != config {formdata[key]['setting']}")
+                    # print(f"{key} form input {forminput[key]} != config {formdata[key]['setting']}")
                     if 'min' in formdata[key].items():
                         vmin = formdata[key]['min']
                         vmax = formdata[key]['max']
