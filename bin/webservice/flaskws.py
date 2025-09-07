@@ -26,7 +26,7 @@ import glob
 import threading
 import zipfile
 from log_functions import read_log, log2dict
-from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access
+from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access, run_motor_home_test
 from redis_functions import redis_init, redis_retrieve
 import camera_functions
 
@@ -319,7 +319,7 @@ def camera():
 @app.route('/control', methods=['GET', 'POST'])
 @login_required
 def control():
-    """Home page showing instrument status"""
+    """Control services, run tests etc"""
 
     selection = ''
     common['so-rad_status'], message = service_status('so-rad')
@@ -330,6 +330,7 @@ def control():
     selection = list(request.form.keys())[0]   # key = name
     flash(f"{selection} requested")
 
+    # if 'test' is included in the command name, only continue if the service is stopped
     if ('test' in selection) and (common['so-rad_status']):
         print("debug checkpoint")
         flash("Please stop the So-Rad service before running this command. If you already stopped the service, click the check button below to verify that the service has stopped.")
@@ -350,8 +351,13 @@ def control():
         flash(f"So-Rad service status: {message}")
         return render_template('control.html', common=common)
 
+    elif selection == 'motor_home_test':
+        # run a the motor_home test script.
+        status, messages = run_motor_home_test()
+        return render_template('control.html', messages=messages, common=common)
+
     elif selection == 'gps_test':
-        # run a so-rad test script.
+        # run gps test script.
         status, messages = run_gps_test()
         return render_template('control.html', messages=messages, common=common)
 
