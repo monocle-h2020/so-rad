@@ -49,6 +49,12 @@
        <td> {{ formdata['solar_elevation_limit']['comment'] }}    </td>
      </tr>
      <tr>
+       <td> {{ formdata['relative_azimuth_target']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="0" max="180" step="1" value = {{ formdata['relative_azimuth_target']['setting'] }} name = "relative_azimuth_target"/>       </td>
+       <td> {{ formdata['relative_azimuth_target']['postlabel'] }}    </td>
+       <td> {{ formdata['relative_azimuth_target']['comment'] }}    </td>
+     </tr>
+     <tr>
        <td> {{ formdata['sampling_interval']['label'] }}        </td>
        <td align="right"> <input type = "number" min="10" max="999999" step="1" value = {{ formdata['sampling_interval']['setting'] }} name = "sampling_interval"/>       </td>
        <td> {{ formdata['sampling_interval']['postlabel'] }}    </td>

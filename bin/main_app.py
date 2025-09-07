@@ -526,7 +526,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                 values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
                                                                       0.0, values['dt'],
                                                                       values['ship_bearing_mean'], motor,
-                                                                      values['motor_pos'])
+                                                                      values['motor_pos'],
+                                                                      relative_azimuth_target=sample['relative_azimuth_target'])
         except:
             log.warning(f"No pointing solution found. Is GPS info available?")
             ready['motor'] = False
@@ -588,7 +589,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     except:
         pass
     values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], 0.0, values['dt'],
-                                                                              values['ship_bearing_mean'], values['motor_deg'], motor)
+                                                                              values['ship_bearing_mean'], values['motor_deg'], motor,
+                                                                              relative_azimuth_target=sample['relative_azimuth_target'])
 
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):

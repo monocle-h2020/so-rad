@@ -39,6 +39,18 @@ def service_status(service):
     else:
         return False, message
 
+def run_motor_home_test():
+    "Run a system test: motor to home location"
+    command = ["/usr/bin/python", "../tests/test_motor_home.py"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    status = process.wait()
+    message = process.stdout.read().decode('utf-8')
+    messages = message.split('\n')
+    if status == 0:
+        return True, messages
+    else:
+        return False, messages
+
 def run_gps_test():
     "Run a system test: show GPS status"
     command = ["/usr/bin/python", "../tests/test_gps.py", "--terse"]
