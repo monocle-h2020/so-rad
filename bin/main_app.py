@@ -29,10 +29,9 @@ from functions.check_functions import check_gps, check_motor, check_sensors, \
                                       check_ed_sampling, check_internet, check_remote_data_store
 import functions.redis_functions as rf
 import functions.config_functions as cf_func
-from thread_managers.export_manager import ParseExportManager
 from numpy import nan, max
 
-__version__ = 20250905.1
+__version__ = 20250907.1
 
 
 # initiate redis connection
@@ -129,6 +128,15 @@ def init_all(conf):
     power_schedule = initialisation.power_schedule_init(conf['POWER_SCHEDULE'])
     cam = initialisation.camera_init(conf['CAMERA'])  # camera
 
+    # set up data export(s)
+    # TODO: include setup and closure in the init, start_all and stop_all functions
+    export = initialisation.export_init(conf['EXPORT'], db)
+    if not export['used']:
+        log.info("No data export configured")
+        rf.store(redis_client, 'upload_status', 'disabled', expires=30)
+    else:
+        export['manager'].start()
+
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
     if Rad_manager is not None and rad['use_gpio_control']:
@@ -206,21 +214,25 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.critical(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
 
     else:
         radiometry_manager = None
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger('stop')
     log.info("Stopping system modules")
     print("stopping")
     rf.store(redis_client, 'system_status', 'stopping', expires=30)
+
+    if export['manager'] is not None:
+        log.info("Stopping export manager thread")
+        export['manager'].stop()
 
     # Stop the radiometry manager
     if radiometry_manager is not None:
@@ -417,7 +429,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             message = format_log_message(counter, ready, values)
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=1800) # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=1800) # calls sys.exit after pausing for idle_time to prevent immediate restart
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
@@ -683,23 +695,13 @@ def run():
         rht = None
         cam = None
         power_schedule = None
+        export = None
         db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule = init_all(conf)
+            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export = init_all(conf)
     except Exception as err:
         log.critical(f"Exception during initialisation: {err}. Stopping.")
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
-                 cam, power_schedule, conf, idle_time=120)
-
-    # set up data export(s)
-    # TODO: include setup and closure in the init, start_all and stop_all functions
-    export_dict = conf['EXPORT']
-    use_export = export_dict.getboolean('use_export')
-    if not use_export:
-        log.debug("f{counter} | No data export configured")
-        rf.store(redis_client, 'upload_status', 'disabled', expires=30)
-    else:
-        pem = ParseExportManager(export_dict, db_dict)
-        pem.start()
+                 cam, power_schedule, export, conf, idle_time=120)
 
     # the main program cycle will run at the following minimum interval
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -746,12 +748,10 @@ def run():
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf)
-            pem.stop()
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, conf, idle_time=120)
-            pem.stop()
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=120)
             raise
 
 if __name__ == '__main__':
