@@ -628,6 +628,8 @@ def settings():
                 forminput['sampling_speed_limit']      = float(request.form['sampling_speed_limit'])
                 forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
                 forminput['sampling_interval']         = int(request.form['sampling_interval'])
+                forminput['operator_contact']          = request.form['operator_contact']
+                forminput['owner_contact']             = request.form['owner_contact']
             except Exception:
                 raise
 
@@ -635,6 +637,7 @@ def settings():
             updates = {}
             for key, val in forminput.items():
                 if forminput[key] != formdata[key]['setting']:
+                    print(f"{key} form input {forminput[key]} != config {formdata[key]['setting']}")
                     if 'min' in formdata[key].items():
                         vmin = formdata[key]['min']
                         vmax = formdata[key]['max']
