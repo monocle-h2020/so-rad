@@ -572,13 +572,6 @@ def collect_settings_formdata():
                                   'comment':   '0 = no minimum speed',
                                   'min':       0,
                                   'max':       999},
-                'solar_elevation_limit':
-                                  {'label':    'Minimum sun elevation to allow sampling',
-                                  'setting':   float(conf['SAMPLING']['solar_elevation_limit']),
-                                  'postlabel': 'degrees',
-                                  'comment':   'normally 30. Allowed range [-90, 90]',
-                                  'min':       -90,
-                                  'max':       90},
                 'sampling_interval':
                                   {'label':    'Interval between radiometric observations',
                                   'setting':   int(conf['RADIOMETERS']['sampling_interval']),
@@ -586,12 +579,29 @@ def collect_settings_formdata():
                                   'comment':   'Normally >= 15 s',
                                   'min':       10,
                                   'max':       99999},
+                'solar_elevation_limit':
+                                  {'label':    'Minimum sun elevation to allow sampling',
+                                  'setting':   float(conf['SAMPLING']['solar_elevation_limit']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'normally 30. Allowed range [-90, 90]',
+                                  'min':       -90,
+                                  'max':       90},
+                'operator_contact':
+                                  {'label':    'Operator contact email address',
+                                  'setting':   conf['EXPORT']['operator_contact'],
+                                  'postlabel': '',
+                                  'comment':   'Must be set to a valid email address'},
+                'owner_contact':
+                                  {'label':    'Data owner contact email address',
+                                  'setting':   conf['EXPORT']['owner_contact'],
+                                  'postlabel': '',
+                                  'comment':   'Must be set to a valid email address'},
                 'use_export':
                                   {'label':    'Upload records in near real-time',
                                   'setting':   {'true': True, 'false': False}[conf['EXPORT']['use_export'].lower()],
                                   'checked':   {'true': 'checked', 'false': None}[conf['EXPORT']['use_export'].lower()],
                                   'postlabel': '',
-                                  'comment':   'When checked and system is connected to internet',
+                                  'comment':   'Active when checked and system is connected to internet',
                                   }
          }
     return formdata
@@ -625,13 +635,14 @@ def settings():
             updates = {}
             for key, val in forminput.items():
                 if forminput[key] != formdata[key]['setting']:
-                    vmin = formdata[key]['min']
-                    vmax = formdata[key]['max']
-                    if (forminput[key] > vmax) or (forminput[key] < vmin):
-                        flash(f"The value for {key} must be in the range {vmin} - {vmax}")
-                    else:
-                        flash(f"A new value for {key} was provided: {forminput[key]}")
-                        updates[key] = forminput[key]
+                    if 'min' in formdata[key].items():
+                        vmin = formdata[key]['min']
+                        vmax = formdata[key]['max']
+                        if (forminput[key] > vmax) or (forminput[key] < vmin):
+                            flash(f"The value for {key} must be in the range {vmin} - {vmax}")
+                            continue
+                    flash(f"A new value for {key} was provided: {forminput[key]}")
+                    updates[key] = forminput[key]
 
             switchitems = ['use_export']
             for switch in switchitems:

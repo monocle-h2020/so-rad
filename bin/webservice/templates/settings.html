@@ -55,6 +55,18 @@
        <td> {{ formdata['sampling_interval']['comment'] }}    </td>
      </tr>
      <tr>
+       <td> {{ formdata['operator_contact']['label'] }}        </td>
+       <td align="right"> <input type = "email" value = {{ formdata['operator_contact']['setting'] }} name = "operator_contact"/>       </td>
+       <td> {{ formdata['operator_contact']['postlabel'] }}    </td>
+       <td> {{ formdata['operator_contact']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['owner_contact']['label'] }}        </td>
+       <td align="right"> <input type = "email" value = {{ formdata['owner_contact']['setting'] }} name = "owner_contact"/>       </td>
+       <td> {{ formdata['owner_contact']['postlabel'] }}    </td>
+       <td> {{ formdata['owner_contact']['comment'] }}    </td>
+     </tr>
+     <tr>
        <td> {{ formdata['use_export']['label'] }}  </td>
        <td align="right"> <input type="checkbox" id="use_export" name="use_export" value="use_export_selected" {{ formdata['use_export']['checked'] }}> <label for="use_export"> Upload data </label> </td>
        <td> {{ formdata['use_export']['postlabel'] }}    </td>
