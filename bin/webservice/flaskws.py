@@ -88,7 +88,6 @@ def update_common_items():
         common['use_camera'] = True
     else:
         common['use_camera'] = False
-    print(f"Camera in use: {common['use_camera']} ({type(common['use_camera'])})")
     return
 
 update_common_items()
@@ -539,6 +538,7 @@ def logout():
 
 def collect_settings_formdata():
     """allow some system configurations to be updated through the web interface"""
+    global conf
     formdata = {
                 'ccw_limit_deg': {'label':     'Counter-clockwise turn limit',
                                   'setting':   int(conf['MOTOR']['ccw_limit_deg']),
@@ -585,7 +585,14 @@ def collect_settings_formdata():
                                   'postlabel': 'seconds',
                                   'comment':   'Normally >= 15 s',
                                   'min':       10,
-                                  'max':       99999}
+                                  'max':       99999},
+                'use_export':
+                                  {'label':    'Upload records in near real-time',
+                                  'setting':   {'true': True, 'false': False}[conf['EXPORT']['use_export'].lower()],
+                                  'checked':   {'true': 'checked', 'false': None}[conf['EXPORT']['use_export'].lower()],
+                                  'postlabel': '',
+                                  'comment':   'When checked and system is connected to internet',
+                                  }
          }
     return formdata
 
@@ -593,28 +600,30 @@ def collect_settings_formdata():
 @login_required
 def settings():
     forminput = {}
+    formdata = {}
     global conf
 
     try:
+        update_config()
         formdata = collect_settings_formdata()
 
         if request.method == 'POST':
             print(request.form)
             try:
-                forminput['ccw_limit_deg'] = int(request.form['ccw_limit_deg'])
-                forminput['cw_limit_deg']  = int(request.form['cw_limit_deg'])
-                forminput['home_pos']      = int(request.form['home_pos'])
+                # ensure correct data types for text inputs
+                forminput['ccw_limit_deg']             = int(request.form['ccw_limit_deg'])
+                forminput['cw_limit_deg']              = int(request.form['cw_limit_deg'])
+                forminput['home_pos']                  = int(request.form['home_pos'])
                 forminput['gps_heading_correction']    = int(request.form['gps_heading_correction'])
-                forminput['sampling_speed_limit']  = float(request.form['sampling_speed_limit'])
-                forminput['solar_elevation_limit'] = float(request.form['solar_elevation_limit'])
-                forminput['sampling_interval']     = int(request.form['sampling_interval'])
+                forminput['sampling_speed_limit']      = float(request.form['sampling_speed_limit'])
+                forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
+                forminput['sampling_interval']         = int(request.form['sampling_interval'])
             except Exception:
                 raise
 
-            print(forminput)
             # process any updates
             updates = {}
-            for key, val in formdata.items():
+            for key, val in forminput.items():
                 if forminput[key] != formdata[key]['setting']:
                     vmin = formdata[key]['min']
                     vmax = formdata[key]['max']
@@ -623,7 +632,21 @@ def settings():
                     else:
                         flash(f"A new value for {key} was provided: {forminput[key]}")
                         updates[key] = forminput[key]
+
+            switchitems = ['use_export']
+            for switch in switchitems:
+                if switch in request.form and formdata[switch]['setting'] is False:
+                    # switch is set and differs from config => update
+                    updates[switch] = True
+                elif (switch not in request.form) and (formdata[switch]['setting'] is True):
+                    # switch is unset differs from config => update
+                    updates[switch] = False
+                else:
+                    # no change
+                    continue
+
             if len(updates) > 0:
+                # write to local-config and update conf dict
                 save_updates_to_local_config(updates)
 
             formdata = collect_settings_formdata()

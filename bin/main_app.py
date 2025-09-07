@@ -691,6 +691,7 @@ def run():
                  cam, power_schedule, conf, idle_time=120)
 
     # set up data export(s)
+    # TODO: include setup and closure in the init, start_all and stop_all functions
     export_dict = conf['EXPORT']
     use_export = export_dict.getboolean('use_export')
     if not use_export:

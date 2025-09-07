@@ -54,6 +54,13 @@
        <td> {{ formdata['sampling_interval']['postlabel'] }}    </td>
        <td> {{ formdata['sampling_interval']['comment'] }}    </td>
      </tr>
+     <tr>
+       <td> {{ formdata['use_export']['label'] }}  </td>
+       <td align="right"> <input type="checkbox" id="use_export" name="use_export" value="use_export_selected" {{ formdata['use_export']['checked'] }}> <label for="use_export"> Upload data </label> </td>
+       <td> {{ formdata['use_export']['postlabel'] }}    </td>
+       <td> {{ formdata['use_export']['comment'] }}    </td>
+     </tr>
+
     </table>
        <p>       <input type = "submit" value = "Save"/> </p>
    </form>
