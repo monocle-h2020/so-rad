@@ -70,7 +70,11 @@ conf = read_config()
 update_config()
 
 log_file_location = conf['LOGGING'].get('log_file_location')
+web_log_file_location = os.path.join(os.path.dirname(log_file_location),
+                                     'web-log.txt')
+
 db_path = conf['DATABASE'].get('database_path')
+
 
 global common
 common = {}  # store some elements that are common to all pages
@@ -112,6 +116,12 @@ def save_updates_to_local_config(updates):
 
         except Exception as err:
             flash(f"Failed to write local config file: {err}")
+
+    # keep a record of changes made by operator through the web interface
+    with open(web_log_file_location, "a") as wlf:
+        for key, val in updates.items():
+            log_line = f"{datetime.datetime.now()},{key},{val}\n"
+            wlf.write(log_line)
 
     update_config()
     update_common_items()
@@ -688,6 +698,7 @@ def settings():
 
 @app.route('/log', methods=['GET', 'POST'])
 def log():
+    selection = 'system'  # by default show the system log
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -698,13 +709,21 @@ def log():
             if common['nrows'] == 0:
                 common['nrows'] =1
 
-        rows = read_log(log_file_location, n=common['nrows'], reverse=True)
+            selection = request.form['logtype']
+            print(f"Log selection: {selection}")
+
+        if selection == 'system':
+            logfile = log_file_location
+        elif selection == 'web':
+            logfile = web_log_file_location
+
+        rows = read_log(logfile, n=common['nrows'], reverse=True)
         if rows is not None and len(rows) > 0:
             common['nrows'] = len(rows)
-            return render_template('log.html', message=rows, common=common)
+            return render_template('log.html', message=rows, common=common, selection=selection)
         else:
             flash("Log file not found.")
-            return render_template('layout.html', message = '', common=common)
+            return render_template('layout.html', message = '', common=common, selection=selection)
 
     except Exception as err:
         return f"An unexpected error occurred handling your request: {err}"
