@@ -138,6 +138,10 @@ def store(client, key, value, expires=30):
         pickleit=True
     else:
         log.warning(f"Setting dtype {type(value)} not implemented, using pickle")
+        try:
+            log.info(f"record was {key} : {value}")
+        except:
+            pass
         client.set(f"{key}_dtype", "pickle")
         pickleit=True
 

@@ -97,10 +97,9 @@ class ParseExportManager(object):
         This will run and read new data and update the instance values
         """
         log.info("Starting Export manager thread")
-        while not self.stop_monitor:
+        export_result = None
 
-            connected_internet = False
-            connected_parse = False
+        while not self.stop_monitor:
 
             # check how many samples need uploading, upload a batch and check again
             if self.last_db_check + datetime.timedelta(seconds=self.upload_interval) < datetime.datetime.now():
@@ -109,29 +108,30 @@ class ParseExportManager(object):
                 self.last_db_check = datetime.datetime.now()
 
                 if self.n_not_inserted > 0:
-                    log.info(f"{n_not_inserted} samples pending upload")
+                    log.info(f"{self.n_not_inserted} samples pending upload")
                     rf.store(redis_client, 'samples_pending_upload', self.n_not_inserted, expires=30)
 
+            # connectivity check
             if (not self.last_connectivity_check_result) and \
                (self.last_connectivity_check_time + datetime.timedelta(seconds=self.connection_retry_interval) < datetime.datetime.now()):
                 # we didn't have a connection last time, and have waited the requisite interval before retrying
                 if not check_internet():
-                    log.debug(f"Internet connection timed out. Retry in 300s")
+                    log.info(f"Internet connection timed out. Retry in 300s")
                     rf.store(redis_client, 'upload_status', 'no_internet_connection', expires=30)
                     self.last_connectivity_check_result = False
                     self.last_connectivity_check_time = datetime.datetime.now()
                     time.sleep(self.sleep_interval)
                     continue
                 else:
+                    log.info(f"Internet connection restored.")
                     self.last_connectivity_check_result = True
                     self.last_connectivity_check_time = datetime.datetime.now()
-            else:
+            elif not self.last_connectivity_check_result:
                 time.sleep(self.sleep_interval)
                 continue
 
             # system status upload
             if self.last_status_update + datetime.timedelta(seconds=self.status_update_interval) < datetime.datetime.now():
-                export_result = None
                 if check_remote_data_store(self.export_dict)[0]:
                     self.last_connectivity_check_result = True
                     self.last_connectivity_check_time = datetime.datetime.now()
@@ -142,7 +142,7 @@ class ParseExportManager(object):
                         rf.store(redis_client, 'upload_status', 'remote_status_updated', expires=30)
                     self.last_status_update = datetime.datetime.now()
                 else:
-                    log.debug(f"No connection to remote server to update instrument status. Retry in 300s")
+                    log.info(f"No connection to remote server to update instrument status. Retry in 300s")
                     rf.store(redis_client, 'upload_status', 'no_connection_to_server', expires=30)
                     self.last_connectivity_check_result = False
                     self.last_connectivity_check_time = datetime.datetime.now()
@@ -152,7 +152,7 @@ class ParseExportManager(object):
                 time.sleep(self.sleep_interval)
                 continue
 
-            # data upload
+            # data upload, unless an export/update just failed
             if (self.n_not_inserted > 0) and \
                   (export_result in [True, None]) and \
                   (self.last_data_export + datetime.timedelta(seconds=self.upload_interval) < datetime.datetime.now()):
@@ -160,13 +160,13 @@ class ParseExportManager(object):
                 if check_remote_data_store(self.export_dict)[0]:
                     self.last_connectivity_check_result = True
                     self.last_connectivity_check_time = datetime.datetime.now()
-                    while (n_not_inserted > 0) and (export_result):
+                    while (self.n_not_inserted > 0) and (export_result) and (not self.stop_monitor):
                         # upload data until no more samples remain or an upload fails.
                         log.debug("Uploading latest 10 samples ({n_not_inserted} pending)")
                         export_result, resultcode, successes = run_export(self.export_dict, self.db_dict, limit=10, test_run=False, fail_limit=3)
                         log.info(f"{successes} sensor records uploaded. Request completed: {export_result}")
                         if export_result:
-                            rf.store(redis_client, 'upload_status', f'{successes}_samples_uploaded', expires=30)
+                            rf.store(redis_client, 'upload_status', f'{successes}_records_uploaded', expires=30)
                         self.n_total, self.n_not_inserted, self.all_not_inserted = identify_new_local_records(self.db_dict, limit=0)
                         rf.store(redis_client, 'samples_pending_upload', self.n_not_inserted, expires=30)
                         time.sleep(0.05)
@@ -184,7 +184,3 @@ class ParseExportManager(object):
             # sleep for a standard period, ideally close to the refresh frequency
             time.sleep(self.sleep_interval)
             continue
-
-
-
-
