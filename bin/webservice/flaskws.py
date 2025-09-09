@@ -419,7 +419,7 @@ def control():
 @app.route('/status', methods=['GET', 'POST'])
 @app.route('/latest', methods=['GET', 'POST'])
 def latest():
-    """Home page showing instrument status"""
+    """Show latest instrument status"""
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -448,8 +448,6 @@ def latest():
                     logrow_parsed = {}  # force new instance
                     logrow_parsed = log2dict(row, logrow_parsed)
                     logvalues.append(logrow_parsed)
-            #print(f"{len(logvalues)} system orientation log lines parsed")
-            #print(logvalues)
 
         else:
             print("Log file not found.")
@@ -458,9 +456,7 @@ def latest():
 
         if len(logvalues) > 0:
             labels = [lrow['timestr'] for lrow in logvalues]
-            print(labels)
-            #for lrow in logvalues:
-            #    print(lrow['timestr'])
+            print(f"{len(labels)} timestamps with orientation data read from service log")
             timeseries = {
                   'sun_azimuth':   [lr['sun_azimuth'] for lr in logvalues if 'sun_azimuth' in lr.keys()],
                   'motor_heading': [lr['motor_heading'] for lr in logvalues if 'motor_heading' in lr.keys()],
@@ -488,6 +484,9 @@ def latest():
         dbrows = get_from_db(db_path, n=1)
         if dbrows is not None and len(dbrows) > 0:
             dbtable = dict(dbrows[0])
+            for key, val in dbtable.items():
+                if val is None:
+                    dbtable[key] = ""
         else:
             flash("Database file not found or database empty.")
             common['dbreads'] = False
@@ -498,8 +497,9 @@ def latest():
         try:
             return render_template('latest.html', logvalues=logvalues, dbtable=dbtable,
                                    labels=labels, timeseries=timeseries, common=common)
-        except:
-            flash("Unable to load the requested page")
+        except Exception as err:
+            flash("Unable to load the requested page. Excluding plotting.")
+
             return render_template('layout.html', common=common)
 
     except Exception as msg:
@@ -710,7 +710,6 @@ def log():
                 common['nrows'] =1
 
             selection = request.form['logtype']
-            print(f"Log selection: {selection}")
 
         if selection == 'system':
             logfile = log_file_location

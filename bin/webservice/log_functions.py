@@ -78,7 +78,7 @@ def log2dict(line, values={}):
         values['sun_azimuth'] =      float(line.split('SunAz')[1].split(' ')[1].strip())
         values['ship_heading'] =     float(line.split('Ship')[1].split(' ')[1].strip())
         values['motor_heading'] =    float(line.split('Ship')[1].split(' ')[3].strip('|'))
-        values['relviewaz'] =        float(line.split('RelViewAz:')[1].split(' ')[1].strip())
+        values['relviewaz'] =        float(line.split('RelAz:')[1].split(' ')[1].strip())
         values['batt_ok'] =          bool(int(line.split('Bat')[1].split(' ')[1].strip()))
     except:
         # probably the wrong log line, so stop parsing here
