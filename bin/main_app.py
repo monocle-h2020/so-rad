@@ -26,12 +26,14 @@ import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, \
                                       check_sun, check_battery, check_speed, \
                                       check_heading, check_pi_cpu_temperature, \
-                                      check_ed_sampling, check_internet, check_remote_data_store
+                                      check_ed_sampling, check_internet, check_remote_data_store, \
+                                      check_rel_az_limits
+
 import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-__version__ = 20250907.1
+__version__ = 20250908.1
 
 
 # initiate redis connection
@@ -330,7 +332,7 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None, redis=Fals
     if (motor is not None) and (motor['used']):
         values['driver_temp'], values['motor_temp'] =  motor_func.motor_temp_read(motor)
 
-    # update redis?
+    # update values through redis as well. Individually is best as we can then see the time of update
     if redis:
         rf.store(redis_client, 'values', values, expires=30)
         rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
@@ -361,8 +363,8 @@ def format_log_message(counter, ready, values):
         strdict['tar_view_az'] = "{0:.2f}".format(values['motor_angles']['target_motor_pos_rel_az_deg'])
 
     try:
-        message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
-        message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelViewAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
+        message += f"Bat {values['batt_voltage']} GPS {checks[ready['gps']]} Head {checks[ready['heading']]} RelAz {checks[ready['rel_az_limits']]} Rad {checks[ready['rad']]} Spd {checks[ready['speed']]} ({strdict['speed']}) Sun {checks[ready['sun']]} ({strdict['solar_el']}) Tilt {strdict['tilt_avg']} Motor {checks[ready['motor']]} ({values['motor_alarm']})"
+        message += f" | SunAz {strdict['solar_az']} Ship {strdict['ship_bearing_mean']} Motor {strdict['motor_deg']}| Fix: {values['fix']} ({values['nsat0']} sats) | RelAz: {strdict['rel_view_az']} (-> {strdict['tar_view_az']}) | loc: {strdict['lat0']} {strdict['lon0']}"
     except: pass
 
     return message
@@ -535,8 +537,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             values['motor_angles']['target_motor_pos_step'] = None
             log.info(f"lat {values['lat0']} lon {values['lon0']} alt {values['alt0']} {values['dt']} heading {values['ship_bearing_mean']} motor {values['motor_pos']}")
 
-        # Check if the sun is in a suitable position
+        # Check if the sun and sensors can be suitably positioned
         ready['sun'] = check_sun(sample, values['solar_az'], values['solar_el'])
+        ready['rel_az_limits'] = check_rel_az_limits(sample, values['motor_angles']['target_motor_pos_rel_az_deg'])
+        log.debug(f"Relative azimuth check: {values['motor_angles']['target_motor_pos_rel_az_deg']} is {ready['rel_az_limits']} for limits [{sample['minimum_relative_azimuth_deg']}, {sample['maximum_relative_azimuth_deg']}]")
 
         # Move motor?
         # full set of criteria
@@ -592,8 +596,14 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                               values['ship_bearing_mean'], values['motor_deg'], motor,
                                                                               relative_azimuth_target=sample['relative_azimuth_target'])
 
+    # check achieved angle against configured limits
+    ready['rel_az_limits'] = check_rel_az_limits(sample, abs(values['rel_view_az']))
+
     # If all checks are good, take radiometry measurements
-    if all([use_rad, ready['gps'], ready['rad'], ready['sun'], ready['speed'], ready['heading'], ready['motor']]):
+    if all([use_rad, ready['gps'], ready['rad'], ready['sun'],
+                     ready['speed'], ready['heading'], ready['motor'],
+                     ready['rel_az_limits']]):
+
         # Get the current time of the computer as a unique trigger id
         rf.store(redis_client, 'sampling_status', 'sampling', expires=30)
         trigger_id['all_sensors'] = datetime.datetime.now()
@@ -650,7 +660,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # Alternatively check to see if just the gps location / metadata should be written
     else:
-        trigger = False
+        # trigger = False
         last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
         log.debug("last commit of any kind: {0}".format(last_any_commit))
         seconds_elapsed_since_last_any_commit = abs(datetime.datetime.now().timestamp() - last_any_commit.timestamp())

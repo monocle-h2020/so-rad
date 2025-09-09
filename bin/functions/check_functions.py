@@ -162,6 +162,18 @@ def check_sun(sample_dict, solar_azimuth, solar_elevation):
     else:
         return False
 
+def check_rel_az_limits(sample_dict, rel_azimuth):
+    """Check the attainable azimuth solution against the user-configured limits"""
+    if rel_azimuth is None:
+        return False
+    if rel_azimuth is nan:
+        return False
+    minaz = sample_dict['minimum_relative_azimuth_deg']
+    maxaz = sample_dict['maximum_relative_azimuth_deg']
+    if minaz <= rel_azimuth <= maxaz:
+        return True
+    else:
+        return False
 
 def check_ed_sampling(use_rad, rad, ready, values):
     "Check whether conditions for periodic Ed sampling are met"

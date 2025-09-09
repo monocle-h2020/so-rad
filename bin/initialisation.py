@@ -439,6 +439,8 @@ def sample_init(sample_conf):
     sample['sampling_speed_limit'] = float(sample_conf.get('sampling_speed_limit'))
     sample['solar_elevation_limit'] = float(sample_conf.get('solar_elevation_limit'))
     sample['relative_azimuth_target'] = float(sample_conf.get('relative_azimuth_target'))
+    sample['minimum_relative_azimuth_deg'] = sample_conf.getint('minimum_relative_azimuth_deg')
+    sample['maximum_relative_azimuth_deg'] = sample_conf.getint('maximum_relative_azimuth_deg')
 
     # Return the sample dict
     return sample
