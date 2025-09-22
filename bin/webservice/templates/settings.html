@@ -55,6 +55,18 @@
        <td> {{ formdata['relative_azimuth_target']['comment'] }}    </td>
      </tr>
      <tr>
+       <td> {{ formdata['minimum_relative_azimuth_deg']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="-1" max="181" step="1" value = {{ formdata['minimum_relative_azimuth_deg']['setting'] }} name = "minimum_relative_azimuth_deg"/>       </td>
+       <td> {{ formdata['minimum_relative_azimuth_deg']['postlabel'] }}    </td>
+       <td> {{ formdata['minimum_relative_azimuth_deg']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['maximum_relative_azimuth_deg']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="-1" max="181" step="1" value = {{ formdata['maximum_relative_azimuth_deg']['setting'] }} name = "maxnimum_relative_azimuth_deg"/>       </td>
+       <td> {{ formdata['maximum_relative_azimuth_deg']['postlabel'] }}    </td>
+       <td> {{ formdata['maximum_relative_azimuth_deg']['comment'] }}    </td>
+     </tr>
+     <tr>
        <td> {{ formdata['sampling_interval']['label'] }}        </td>
        <td align="right"> <input type = "number" min="10" max="999999" step="1" value = {{ formdata['sampling_interval']['setting'] }} name = "sampling_interval"/>       </td>
        <td> {{ formdata['sampling_interval']['postlabel'] }}    </td>

@@ -609,6 +609,20 @@ def collect_settings_formdata():
                                   'comment':   'normally 135. Allowed range [0, 180]',
                                   'min':       0,
                                   'max':       180},
+                'minimum_relative_azimuth_deg':
+                                  {'label':    'Minimum viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['minimum_relative_azimuth_deg']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'For continuous sampling allow 0',
+                                  'min':       -1,
+                                  'max':       181},
+                'maximum_relative_azimuth_deg':
+                                  {'label':    'Maximum viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['maximum_relative_azimuth_deg']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'For continuous sampling allow 180',
+                                  'min':       -1,
+                                  'max':       181},
                 'operator_contact':
                                   {'label':    'Operator contact email address',
                                   'setting':   conf['EXPORT']['operator_contact'],
@@ -652,6 +666,8 @@ def settings():
                 forminput['sampling_interval']         = int(request.form['sampling_interval'])
                 forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
                 forminput['relative_azimuth_target']   = float(request.form['relative_azimuth_target'])
+                forminput['minimum_relative_azimuth_deg']   = float(request.form['minimum_relative_azimuth_deg'])
+                forminput['maximum_relative_azimuth_deg']   = float(request.form['maximum_relative_azimuth_deg'])
                 forminput['operator_contact']          = request.form['operator_contact']
                 forminput['owner_contact']             = request.form['owner_contact']
 
