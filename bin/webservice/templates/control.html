@@ -22,28 +22,41 @@
       {% endif %}
     </p>
     <p>
+    <b>Set access level for remote assistance:</b><br>
+       'always' allows remote assistance (default).<br>
+       'session' provides access for the current session (until system restart).<br>
+       'disable' removes access until is is granted again.<br>
+       <input type = "submit" value = "always" name="shellhub_always"/>
+       <input type = "submit" value = "session" name="shellhub_session"/>
+       <input type = "submit" value = "disable" name="shellhub_disable"/>
+    </p>
+    <p>
+    <b>GPS test (requires So-Rad service to be stopped first):</b><br>
        <input type = "submit" value = "Test GPS" name="gps_test"/>
     </p>
     <p>
+    <b>Data export (requires So-Rad service to be stopped first):</b><br>
        <input type = "submit" value = "Data export status" name="export_test"/>
        <input type = "submit" value = "Upload data now" name="export_test_force"/>
     </p>
     <p>
+    <b>System reboot:</b><br>
        <input type = "submit" value = "Reboot" name="reboot"/>
        <input type = "submit" value = "Cancel Reboot" name="cancelreboot"/>
     </p>
     <p>
-       Warning: Once shut down, a power cycle is needed to restart the system! This cannot be done remotely.<br> 
+    <b>System shutdown:</b><br>
+    <b>Warning: Once shut down, a power cycle is needed to restart the system! This cannot be done remotely.</b><br> 
        <input type = "submit" value = "Shutdown" name="shutdown"/>
        <input type = "submit" value = "Cancel Shutdown" name="cancelreboot"/>
     </p>
   </p>
    </form>
   </div>
-
+<br>
   <div>
     <p>
-    Results:
+    <b>Results from the last command:</b>
     </p>
     {% for message in messages %}
       {{ message }}<br>

@@ -26,7 +26,7 @@ import glob
 import threading
 import zipfile
 from log_functions import read_log, log2dict
-from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
+from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access
 from redis_functions import redis_init, redis_retrieve
 import camera_functions
 
@@ -354,6 +354,20 @@ def control():
     elif selection == 'gps_test':
         # run a so-rad test script.
         status, messages = run_gps_test()
+        return render_template('control.html', messages=messages, common=common)
+
+    # shellhub access
+    elif selection == 'shellhub_always':
+        # run a so-rad test script.
+        status, messages = set_shellhub_access(access='always')
+        return render_template('control.html', messages=messages, common=common)
+    elif selection == 'shellhub_session':
+        # run a so-rad test script.
+        status, messages = set_shellhub_access(access='session')
+        return render_template('control.html', messages=messages, common=common)
+    elif selection == 'shellhub_disable':
+        # run a so-rad test script.
+        status, messages = set_shellhub_access(access='disable')
         return render_template('control.html', messages=messages, common=common)
 
     elif selection == 'export_test':

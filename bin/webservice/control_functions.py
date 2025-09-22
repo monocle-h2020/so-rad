@@ -46,10 +46,28 @@ def run_gps_test():
     status = process.wait()
     message = process.stdout.read().decode('utf-8')
     messages = message.split('\n')
-    if status == '0':
+    if status == 0:
         return True, messages
     else:
         return False, messages
+
+def set_shellhub_access(access='always'):
+    """Update the shellhub docker status and restart configuration
+    param str access: set to always [default], session [until next reboot or failure], or disable'
+    """
+    if access == 'always':
+        status1 = os.system("/usr/bin/sudo docker update --restart on-failure shellhub")
+        status2 = os.system("/usr/bin/sudo docker start shellhub")
+    elif access == 'session':
+        status1 = os.system(f"/usr/bin/sudo docker start shellhub")
+        status2 = 0
+    elif access == 'disable':
+        status1 = os.system(f"/usr/bin/sudo docker update --restart no shellhub")
+        status2 = os.system(f"/usr/bin/sudo docker stop shellhub")
+    if (status1 == 0) and (status2 ==0):
+        return True, ["Remote assistance access updated"]
+    else:
+        return False, ["Failed to update remote assistance access"]
 
 def run_export_test(force=False):
     "Show data upload status and optionally force bulk upload"
@@ -64,7 +82,7 @@ def run_export_test(force=False):
     message = process.stdout.read().decode('utf-8')
     print(message)
     messages = message.split('\n')
-    if status == '0':
+    if status == 0:
         return True, messages
     else:
         return False, messages
