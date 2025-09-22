@@ -6,11 +6,24 @@
 
   <div>
    <form action="/log" method = "POST">
+    <p>Select log:<br>
+       {% if selection=='system' %}
+           <input type = "radio" id="system" value = "system" name="logtype" checked="checked"/>
+           <label for="system">So-Rad service log (default)</label><br>
+           <input type = "radio" id="web"    value = "web" name="logtype"/>
+           <label for="web">Web interface log</label><br>
+       {% else %}
+           <input type = "radio" id="system" value = "system" name="logtype"/>
+           <label for="system">So-Rad service log (default)</label><br>
+           <input type = "radio" id="web"    value = "web" name="logtype" checked="checked"/>
+           <label for="web">Web interface log</label><br>
+       {% endif %}
+
+    </p>
     <p>Rows <input type = "number" value = {{ common['nrows'] }} name = "nrows" />  
        <input type = "submit" value = "Show"/>
        <input type = "submit" value = "Show all" name="All"/>
        <input type = "submit" value = "Show 100" name="100"/></p>
-  </p>
    </form>
   </div>
 
@@ -19,5 +32,4 @@
     <div class=body>{{ m }}</div>
   {% endfor %}
   <br>
-
 {% endblock %}

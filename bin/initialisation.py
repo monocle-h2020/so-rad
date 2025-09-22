@@ -24,6 +24,7 @@ from thread_managers import gps_manager
 from thread_managers import rht_manager
 from thread_managers import gpio_manager
 from thread_managers import camera_manager
+from thread_managers import export_manager
 from functions import db_functions
 log = logging.getLogger('init')   # report to root logger
 
@@ -437,6 +438,47 @@ def sample_init(sample_conf):
     # Get the sampling variables from the config file
     sample['sampling_speed_limit'] = float(sample_conf.get('sampling_speed_limit'))
     sample['solar_elevation_limit'] = float(sample_conf.get('solar_elevation_limit'))
+    sample['relative_azimuth_target'] = float(sample_conf.get('relative_azimuth_target'))
+    sample['minimum_relative_azimuth_deg'] = sample_conf.getint('minimum_relative_azimuth_deg')
+    sample['maximum_relative_azimuth_deg'] = sample_conf.getint('maximum_relative_azimuth_deg')
 
     # Return the sample dict
     return sample
+
+
+def export_init(export_config, db_dict):
+    """
+    Read export config settings needed to run export thread
+    : export_config is the [EXPORT] section in the config file
+    : export is a dictionary containing the configuration and manager
+    : db_dict is a dictionary containing the database configuration
+    """
+    export = {}
+    # Get all the TPR variables from the config file
+    export['used'] = export_config.getboolean('use_export')
+    export['export_protocol'] = export_config.get('export_protocol')
+    export['data_upload_interval_sec'] = export_config.getint('data_upload_interval_sec')
+    export['status_update_interval_sec'] = export_config.getint('status_update_interval_sec')
+
+    export['parse_url'] = export_config.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
+    export['parse_app_id'] = export_config.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
+    export['platform_id'] = export_config.get('platform_id')
+    export['parse_clientkey'] = export_config.get('parse_clientkey')
+
+    export['platform_id']       = export_config.get('platform_id')
+    export['owner_contact']     = export_config.get('owner_contact')
+    export['operator_contact']  = export_config.get('operator_contact')
+    export['license']           = export_config.get('license')
+    export['license_reference'] = export_config.get('license_reference')
+    export['platform_uuid']     = export_config.get('platform_uuid')
+
+    if not export['used']:
+        log.info(f"Export disabled in config")
+        export['manager'] = None
+        return export
+
+    # Return the configuration dict and initialise relevant manager class
+    if export['export_protocol'] in ['parse_platform']:
+        export['manager'] = export_manager.ParseExportManager(export, db_dict)
+
+    return export

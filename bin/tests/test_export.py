@@ -21,7 +21,7 @@ import logging
 import argparse
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-from initialisation import db_init
+from initialisation import db_init, export_init
 import functions.db_functions as db_func
 import functions.config_functions as cf_func
 import functions.export_functions as exp
@@ -97,7 +97,9 @@ if __name__ == '__main__':
     log.info(f"{n_not_inserted} records pending upload")
     conn.close()
 
-    can_connect = check_remote_data_store(conf)[0]
+    export_conf = export_init(conf['EXPORT'], db)
+
+    can_connect = check_remote_data_store(export_conf)[0]
     log.info(f"Connection to remote server: {can_connect}")
 
     if args.force_upload > 0:
@@ -114,11 +116,10 @@ if __name__ == '__main__':
         test_run = True
 
     if not args.update:
-        export_result, status_code, successes = exp.run_export(conf, db, limit=limit,
+        export_result, status_code, successes = exp.run_export(export_conf, db, limit=limit,
                                                               test_run=test_run, version=args.version,
                                                               update_local=True)
-
         log.info(f"{successes} records uploaded")
     else:
-        export_result, status_code = exp.update_status_parse_server(conf, db)
+        export_result, status_code = exp.update_status_parse_server(export_conf, db)
         log.info(f"status upload success: {export_result}")

@@ -52,22 +52,22 @@
             <th style="color:#4444ff">Driver Temp</th>      <td style="color:#4444ff">{{ dbtable['driver_temp'] }}                </td> </tr>
       <tr>  <th>Longitude</th>                              <td>{{ logvalues[0]['longitude'] }}                                   </td>
             <th>Motor rotation</th>                         <td>{{ logvalues[0]['motor_heading'] }}                               </td>
-            <th style="color:#4444ff">Control unit Temp</th><td style="color:#4444ff">{{ dbtable['inside_temp'] | round(2) }}     </td> </tr>
+            <th style="color:#4444ff">Control unit Temp</th><td style="color:#4444ff">{{ dbtable['inside_temp'] }}     </td> </tr>
       <tr>  <th>Fix quality</th>                            <td>{{ logvalues[0]['fix'] }}                                         </td>
             <th>Sensor-sun azimuth</th>                     <td>{{ logvalues[0]['relviewaz'] }}                                   </td>
-            <th style="color:#4444ff">Control unit RH%</th> <td style="color:#4444ff">{{ dbtable['inside_rel_hum'] | round(2) }}  </td> </tr>
+            <th style="color:#4444ff">Control unit RH%</th> <td style="color:#4444ff">{{ dbtable['inside_rel_hum'] }}  </td> </tr>
       <tr>  <th>Satellites</th>                             <td>{{ logvalues[0]['nsat'] }}                                        </td>
-            <th style="color:#4444ff">Tilt average</th>    <td style="color:#4444ff">{{ dbtable['tilt_avg'] | round(2) }}         </td>
+            <th style="color:#4444ff">Tilt average</th>    <td style="color:#4444ff">{{ dbtable['tilt_avg'] }}         </td>
             <th style="color:#4444ff">Battery Voltage</th>  <td style="color:#4444ff">{{ dbtable['batt_v'] }}                     </td> </tr>
       <tr>  <th>Speed</th>                                  <td>{{ logvalues[0]['speed'] }}                                       </td>
-            <th style="color:#4444ff">Tilt st.dev.</th>     <td style="color:#4444ff">{{ dbtable['tilt_std'] | round(2) }}        </td>
+            <th style="color:#4444ff">Tilt st.dev.</th>     <td style="color:#4444ff">{{ dbtable['tilt_std'] }}        </td>
             <th style="color:#4444ff">Software version</th> <td style="color:#4444ff">{{ dbtable['sorad_version'] }}              </td> </tr>
 
   </table>
 </div>
 {% endif %}
 
-{% if common['systemlog']==true %}
+{% if common['plot']==true %}
 <br>
 <!-- Chart(s) -->
 <div align="center" margin-left="auto" margin-right="auto">

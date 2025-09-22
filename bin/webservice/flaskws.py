@@ -26,7 +26,7 @@ import glob
 import threading
 import zipfile
 from log_functions import read_log, log2dict
-from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access
+from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access, run_motor_home_test
 from redis_functions import redis_init, redis_retrieve
 import camera_functions
 
@@ -70,7 +70,11 @@ conf = read_config()
 update_config()
 
 log_file_location = conf['LOGGING'].get('log_file_location')
+web_log_file_location = os.path.join(os.path.dirname(log_file_location),
+                                     'web-log.txt')
+
 db_path = conf['DATABASE'].get('database_path')
+
 
 global common
 common = {}  # store some elements that are common to all pages
@@ -88,7 +92,6 @@ def update_common_items():
         common['use_camera'] = True
     else:
         common['use_camera'] = False
-    print(f"Camera in use: {common['use_camera']} ({type(common['use_camera'])})")
     return
 
 update_common_items()
@@ -113,6 +116,12 @@ def save_updates_to_local_config(updates):
 
         except Exception as err:
             flash(f"Failed to write local config file: {err}")
+
+    # keep a record of changes made by operator through the web interface
+    with open(web_log_file_location, "a") as wlf:
+        for key, val in updates.items():
+            log_line = f"{datetime.datetime.now()},{key},{val}\n"
+            wlf.write(log_line)
 
     update_config()
     update_common_items()
@@ -320,7 +329,7 @@ def camera():
 @app.route('/control', methods=['GET', 'POST'])
 @login_required
 def control():
-    """Home page showing instrument status"""
+    """Control services, run tests etc"""
 
     selection = ''
     common['so-rad_status'], message = service_status('so-rad')
@@ -331,6 +340,7 @@ def control():
     selection = list(request.form.keys())[0]   # key = name
     flash(f"{selection} requested")
 
+    # if 'test' is included in the command name, only continue if the service is stopped
     if ('test' in selection) and (common['so-rad_status']):
         print("debug checkpoint")
         flash("Please stop the So-Rad service before running this command. If you already stopped the service, click the check button below to verify that the service has stopped.")
@@ -351,8 +361,13 @@ def control():
         flash(f"So-Rad service status: {message}")
         return render_template('control.html', common=common)
 
+    elif selection == 'motor_home_test':
+        # run a the motor_home test script.
+        status, messages = run_motor_home_test()
+        return render_template('control.html', messages=messages, common=common)
+
     elif selection == 'gps_test':
-        # run a so-rad test script.
+        # run gps test script.
         status, messages = run_gps_test()
         return render_template('control.html', messages=messages, common=common)
 
@@ -404,7 +419,7 @@ def control():
 @app.route('/status', methods=['GET', 'POST'])
 @app.route('/latest', methods=['GET', 'POST'])
 def latest():
-    """Home page showing instrument status"""
+    """Show latest instrument status"""
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -433,8 +448,6 @@ def latest():
                     logrow_parsed = {}  # force new instance
                     logrow_parsed = log2dict(row, logrow_parsed)
                     logvalues.append(logrow_parsed)
-            #print(f"{len(logvalues)} system orientation log lines parsed")
-            #print(logvalues)
 
         else:
             print("Log file not found.")
@@ -443,9 +456,7 @@ def latest():
 
         if len(logvalues) > 0:
             labels = [lrow['timestr'] for lrow in logvalues]
-            print(labels)
-            #for lrow in logvalues:
-            #    print(lrow['timestr'])
+            print(f"{len(labels)} timestamps with orientation data read from service log")
             timeseries = {
                   'sun_azimuth':   [lr['sun_azimuth'] for lr in logvalues if 'sun_azimuth' in lr.keys()],
                   'motor_heading': [lr['motor_heading'] for lr in logvalues if 'motor_heading' in lr.keys()],
@@ -473,6 +484,9 @@ def latest():
         dbrows = get_from_db(db_path, n=1)
         if dbrows is not None and len(dbrows) > 0:
             dbtable = dict(dbrows[0])
+            for key, val in dbtable.items():
+                if val is None:
+                    dbtable[key] = ""
         else:
             flash("Database file not found or database empty.")
             common['dbreads'] = False
@@ -483,8 +497,9 @@ def latest():
         try:
             return render_template('latest.html', logvalues=logvalues, dbtable=dbtable,
                                    labels=labels, timeseries=timeseries, common=common)
-        except:
-            flash("Unable to load the requested page")
+        except Exception as err:
+            flash("Unable to load the requested page. Excluding plotting.")
+
             return render_template('layout.html', common=common)
 
     except Exception as msg:
@@ -539,6 +554,7 @@ def logout():
 
 def collect_settings_formdata():
     """allow some system configurations to be updated through the web interface"""
+    global conf
     formdata = {
                 'ccw_limit_deg': {'label':     'Counter-clockwise turn limit',
                                   'setting':   int(conf['MOTOR']['ccw_limit_deg']),
@@ -572,6 +588,13 @@ def collect_settings_formdata():
                                   'comment':   '0 = no minimum speed',
                                   'min':       0,
                                   'max':       999},
+                'sampling_interval':
+                                  {'label':    'Interval between radiometric observations',
+                                  'setting':   int(conf['RADIOMETERS']['sampling_interval']),
+                                  'postlabel': 'seconds',
+                                  'comment':   'Normally >= 15 s',
+                                  'min':       10,
+                                  'max':       99999},
                 'solar_elevation_limit':
                                   {'label':    'Minimum sun elevation to allow sampling',
                                   'setting':   float(conf['SAMPLING']['solar_elevation_limit']),
@@ -579,13 +602,44 @@ def collect_settings_formdata():
                                   'comment':   'normally 30. Allowed range [-90, 90]',
                                   'min':       -90,
                                   'max':       90},
-                'sampling_interval':
-                                  {'label':    'Interval between radiometric observations',
-                                  'setting':   int(conf['RADIOMETERS']['sampling_interval']),
-                                  'postlabel': 'seconds',
-                                  'comment':   'Normally >= 15 s',
-                                  'min':       10,
-                                  'max':       99999}
+                'relative_azimuth_target':
+                                  {'label':    'Target viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['relative_azimuth_target']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'normally 135. Allowed range [0, 180]',
+                                  'min':       0,
+                                  'max':       180},
+                'minimum_relative_azimuth_deg':
+                                  {'label':    'Minimum viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['minimum_relative_azimuth_deg']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'For continuous sampling allow 0',
+                                  'min':       -1,
+                                  'max':       181},
+                'maximum_relative_azimuth_deg':
+                                  {'label':    'Maximum viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['maximum_relative_azimuth_deg']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'For continuous sampling allow 180',
+                                  'min':       -1,
+                                  'max':       181},
+                'operator_contact':
+                                  {'label':    'Operator contact email address',
+                                  'setting':   conf['EXPORT']['operator_contact'],
+                                  'postlabel': '',
+                                  'comment':   'Must be set to a valid email address'},
+                'owner_contact':
+                                  {'label':    'Data owner contact email address',
+                                  'setting':   conf['EXPORT']['owner_contact'],
+                                  'postlabel': '',
+                                  'comment':   'Must be set to a valid email address'},
+                'use_export':
+                                  {'label':    'Upload records in near real-time',
+                                  'setting':   {'true': True, 'false': False}[conf['EXPORT']['use_export'].lower()],
+                                  'checked':   {'true': 'checked', 'false': None}[conf['EXPORT']['use_export'].lower()],
+                                  'postlabel': '',
+                                  'comment':   'Active when checked and system is connected to internet',
+                                  }
          }
     return formdata
 
@@ -593,37 +647,61 @@ def collect_settings_formdata():
 @login_required
 def settings():
     forminput = {}
+    formdata = {}
     global conf
 
     try:
+        update_config()
         formdata = collect_settings_formdata()
 
         if request.method == 'POST':
             print(request.form)
             try:
-                forminput['ccw_limit_deg'] = int(request.form['ccw_limit_deg'])
-                forminput['cw_limit_deg']  = int(request.form['cw_limit_deg'])
-                forminput['home_pos']      = int(request.form['home_pos'])
+                # ensure correct data types for text inputs
+                forminput['ccw_limit_deg']             = int(request.form['ccw_limit_deg'])
+                forminput['cw_limit_deg']              = int(request.form['cw_limit_deg'])
+                forminput['home_pos']                  = int(request.form['home_pos'])
                 forminput['gps_heading_correction']    = int(request.form['gps_heading_correction'])
-                forminput['sampling_speed_limit']  = float(request.form['sampling_speed_limit'])
-                forminput['solar_elevation_limit'] = float(request.form['solar_elevation_limit'])
-                forminput['sampling_interval']     = int(request.form['sampling_interval'])
+                forminput['sampling_speed_limit']      = float(request.form['sampling_speed_limit'])
+                forminput['sampling_interval']         = int(request.form['sampling_interval'])
+                forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
+                forminput['relative_azimuth_target']   = float(request.form['relative_azimuth_target'])
+                forminput['minimum_relative_azimuth_deg']   = float(request.form['minimum_relative_azimuth_deg'])
+                forminput['maximum_relative_azimuth_deg']   = float(request.form['maximum_relative_azimuth_deg'])
+                forminput['operator_contact']          = request.form['operator_contact']
+                forminput['owner_contact']             = request.form['owner_contact']
+
             except Exception:
                 raise
 
-            print(forminput)
             # process any updates
             updates = {}
-            for key, val in formdata.items():
+            for key, val in forminput.items():
                 if forminput[key] != formdata[key]['setting']:
-                    vmin = formdata[key]['min']
-                    vmax = formdata[key]['max']
-                    if (forminput[key] > vmax) or (forminput[key] < vmin):
-                        flash(f"The value for {key} must be in the range {vmin} - {vmax}")
-                    else:
-                        flash(f"A new value for {key} was provided: {forminput[key]}")
-                        updates[key] = forminput[key]
+                    # print(f"{key} form input {forminput[key]} != config {formdata[key]['setting']}")
+                    if 'min' in formdata[key].items():
+                        vmin = formdata[key]['min']
+                        vmax = formdata[key]['max']
+                        if (forminput[key] > vmax) or (forminput[key] < vmin):
+                            flash(f"The value for {key} must be in the range {vmin} - {vmax}")
+                            continue
+                    flash(f"A new value for {key} was provided: {forminput[key]}")
+                    updates[key] = forminput[key]
+
+            switchitems = ['use_export']
+            for switch in switchitems:
+                if switch in request.form and formdata[switch]['setting'] is False:
+                    # switch is set and differs from config => update
+                    updates[switch] = True
+                elif (switch not in request.form) and (formdata[switch]['setting'] is True):
+                    # switch is unset differs from config => update
+                    updates[switch] = False
+                else:
+                    # no change
+                    continue
+
             if len(updates) > 0:
+                # write to local-config and update conf dict
                 save_updates_to_local_config(updates)
 
             formdata = collect_settings_formdata()
@@ -636,6 +714,7 @@ def settings():
 
 @app.route('/log', methods=['GET', 'POST'])
 def log():
+    selection = 'system'  # by default show the system log
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -646,13 +725,20 @@ def log():
             if common['nrows'] == 0:
                 common['nrows'] =1
 
-        rows = read_log(log_file_location, n=common['nrows'], reverse=True)
+            selection = request.form['logtype']
+
+        if selection == 'system':
+            logfile = log_file_location
+        elif selection == 'web':
+            logfile = web_log_file_location
+
+        rows = read_log(logfile, n=common['nrows'], reverse=True)
         if rows is not None and len(rows) > 0:
             common['nrows'] = len(rows)
-            return render_template('log.html', message=rows, common=common)
+            return render_template('log.html', message=rows, common=common, selection=selection)
         else:
             flash("Log file not found.")
-            return render_template('layout.html', message = '', common=common)
+            return render_template('layout.html', message = '', common=common, selection=selection)
 
     except Exception as err:
         return f"An unexpected error occurred handling your request: {err}"

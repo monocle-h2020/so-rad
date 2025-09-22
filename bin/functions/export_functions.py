@@ -42,7 +42,7 @@ TIMEOUT_SHORT = 1 # timeout for getting response on connectivity tests, status q
 log = logging.getLogger('export')
 #log.setLevel('DEBUG')
 
-def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
+def run_export(export_config_dict, db, limit=1, test_run=True, version=None, update_local=True, fail_limit=10):
     """
     Main function
 
@@ -50,7 +50,6 @@ def run_export(conf, db, limit=1, test_run=True, version=None, update_local=True
     :version float:  will limit activity to data associated with a specific sorad_version in the db
     :update_local bool: update the local db file with the export status (success/fail) and number of attempts to export
     """
-    export_config_dict = conf['EXPORT']
     n_total, n_new, records = identify_new_local_records(db, limit=limit, version=version)
     log.debug("records={0}, not_uploaded={1}".format(n_total, n_new))
 
@@ -148,12 +147,12 @@ def add_metadata(export_config_dict, record, db):
 
     # metadata from export section of config (operator-defined)
     record_as_dict['content']           = "observation"
-    record_as_dict['platform_id']       = export_config_dict.get('platform_id')
-    record_as_dict['owner_contact']     = export_config_dict.get('owner_contact')
-    record_as_dict['operator_contact']  = export_config_dict.get('operator_contact')
-    record_as_dict['license']           = export_config_dict.get('license')
-    record_as_dict['license_reference'] = export_config_dict.get('license_reference')
-    record_as_dict['platform_uuid']     = export_config_dict.get('platform_uuid')
+    record_as_dict['platform_id']       = export_config_dict['platform_id']
+    record_as_dict['owner_contact']     = export_config_dict['owner_contact']
+    record_as_dict['operator_contact']  = export_config_dict['operator_contact']
+    record_as_dict['license']           = export_config_dict['license']
+    record_as_dict['license_reference'] = export_config_dict['license_reference']
+    record_as_dict['platform_uuid']     = export_config_dict['platform_uuid']
 
     # add the following if not already present
     if 'processing_level' not in record_as_dict:
@@ -189,9 +188,9 @@ def add_metadata(export_config_dict, record, db):
 
 def export_to_parse_server(export_config_dict, json_record):
     """attempt to upload a record to a remote Parse server"""
-    parse_app_url = export_config_dict.get('parse_url')  # something like https://1.2.3.4:port/parse/classes/sorad
-    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key
-    parse_clientkey = export_config_dict.get('parse_clientkey')
+    parse_app_url = export_config_dict['parse_url']  # something like https://1.2.3.4:port/parse/classes/sorad
+    parse_app_id = export_config_dict['parse_app_id']  # ask the parse server admin for this key
+    parse_clientkey = export_config_dict['parse_clientkey']
     headers = {'content-type': 'application/json',
                'X-Parse-Application-Id': parse_app_id,
                'X-Parse-Client-Key': parse_clientkey}
@@ -214,9 +213,9 @@ def export_to_parse_server(export_config_dict, json_record):
 
 def update_on_parse_server(export_config_dict, json_record, objectId):
     """attempt to upload a record to a remote Parse server"""
-    parse_app_url = export_config_dict.get('parse_url') + f"/{objectId}"   # something like https://1.2.3.4:port/parse/classes/sorad/dfjwf3df
-    parse_app_id = export_config_dict.get('parse_app_id')                  # ask the parse server admin for this key
-    parse_clientkey = export_config_dict.get('parse_clientkey')
+    parse_app_url = export_config_dict['parse_url'] + f"/{objectId}"   # something like https://1.2.3.4:port/parse/classes/sorad/dfjwf3df
+    parse_app_id = export_config_dict['parse_app_id']                  # ask the parse server admin for this key
+    parse_clientkey = export_config_dict['parse_clientkey']
     headers = {'content-type': 'application/json',
                'X-Parse-Application-Id': parse_app_id,
                'X-Parse-Client-Key': parse_clientkey}
@@ -235,14 +234,13 @@ def update_on_parse_server(export_config_dict, json_record, objectId):
         return False, None
 
 
-def update_status_parse_server(conf, db):
+def update_status_parse_server(export_config_dict, db):
     "Update latest status update on Parse server. A status update has the 'content' field set to 'status' and only contains a metadata record"
-    export_config_dict = conf['EXPORT']
 
-    parse_app_url = export_config_dict.get('parse_url')  # something like https://1.2.3.4:port/parse/classes/sorad
-    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
-    platform_id = export_config_dict.get('platform_id')
-    parse_clientkey = export_config_dict.get('parse_clientkey')
+    parse_app_url = export_config_dict['parse_url']  # something like https://1.2.3.4:port/parse/classes/sorad
+    parse_app_id = export_config_dict['parse_app_id']  # ask the parse server admin for this key and store it in local-config.ini
+    platform_id = export_config_dict['platform_id']
+    parse_clientkey = export_config_dict['parse_clientkey']
     headers = {'content-type': 'application/json',
                'X-Parse-Application-Id': parse_app_id,
                'X-Parse-Client-Key': parse_clientkey}
@@ -274,10 +272,10 @@ def update_status_parse_server(conf, db):
 
     meta_as_dict = dict(zip(db['header_meta'], meta_local))
     meta_as_dict['content']           = "status"
-    meta_as_dict['platform_id']       = export_config_dict.get('platform_id')
-    meta_as_dict['platform_uuid']     = export_config_dict.get('platform_uuid')
-    meta_as_dict['owner_contact']     = export_config_dict.get('owner_contact')
-    meta_as_dict['operator_contact']  = export_config_dict.get('operator_contact')
+    meta_as_dict['platform_id']       = export_config_dict['platform_id']
+    meta_as_dict['platform_uuid']     = export_config_dict['platform_uuid']
+    meta_as_dict['owner_contact']     = export_config_dict['owner_contact']
+    meta_as_dict['operator_contact']  = export_config_dict['operator_contact']
 
     for key, val in meta_as_dict.items():
         # replace gps1_ with gps_ in keys
