@@ -75,7 +75,7 @@ class Ada_amt2301b(object):
 
 
     def __repr__(self):
-        return f"RH manager"
+        return f"RH (AMT) manager"
 
     def start(self):
         """
