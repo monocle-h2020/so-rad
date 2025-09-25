@@ -271,6 +271,7 @@ def rht_init(rht_config):
     rht['used'] = rht_config.getboolean('use_rht')
     rht['interface'] = rht_config.get('protocol').lower()
     rht['pin'] = rht_config.getint('pin')
+    rht['address'] = rht_config.getint('address')
     rht['sampling_time'] = rht_config.getint('sampling_time')
     rht['manager'] = None
     rht['update_interval'] = rht_config.getint('update_interval')
@@ -279,11 +280,14 @@ def rht_init(rht_config):
         log.info(f"RHT sensor disabled in config")
         return rht
 
-    assert rht['interface'].lower() in ['ada_dht22', 'ada_cp_dht']
+    assert rht['interface'].lower() in ['ada_dht22', 'ada_cp_dht', 'amt2301b']
 
     # Return the configuration dict and initialise relevant manager class
     if rht['interface'] in ['ada_dht22', 'ada_cp_dht']:
         rht['manager'] = rht_manager.Ada_dht22(rht)
+
+    if rht['interface'] in ['amt2301b']:
+        rht['manager'] = rht_manager.Ada_amt2301b(rht)
 
     return rht
 
