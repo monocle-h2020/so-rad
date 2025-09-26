@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block content %}
+<div>
+  <h2>Dataset Downloads</h2>
+<br>
+</div>
+
+<style>
+img {
+     max-width: 90%;
+     height: auto;
+    }
+</style>
+
+{% if common['use_downloads'] %}
+<p>Downloadable datasets are being generate when So-Rad service is running.</p>
+{% else %}
+<p>Datasets are not being automatically generated.</p>
+{% endif %}
+
+<p>{{ dataset_vals['stored_gb'] }} Gb stored out of {{ dataset_vals['max_storage_gb'] }} Gb allowed.</p>
+
+  <form action="/download" method = "POST">
+    <p> {{ dataset_vals['n_datasets'] }} Datasets available. List:
+      <input type = "number" value = {{ dataset_vals['n_datasets_shown'] }} name = "n_datasets_shown" size="6"/> 
+      <input type = "submit" value = "Confirm"/> or: 
+      <input type = "submit" value = "Show all" name="All"/>
+      <input type = "submit" value = "Show 100 most recent" name="100"/>
+    </p>
+
+    <p>
+    CSV datasets:
+    <br>
+    <input type = "submit" value = "Delete all stored datasets" name = "clear_csv_storage">
+    <br>
+    <table>
+    {% for m, s in zip(dataset_vals['csv_dataset_list'], dataset_vals['csv_dataset_sizes']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} kb </td>
+        <td> <input type = "submit" value = "Download dataset" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+    <p>
+    HDF datasets:
+    <br>
+    <input type = "submit" value = "Delete all stored datasets" name = "clear_hdf_storage">
+    <br>
+    <table>
+    {% for m, s in zip(dataset_vals['hdf_dataset_list'], dataset_vals['hdf_dataset_sizes']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} kb </td>
+        <td> <input type = "submit" value = "Download dataset" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+  </form>
+
+{% endblock %}

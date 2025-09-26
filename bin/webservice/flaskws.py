@@ -28,6 +28,7 @@ import zipfile
 from log_functions import read_log, log2dict
 from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access, run_motor_home_test
 from redis_functions import redis_init, redis_retrieve
+import dataset_functions
 import camera_functions
 
 # TODO: check safe_join
@@ -92,6 +93,11 @@ def update_common_items():
         common['use_camera'] = True
     else:
         common['use_camera'] = False
+    download_str = conf['DOWNLOAD']['use_downloads']
+    if download_str.lower() == 'true':
+        common['use_downloads'] = True
+    else:
+        common['use_downloads'] = False
     return
 
 update_common_items()
@@ -324,6 +330,12 @@ def serve_img(quality):
 @login_required
 def camera():
     return camera_functions.camera_main(common, conf)
+
+
+@app.route('/download', methods=['GET', 'POST'])
+@login_required
+def download():
+    return dataset_functions.download_main(common, conf)
 
 
 @app.route('/control', methods=['GET', 'POST'])

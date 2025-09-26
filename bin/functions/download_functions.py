@@ -27,11 +27,11 @@ def save_to_csv(records, data_folder, platform_id, start_time, end_time, meta_co
         return
 
     # make filename friendly labels
-    start_str = datetime.datetime.strftime(start_time, "%Y%m%d_%H%M%S")
-    end_str =   datetime.datetime.strftime(end_time,   "%Y%m%d_%H%M%S")
+    start_str = datetime.datetime.strftime(start_time, "%Y%m%dT%H%M%S")
+    end_str =   datetime.datetime.strftime(end_time,   "%Y%m%dT%H%M%S")
 
     out_filepath = os.path.join(os.path.dirname(data_folder),
-                                f"{platform_id}_{start_str}_{end_str}.csv")
+                                f"{platform_id}_{start_str}-{end_str}.csv")
     header = ",".join(meta_columns+data_columns)
     meas_index = len(meta_columns) + data_columns.index('measurement') # where is the spectrum array
 

@@ -10,7 +10,7 @@ import logging
 import argparse
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
-from initialisation import db_init
+from initialisation import db_init, datasets_init
 import functions.config_functions as cf_func
 import functions.download_functions as df
 from functions.db_functions import connect_db, column_names
@@ -65,6 +65,7 @@ if __name__ == '__main__':
     conf = cf_func.update_config(conf, args.local_config_file, verbosity=False)
 
     db_dict = db_init(conf['DATABASE'])
+    dataset_dict = datasets_init(conf['DOWNLOAD'])
 
     # previous 24 hours
     today = datetime.datetime.now()
@@ -86,7 +87,6 @@ if __name__ == '__main__':
     meta_columns = column_names(conn, cur, table="sorad_metadata")
     data_columns = column_names(conn, cur, table="sorad_radiometry")
 
-
-    data_folder = conf['DATABASE']['database_path']
+    data_folder = dataset_dict['storage_path']
     platform_id = conf['EXPORT']['platform_id']
     df.save_to_csv(records, data_folder, platform_id, start_time, end_time, meta_columns, data_columns)

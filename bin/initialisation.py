@@ -88,6 +88,30 @@ def db_init(db_config):
 
     return db
 
+
+def datasets_init(download_config):
+    """
+    Read dataset generation / download config settings
+    : download_config is the [DOWNLOAD] section in the config file
+    : dataset_dict is a dictionary containing the configuration and manager
+    """
+    datasets = {}
+    # Get all the TPR variables from the config file
+    datasets['used'] = download_config.getboolean('use_downloads')
+    datasets['storage_path'] = download_config.get('storage_path')
+    datasets['max_storage_gb'] = float(download_config.get('max_storage_gb'))
+    datasets['storage_protocol'] = download_config.get('storage_protocol')
+
+    if not datasets['used']:
+        log.info(f"No periodic dataset dumps configured")
+        return datasets
+
+    if not os.path.exists(datasets['storage_path']):
+        os.makedirs(datasets['storage_path'])
+
+    return datasets
+
+
 def camera_init(camera_config):
     """
     Read Camera config settings and initialise camera manager
