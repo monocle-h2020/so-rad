@@ -16,6 +16,15 @@ import logging
 import threading
 import datetime
 import time
+try:
+    import Adafruit_DHT
+except:
+    pass
+try:
+    import adafruit_dht
+except:
+    pass
+
 
 log = logging.getLogger('rht')
 
@@ -160,15 +169,6 @@ class Ada_dht22(object):
         Set up
         : rht is the [RHT] part of the config file interpreted as a dictionary in initialisation.py
         """
-        try:
-            import Adafruit_DHT
-        except:
-            pass
-        try:
-            import adafruit_dht
-        except:
-            pass
-
         self.interface = rht['interface']
 
         self.pin = rht['pin']  # an integer representing the GPIO number rather than the pin on the board.
