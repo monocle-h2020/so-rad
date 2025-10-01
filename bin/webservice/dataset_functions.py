@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfi
 from functions import download_functions as df
 from rq import Queue, Worker
 
+# link to or create redis queue 'sorad_q'
 sorad_q = Queue('sorad_q', connection=Redis())
 
 def get_file_lists(conf, mask='*.csv'):
@@ -51,7 +52,9 @@ def get_file_lists(conf, mask='*.csv'):
     return filelist, filesizes, filetimes
 
 def queue_info(queue):
-    """Retrieve queue info"""
+    """
+    Retrieve queue info
+    """
     nqueueing = len(queue.job_ids)
     nstarted =  queue.started_job_registry.count
     nfinished = queue.finished_job_registry.count
@@ -106,7 +109,7 @@ def download_main(common, conf):
                     #name_to_queue = df.filename_from_dates(common['platform_id'],
                     job = sorad_q.enqueue(df.csv_from_web_request, conf,
                                           csv_start, csv_end, common['platform_id'])
-                    flash(job)
+                    flash(f"Job {job.id} was added to the processing queue")
 
                 except Exception as err:
                     print(err)
