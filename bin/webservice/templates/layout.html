@@ -34,9 +34,7 @@
           {% if common['use_camera'] %}
             <a href="{{ url_for('camera') }}">Camera</a>
           {% endif %}
-          {% if common['use_downloads'] %}
-            <a href="{{ url_for('download') }}">Downloads</a>
-          {% endif %}
+          <a href="{{ url_for('download') }}">Downloads</a>
           <a href="{{ url_for('settings') }}">Settings</a>
           <a href="{{ url_for('control') }}">Control</a>
           {% if current_user.is_anonymous %}

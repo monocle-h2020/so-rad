@@ -33,7 +33,7 @@ import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-__version__ = 20250908.1
+__version__ = 20250930.1
 
 
 # initiate redis connection

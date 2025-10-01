@@ -13,14 +13,29 @@ img {
 </style>
 
 {% if common['use_downloads'] %}
-<p>Downloadable datasets are being generate when So-Rad service is running.</p>
+<p>
+Downloadable datasets are automatically generated while the So-Rad service is running.<br>
+</p>
 {% else %}
-<p>Datasets are not being automatically generated.</p>
+<p>Datasets are not being automatically generated in the current configuration.</p>
 {% endif %}
+Review, download and delete previously generated datasets through the options below,<br>
+or generate a dataset for a specific timeframe in either csv or hdf format.<br>
+Requests are added to a processing queue and results will appear here when refreshing this page.
 
 <p>{{ dataset_vals['stored_gb'] }} Gb stored out of {{ dataset_vals['max_storage_gb'] }} Gb allowed.</p>
+<p>{{ dataset_vals['queue_status_message'] }}</p>
 
   <form action="/download" method = "POST">
+    <p>
+      <label for="make_csv_start">Generate downloadable dataset for timeframe:</label>
+      <input type="datetime-local" id="make_csv_start" name="make_csv_start" value={{dataset_vals['make_csv_start_current']}} />
+      <label for="make_csv_end"> to:</label>
+      <input type="datetime-local" id="make_csv_end" name="make_csv_end" value={{dataset_vals['make_csv_end_current']}} />
+      <input type = "submit" value = "Generate CSV" name="make_csv" />
+      <input type = "submit" value = "Generate HDF" name="make_hdf" />
+    </p>
+
     <p> {{ dataset_vals['n_datasets'] }} Datasets available. List:
       <input type = "number" value = {{ dataset_vals['n_datasets_shown'] }} name = "n_datasets_shown" size="6"/> 
       <input type = "submit" value = "Confirm"/> or: 
@@ -31,7 +46,7 @@ img {
     <p>
     CSV datasets:
     <br>
-    <input type = "submit" value = "Delete all stored datasets" name = "clear_csv_storage">
+    <input type = "submit" value = "Delete all stored CSV datasets" name = "clear_csv_storage">
     <br>
     <table>
     {% for m, s in zip(dataset_vals['csv_dataset_list'], dataset_vals['csv_dataset_sizes']) %}
@@ -48,7 +63,7 @@ img {
     <p>
     HDF datasets:
     <br>
-    <input type = "submit" value = "Delete all stored datasets" name = "clear_hdf_storage">
+    <input type = "submit" value = "Delete all stored HDF datasets" name = "clear_hdf_storage">
     <br>
     <table>
     {% for m, s in zip(dataset_vals['hdf_dataset_list'], dataset_vals['hdf_dataset_sizes']) %}
