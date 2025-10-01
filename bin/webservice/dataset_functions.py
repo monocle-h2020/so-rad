@@ -21,7 +21,7 @@ import sys
 import inspect
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
 from functions import download_functions as df
-from rq import Queue, Worker
+from rq import Queue
 
 # link to or create redis queue 'sorad_q'
 sorad_q = Queue('sorad_q', connection=Redis())

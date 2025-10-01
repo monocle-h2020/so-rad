@@ -32,7 +32,7 @@ def parse_args():
                         help="Start time of request (date time YYYYMMDDTHHmmss in UTC")
     parser.add_argument('--end', required=False,
                         help="End time of request (date time YYYYMMDDTHHmmss in UTC")
-    parser.add_argument('-f', '--format', required=False, default='csv',
+    parser.add_argument('-f', '--format', required=False, default='hdf',
                         help="Choose csv or hdf output format")
     parser.add_argument('-d', '--debug', required=False, action='store_true',
                         help="set log level to debug")
@@ -95,23 +95,4 @@ if __name__ == '__main__':
                                                  start_time, end_time,
                                                  format='csv'))
 
-    if args.format='csv':
-        job = sorad_q.enqueue(df.csv_from_web_request, conf, start_time, end_time, platform_id)
-    elif args.format='hdf':
-        job = sorad_q.enqueue(df.hdf_from_web_request, conf, start_time, end_time, platform_id)
-
-    current_status = job.get_status()
-
-    while current_status not in [None, 'finished', 'failed', 'deferred', 'canceled', 'stopped']:
-        new_status = job.get_status()
-        if new_status != current_status:
-            log.info(new_status)
-            current_status = new_status
-        time.sleep(1)
-
-    if os.path.exists(outfile):
-        log.info(f"File {outfile} was written, file size is {os.path.getsize(outfile)}")
-        os.remove(outfile)
-        log.info(f"File deleted. Test complete.")
-    else:
-        log.info(f"File {outfile} not found, test failed.")
+    df.hdf_from_web_request(conf, start_time, end_time, platform_id)
