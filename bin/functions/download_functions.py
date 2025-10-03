@@ -49,7 +49,7 @@ def hdf_from_web_request(conf, start_time, end_time, platform_id):
         log.info(f"Saved {outfile}")
 
     except Exception as err:
-        print(err)
+        log.exception(err)
 
 
 def extract_arrays_from_records(records, meta_columns, data_columns):
@@ -59,44 +59,55 @@ def extract_arrays_from_records(records, meta_columns, data_columns):
     meta_columns: columns in the sorad_metadata table
     data_columns: column names of the sorad_radiometry table
     """
-    #for key in meta_columns + data_columns:
-
-    # a record is a tuple, elements can be various datatypes so must
-    # be identified from the database columns
+    # identify and harmonize all data types,
+    # from the order in which they appear in database columns
     db_columns = meta_columns + data_columns
 
-    sample_uuids =    [rec[db_columns.index('sample_uuid')] for rec in records]
-    times =            [rec[db_columns.index('gps_time')] for rec in records]
-    lats =             [rec[db_columns.index('gps_lat')] for rec in records]
-    lons =             [rec[db_columns.index('gps_long')] for rec in records]
-    gps_speeds =       [rec[db_columns.index('gps_speed')] for rec in records]
-    tilt_avgs =        [rec[db_columns.index('tilt_avg')] for rec in records]
-    tilt_stds =        [rec[db_columns.index('tilt_std')] for rec in records]
-    rel_view_azs =     [rec[db_columns.index('rel_view_az')] for rec in records]
-    sensor_ids =      [rec[db_columns.index('sensor_id')] for rec in records]
-    inttimes =        [rec[db_columns.index('inttime')] for rec in records]
-
+    # parse spectra
     spectra_index = db_columns.index('measurement')
     spectra = []
-    for r in records:
-        spectrum = r[spectra_index]
-        spectrum = spectrum.replace("[","").replace("]","").split(",")
-        spectrum = [int(s) for s in spectrum]
-        spectra.append(spectrum)
+    corrupt = []
+    for i, r in enumerate(records):
+        spectrum = r[spectra_index] # comma+space-separated string
+        spectrum = spectrum.replace("[","").replace("]","").split(", ")
+        if 'None' in spectrum:
+            # these spectra are corrupt, mark record for deletion
+            corrupt.append(i)
+        else:
+            spectrum = [int(s) for s in spectrum]
+            spectra.append(spectrum)
 
-    # not in local db:
-    # platform_ids, platform_uuids, ed_inttime, ls_inttime, lt_inttime
+    sample_uuids =    [rec[db_columns.index('sample_uuid')] for i, rec in enumerate(records) if i not in corrupt]   # str
+    times =           [rec[db_columns.index('gps_time')] for i, rec in enumerate(records) if i not in corrupt]      # str -> datetime below
+    lats =            [rec[db_columns.index('gps_lat')] for i, rec in enumerate(records) if i not in corrupt]       # float
+    lons =            [rec[db_columns.index('gps_long')] for i, rec in enumerate(records) if i not in corrupt]      # float
+    gps_speeds =      [rec[db_columns.index('gps_speed')] for i, rec in enumerate(records) if i not in corrupt]     # float
+    tilt_avgs =       [rec[db_columns.index('tilt_avg')] for i, rec in enumerate(records) if i not in corrupt]      # float
+    tilt_stds =       [rec[db_columns.index('tilt_std')] for i, rec in enumerate(records) if i not in corrupt]      # float
+    rel_view_azs =    [rec[db_columns.index('rel_view_az')] for i, rec in enumerate(records) if i not in corrupt]   # float
+    sensor_ids =      [rec[db_columns.index('sensor_id')] for i, rec in enumerate(records) if i not in corrupt]     # str
+    inttimes =        [rec[db_columns.index('inttime')] for i, rec in enumerate(records) if i not in corrupt]       # int
+
+    # parse timestamps, comply with mlb format
+    times = [datetime.datetime.strptime(t, '%Y-%m-%d %H:%M:%S.%f') for t in times]
+    # datetag is fractional days from 1900
+    datetag_reference = datetime.datetime(1900,1,1,0,0,0)
+    datetag_timedeltas = [t - datetag_reference for t in times]
+    datetags = [t.days + (t.seconds/(24.*60.*60.)) + (t.microseconds/(1000000.*24.*60.*60.)) for t in datetag_timedeltas]
+    # datetag2 = YYYYjjj where jjj is day of year
+    datetag2s = [float(datetime.datetime.strftime(t, '%Y%j')) for t in times]
+    # timetags
+    timetag2s = [float(datetime.datetime.strftime(t, "%H%M%S.%f")[:-3]) for t in times]
+    # not stored in local db: platform_ids, platform_uuids, ed_inttime, ls_inttime, lt_inttime
 
     return sample_uuids, \
-      times, \
-      lats, \
-      lons, \
+      times, datetags, datetag2s, timetag2s, \
+      lats, lons, \
       gps_speeds, \
-      tilt_avgs, \
-      tilt_stds, \
+      tilt_avgs, tilt_stds, \
       rel_view_azs, \
-      sensor_ids, \
-      spectra
+      inttimes, \
+      sensor_ids, spectra
 
 def save_to_hdf(records, destination_file, meta_columns, data_columns):
     """
@@ -106,28 +117,53 @@ def save_to_hdf(records, destination_file, meta_columns, data_columns):
 
     # Store core Sorad metadata, including sensor integration times in a dataframe
     #d = access.meta_l0_dataframe(sample_uuids, platform_ids, platform_uuids, time, lat, lon, gps_speed, tilt_avg, tilt_std, rel_view_az, ed_inttime, ls_inttime, lt_inttime, sensor_ids)
-    sample_uuids, \
-      times, \
-      lats, \
-      lons, \
+    sample_uuids, times, datetags, datetag2s, timetag2s, \
+      lats, lons, \
       gps_speeds, \
-      tilt_avgs, \
-      tilt_stds, \
+      tilt_avgs, tilt_stds, \
       rel_view_azs, \
       inttimes, \
-      sensor_ids, \
-      spectra = extract_arrays_from_records(records, meta_columns, data_columns)
+      sensor_ids, spectra = extract_arrays_from_records(records, meta_columns, data_columns)
 
     # create HDF root structure
-    breakpoint()
-    #root = HDFRoot()
-    #root.id = "/"
+    f = h5py.File(destination_file, "w")
 
-    # create HDF attributes
-    #init_attributes(root, response, hours_of_sampling[h])
+    # root attributes
+    f.attrs["WAVELENGTH_UNITS"] = "nm"
+    f.attrs["LI_UNITS"] = "count"
+    f.attrs["LT_UNITS"] = "count"
+    f.attrs["ES_UNITS"] = "count"
+    #f.attrs["SATPYR_UNITS"] = "count"  # include if needed, but no relation to So-Rad
+    f.attrs["RAW_FILE_NAME"] = ""       # there is no upstream file
+    f.attrs["PROCESSING_LEVEL"] = "0"
+    f.attrs["CAST"] = datetime.datetime.strftime(times[0], "%Y%m%d_%H")
+    f.attrs["TIME-STAMP"] = datetime.datetime.strftime(times[0],'%a %b %d %H:%M:%S %Y')
 
-    # create sorad group
-    #init_sorad_group(root, d_h)
+    # metadata group
+    gp = f.create_group("sorad")
+    gp.attrs['PLATFORM_ID'] = platform_id
+    gp.attrs['CalFileName'] = None
+    gp.attrs['FrameType'] = 'Not Required'
+
+    # add datasets
+    n_samples = len(sample_uuids)
+    gp.create_dataset('DATETAG2', data=datetag2s)
+    gp.create_dataset('TIMETAG2', data=timetag2s)
+
+    gp.create_dataset('LATITUDE', data=lats)
+    gp.attrs['LATITUDE_UNITS'] = 'degrees'
+    gp.create_dataset('LONGITUDE', data=lons)
+    gp.attrs['LONGITUDE_UNITS'] = 'degrees'
+    gp.createdataset('REL_AZ', data=rel_view_azs)
+    gp.attrs['REL_AZ_UNITS'] = 'degrees'
+    gp.create_dataset('TILT', data=tilt_avgs)
+    gp.attrs['TILT_UNITS'] = 'degrees'
+    gp.create_dataset('TILT_STD', data=tilt_stds)
+    gp.attrs['TILT_STD_UNITS'] = 'degrees'
+    gp.create_dataset('GPS_SPEED', data=gps_speeds)
+    gp.attrs['GPS_SPEED_UNITS'] = 'm/s'
+
+    f.close()
 
     # create sensor l0 groups
     #l0_data = {sensor_ids[0]: ed_h,  sensor_ids[1]: ls_h, sensor_ids[2]: lt_h} # l0 data in dict
