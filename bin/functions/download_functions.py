@@ -16,7 +16,7 @@ import sqlite3
 import datetime
 import functions.db_functions as db_func
 import h5py
-from numpy import unique, nanmean, argmin, argmax
+from numpy import unique, nanmean, argmin, argmax, nan
 from collections import OrderedDict
 
 log = logging.getLogger('download')
@@ -64,52 +64,72 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
     f = h5py.File(destination_file, "w")
 
     # root attributes
-    f.attrs["WAVELENGTH_UNITS"] = "nm"
+    # f.attrs["WAVELENGTH_UNITS"] = "nm"
     f.attrs["LI_UNITS"] = "count"
     f.attrs["LT_UNITS"] = "count"
     f.attrs["ES_UNITS"] = "count"
     #f.attrs["SATPYR_UNITS"] = "count"  # include if needed, but no relation to So-Rad
     f.attrs["RAW_FILE_NAME"] = ""       # there is no upstream file
     f.attrs["PROCESSING_LEVEL"] = "0"
-    breakpoint()
-    f.attrs["CAST"] = datetime.datetime.strftime([v['gps_time'] for k,v in sets.items()][0], "%Y%m%d_%H")
-    f.attrs["TIME-STAMP"] = datetime.datetime.strftime([v['gps_time'] for k,v in sets.items()][0], "%a %b %d %H:%M:%S %Y")
+    start_time = [v['gps_time'] for k,v in sets.items()][0]
+    f.attrs["CAST"] = datetime.datetime.strftime(start_time, "%Y%m%d_%H")
+    f.attrs["TIME-STAMP"] = datetime.datetime.strftime(start_time, "%a %b %d %H:%M:%S %Y")
 
     # metadata group
     meta = f.create_group("sorad")
     meta.attrs['PLATFORM_ID'] = platform_id
-    meta.attrs['CalFileName'] = None
+    # meta.attrs['CalFileName'] = "n/a"
     meta.attrs['FrameType'] = 'Not Required'
 
     # add datasets
     n_samples = len(sets)
-    meta.create_dataset('DATETAG2', data=[v['datetag2'] for k,v in sets.items()])
-    meta.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()])
-    meta.create_dataset('LATITUDE', data=[v['latitude'] for k,v in sets.items()])
+    meta.create_dataset('DATETAG2', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
+    meta.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()], dtype='f')
+    meta.create_dataset('LATITUDE', data=[v['latitude'] for k,v in sets.items()], dtype='f')
     meta.attrs['LATITUDE_UNITS'] = 'degrees'
-    meta.create_dataset('LONGITUDE', data=[v['longitude'] for k,v in sets.items()])
+    meta.create_dataset('LONGITUDE', data=[v['longitude'] for k,v in sets.items()], dtype='f')
     meta.attrs['LONGITUDE_UNITS'] = 'degrees'
-    meta.createdataset('REL_AZ', data=[v['rel_view_az'] for k,v in sets.items()])
+    meta.create_dataset('REL_AZ', data=[v['rel_view_az'] for k,v in sets.items()], dtype='f')
     meta.attrs['REL_AZ_UNITS'] = 'degrees'
-    meta.create_dataset('TILT', data=[v['tilt_avg'] for k,v in sets.items()])
+    meta.create_dataset('TILT', data=[v['tilt_avg'] for k,v in sets.items()], dtype='f')
     meta.attrs['TILT_UNITS'] = 'degrees'
-    meta.create_dataset('TILT_STD', data=[v['tilt_std'] for k,v in sets.items()])
+    meta.create_dataset('TILT_STD', data=[v['tilt_std'] for k,v in sets.items()], dtype='f')
     meta.attrs['TILT_STD_UNITS'] = 'degrees'
-    meta.create_dataset('GPS_SPEED', data=[v['gps_speed'] for k,v in sets.items()])
+    meta.create_dataset('GPS_SPEED', data=[v['gps_speed'] for k,v in sets.items()], dtype='f')
     meta.attrs['GPS_SPEED_UNITS'] = 'm/s'
 
-    f.close()
+    # Sensor groups
+    # naming convention: ES (ed), LI (LS), LT (lt)
+    LI  = f.create_group(sensors['ls'])
+    LI.attrs['FrameType'] = str(sensors['ls'])
+    LI.attrs['RadianceTerm1'] = 'LI'   # Satlantic naming legacy
+    LI.attrs['RadianceTerm2'] = 'Ls'   # Gordon/Mobley naming legacy
+    LI.create_dataset('L0', data= [v['ls'] for k,v in sets.items()], dtype='i8')
+    LI.attrs['L0_units'] = 'count'
+    LI.create_dataset('integration_time', data= [v['ls'] for k,v in sets.items()], dtype='i8')
+    LI.attrs['integration_time_units'] = 'ms'
 
-    # create sensor L0 groups
-    #l0_data = {sensor_ids[0]: ed_h,  sensor_ids[1]: ls_h, sensor_ids[2]: lt_h} # l0 data in dict
+    ES  = f.create_group(sensors['ed'])
+    ES.attrs['FrameType'] = str(sensors['ed'])
+    ES.attrs['RadianceTerm1'] = 'ES'   # Satlantic naming legacy
+    ES.attrs['RadianceTerm2'] = 'Ed'   # Gordon/Mobley naming legacy
+    ES.create_dataset('L0', data= [v['ed'] for k,v in sets.items()], dtype='i8')
+    ES.attrs['L0_units'] = 'count'
+    ES.create_dataset('integration_time', data= [v['ed'] for k,v in sets.items()], dtype='i8')
+    ES.attrs['integration_time_units'] = 'ms'
 
-    #for s in range(len(sensor_ids)):  # loop over sensor types
-    #    init_sensor_group(root, l0_data, sensor_ids[s], config_path, cal_path, d_h)
+    LT  = f.create_group(sensors['lt'])
+    LT.attrs['FrameType'] = str(sensors['lt'])
+    LT.attrs['RadianceTerm1'] = 'LT'   # Satlantic naming legacy
+    LT.attrs['RadianceTerm2'] = 'Lt'   # Gordon/Mobley naming legacy
+    LT.create_dataset('L0', data= [v['lt'] for k,v in sets.items()], dtype='i8')
+    LT.attrs['L0_units'] = 'count'
+    LT.create_dataset('integration_time', data= [v['lt'] for k,v in sets.items()], dtype='i8')
+    LT.attrs['integration_time_units'] = 'ms'
 
     # write to file
-    #hdf_filename =  str(platform_ids[0]) + '_' + f"{datetime_i.strftime('%Y-%m-%d')}"  + '_' + str(hours_of_sampling[h]).zfill(2) + '_L1A.hdf'
-    #root.attributes["L1A_FILENAME"] = hdf_filename
-    #root.writeHDF5(os.path.join(storage_path, hdf_filename))
+    f.attrs["L1A_FILENAME"] = os.path.basename(destination_file)
+    f.close()
 
 
 def parse_records(records, meta_columns, data_columns):
@@ -133,14 +153,17 @@ def parse_records(records, meta_columns, data_columns):
     sets = OrderedDict()
 
     for uuid in unique(sample_uuids):
-        # fetch all records with this uuid
+        # first identify all records with this uuid
         uuid_set_indices = [j for j, x in enumerate(sample_uuids) if x == uuid]
-        r = records[uuid_set_indices[0]]          # first record - to grab metadata from
+        # first record in sample - to grab metadata from
+        r = records[uuid_set_indices[0]]
+
+        # skip incomplete samples
         if len(uuid_set_indices) != 3:
-            # skip incomplete or corrupt record
             log.warning(f"Only {len(uuid_set_indices)} records found with uuid={uuid}, skipping this sample.")
             continue
 
+        # prepare to structure records for this sample
         sensor_id_ix = db_columns.index('sensor_id')
         inttime_ix =   db_columns.index('inttime')
         spectrum_index = db_columns.index('measurement')
@@ -185,8 +208,13 @@ def parse_records(records, meta_columns, data_columns):
                       'intensities': intensities,
                       'sensor_ids':  sensor_ids,
                       'inttimes':    inttimes,
-                      'spectra':     spectra
+                      'spectra':     spectra,
+                      'indices':     uuid_set_indices
                      }
+
+        for key in ['tilt_avg', 'tilt_std', 'rel_view_az']:
+            if sets[uuid][key] is None:
+                sets[uuid][key] = nan
 
     # determine which sensor is Lt, Ls, Ed (increasing order of intensity)
     sensors_flat =     [x for k,v in sets.items() for x in v['sensor_ids']]
@@ -202,7 +230,19 @@ def parse_records(records, meta_columns, data_columns):
     sensors = {}
     sensors['lt'] = min(sensor_map, key=sensor_map.get)
     sensors['ed'] = max(sensor_map, key=sensor_map.get)
-    sensors['ls'] = list(set(unique_sensors) - set([lt, ed]))[0]
+    sensors['ls'] = list(set(unique_sensors) - set([sensors['lt'], sensors['ed']]))[0]
+
+    # assign radiance signals to sets
+    for uuid in unique(sample_uuids):
+        ls_ix = sets[uuid]['sensor_ids'].index(sensors['ls'])
+        lt_ix = sets[uuid]['sensor_ids'].index(sensors['lt'])
+        ed_ix = sets[uuid]['sensor_ids'].index(sensors['ed'])
+        sets[uuid]['ls'] = sets[uuid]['spectra'][ls_ix]
+        sets[uuid]['lt'] = sets[uuid]['spectra'][lt_ix]
+        sets[uuid]['ed'] = sets[uuid]['spectra'][ed_ix]
+        sets[uuid]['ls_inttime'] = sets[uuid]['inttimes'][ls_ix]
+        sets[uuid]['lt_inttime'] = sets[uuid]['inttimes'][lt_ix]
+        sets[uuid]['ed_inttime'] = sets[uuid]['inttimes'][ed_ix]
 
     return sets, sensors
 
