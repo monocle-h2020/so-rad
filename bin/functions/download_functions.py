@@ -16,6 +16,8 @@ import sqlite3
 import datetime
 import functions.db_functions as db_func
 import h5py
+from numpy import unique, nanmean, argmin, argmax
+from collections import OrderedDict
 
 log = logging.getLogger('download')
 #log.setLevel('DEBUG')
@@ -29,6 +31,7 @@ def hdf_from_web_request(conf, start_time, end_time, platform_id):
     data_folder = conf['DOWNLOAD'].get('storage_path')
     logfilename = os.path.join(data_folder, 'csv_log.txt')
     db_dict = {'file': conf['DATABASE'].get('database_path')}
+    platform_id = conf['EXPORT'].get('platform_id')
 
     try:
         log = init_job_logger(logfilename)
@@ -38,93 +41,25 @@ def hdf_from_web_request(conf, start_time, end_time, platform_id):
         conn.close()
 
         records = identify_records(db_dict, start_time, end_time)
+        sets, sensors = parse_records(records, meta_columns, data_columns)
 
-        outfile = os.path.join(data_folder,
-                               filename_from_dates(platform_id,
-                                                   start_time, end_time,
-                                                   format='csv'))
+        destination_file = os.path.join(data_folder,
+                                        filename_from_dates(platform_id,
+                                                            start_time, end_time,
+                                                            format='hdf'))
 
-        save_to_hdf(records, outfile, meta_columns, data_columns)
+        save_to_hdf(sets, sensors, destination_file, platform_id)
 
-        log.info(f"Saved {outfile}")
+        log.info(f"Saved {destination_file}")
 
     except Exception as err:
         log.exception(err)
 
 
-def extract_arrays_from_records(records, meta_columns, data_columns):
-    """
-    Parse the database records to numpy arrays
-    records: list of records returned from database
-    meta_columns: columns in the sorad_metadata table
-    data_columns: column names of the sorad_radiometry table
-    """
-    # identify and harmonize all data types,
-    # from the order in which they appear in database columns
-    db_columns = meta_columns + data_columns
-
-    # parse spectra
-    spectra_index = db_columns.index('measurement')
-    spectra = []
-    corrupt = []
-    for i, r in enumerate(records):
-        spectrum = r[spectra_index] # comma+space-separated string
-        spectrum = spectrum.replace("[","").replace("]","").split(", ")
-        if 'None' in spectrum:
-            # these spectra are corrupt, mark record for deletion
-            corrupt.append(i)
-        else:
-            spectrum = [int(s) for s in spectrum]
-            spectra.append(spectrum)
-
-    sample_uuids =    [rec[db_columns.index('sample_uuid')] for i, rec in enumerate(records) if i not in corrupt]   # str
-    times =           [rec[db_columns.index('gps_time')] for i, rec in enumerate(records) if i not in corrupt]      # str -> datetime below
-    lats =            [rec[db_columns.index('gps_lat')] for i, rec in enumerate(records) if i not in corrupt]       # float
-    lons =            [rec[db_columns.index('gps_long')] for i, rec in enumerate(records) if i not in corrupt]      # float
-    gps_speeds =      [rec[db_columns.index('gps_speed')] for i, rec in enumerate(records) if i not in corrupt]     # float
-    tilt_avgs =       [rec[db_columns.index('tilt_avg')] for i, rec in enumerate(records) if i not in corrupt]      # float
-    tilt_stds =       [rec[db_columns.index('tilt_std')] for i, rec in enumerate(records) if i not in corrupt]      # float
-    rel_view_azs =    [rec[db_columns.index('rel_view_az')] for i, rec in enumerate(records) if i not in corrupt]   # float
-    sensor_ids =      [rec[db_columns.index('sensor_id')] for i, rec in enumerate(records) if i not in corrupt]     # str
-    inttimes =        [rec[db_columns.index('inttime')] for i, rec in enumerate(records) if i not in corrupt]       # int
-
-    # parse timestamps, comply with mlb format
-    times = [datetime.datetime.strptime(t, '%Y-%m-%d %H:%M:%S.%f') for t in times]
-    # datetag is fractional days from 1900
-    datetag_reference = datetime.datetime(1900,1,1,0,0,0)
-    datetag_timedeltas = [t - datetag_reference for t in times]
-    datetags = [t.days + (t.seconds/(24.*60.*60.)) + (t.microseconds/(1000000.*24.*60.*60.)) for t in datetag_timedeltas]
-    # datetag2 = YYYYjjj where jjj is day of year
-    datetag2s = [float(datetime.datetime.strftime(t, '%Y%j')) for t in times]
-    # timetags
-    timetag2s = [float(datetime.datetime.strftime(t, "%H%M%S.%f")[:-3]) for t in times]
-    # not stored in local db: platform_ids, platform_uuids, ed_inttime, ls_inttime, lt_inttime
-
-    return sample_uuids, \
-      times, datetags, datetag2s, timetag2s, \
-      lats, lons, \
-      gps_speeds, \
-      tilt_avgs, tilt_stds, \
-      rel_view_azs, \
-      inttimes, \
-      sensor_ids, spectra
-
-def save_to_hdf(records, destination_file, meta_columns, data_columns):
+def save_to_hdf(sets, sensors, destination_file, platform_id):
     """
     Save records to a hdf format, e.g. for ingestion by HyperCP
     """
-    # adapt header to database columns
-
-    # Store core Sorad metadata, including sensor integration times in a dataframe
-    #d = access.meta_l0_dataframe(sample_uuids, platform_ids, platform_uuids, time, lat, lon, gps_speed, tilt_avg, tilt_std, rel_view_az, ed_inttime, ls_inttime, lt_inttime, sensor_ids)
-    sample_uuids, times, datetags, datetag2s, timetag2s, \
-      lats, lons, \
-      gps_speeds, \
-      tilt_avgs, tilt_stds, \
-      rel_view_azs, \
-      inttimes, \
-      sensor_ids, spectra = extract_arrays_from_records(records, meta_columns, data_columns)
-
     # create HDF root structure
     f = h5py.File(destination_file, "w")
 
@@ -136,36 +71,36 @@ def save_to_hdf(records, destination_file, meta_columns, data_columns):
     #f.attrs["SATPYR_UNITS"] = "count"  # include if needed, but no relation to So-Rad
     f.attrs["RAW_FILE_NAME"] = ""       # there is no upstream file
     f.attrs["PROCESSING_LEVEL"] = "0"
-    f.attrs["CAST"] = datetime.datetime.strftime(times[0], "%Y%m%d_%H")
-    f.attrs["TIME-STAMP"] = datetime.datetime.strftime(times[0],'%a %b %d %H:%M:%S %Y')
+    breakpoint()
+    f.attrs["CAST"] = datetime.datetime.strftime([v['gps_time'] for k,v in sets.items()][0], "%Y%m%d_%H")
+    f.attrs["TIME-STAMP"] = datetime.datetime.strftime([v['gps_time'] for k,v in sets.items()][0], "%a %b %d %H:%M:%S %Y")
 
     # metadata group
-    gp = f.create_group("sorad")
-    gp.attrs['PLATFORM_ID'] = platform_id
-    gp.attrs['CalFileName'] = None
-    gp.attrs['FrameType'] = 'Not Required'
+    meta = f.create_group("sorad")
+    meta.attrs['PLATFORM_ID'] = platform_id
+    meta.attrs['CalFileName'] = None
+    meta.attrs['FrameType'] = 'Not Required'
 
     # add datasets
-    n_samples = len(sample_uuids)
-    gp.create_dataset('DATETAG2', data=datetag2s)
-    gp.create_dataset('TIMETAG2', data=timetag2s)
-
-    gp.create_dataset('LATITUDE', data=lats)
-    gp.attrs['LATITUDE_UNITS'] = 'degrees'
-    gp.create_dataset('LONGITUDE', data=lons)
-    gp.attrs['LONGITUDE_UNITS'] = 'degrees'
-    gp.createdataset('REL_AZ', data=rel_view_azs)
-    gp.attrs['REL_AZ_UNITS'] = 'degrees'
-    gp.create_dataset('TILT', data=tilt_avgs)
-    gp.attrs['TILT_UNITS'] = 'degrees'
-    gp.create_dataset('TILT_STD', data=tilt_stds)
-    gp.attrs['TILT_STD_UNITS'] = 'degrees'
-    gp.create_dataset('GPS_SPEED', data=gps_speeds)
-    gp.attrs['GPS_SPEED_UNITS'] = 'm/s'
+    n_samples = len(sets)
+    meta.create_dataset('DATETAG2', data=[v['datetag2'] for k,v in sets.items()])
+    meta.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()])
+    meta.create_dataset('LATITUDE', data=[v['latitude'] for k,v in sets.items()])
+    meta.attrs['LATITUDE_UNITS'] = 'degrees'
+    meta.create_dataset('LONGITUDE', data=[v['longitude'] for k,v in sets.items()])
+    meta.attrs['LONGITUDE_UNITS'] = 'degrees'
+    meta.createdataset('REL_AZ', data=[v['rel_view_az'] for k,v in sets.items()])
+    meta.attrs['REL_AZ_UNITS'] = 'degrees'
+    meta.create_dataset('TILT', data=[v['tilt_avg'] for k,v in sets.items()])
+    meta.attrs['TILT_UNITS'] = 'degrees'
+    meta.create_dataset('TILT_STD', data=[v['tilt_std'] for k,v in sets.items()])
+    meta.attrs['TILT_STD_UNITS'] = 'degrees'
+    meta.create_dataset('GPS_SPEED', data=[v['gps_speed'] for k,v in sets.items()])
+    meta.attrs['GPS_SPEED_UNITS'] = 'm/s'
 
     f.close()
 
-    # create sensor l0 groups
+    # create sensor L0 groups
     #l0_data = {sensor_ids[0]: ed_h,  sensor_ids[1]: ls_h, sensor_ids[2]: lt_h} # l0 data in dict
 
     #for s in range(len(sensor_ids)):  # loop over sensor types
@@ -177,7 +112,99 @@ def save_to_hdf(records, destination_file, meta_columns, data_columns):
     #root.writeHDF5(os.path.join(storage_path, hdf_filename))
 
 
+def parse_records(records, meta_columns, data_columns):
+    """
+    Parse the database records to measurement sets.
 
+    records: list of records returned from database
+    meta_columns: columns in the sorad_metadata table
+    data_columns: column names of the sorad_radiometry table
+    """
+    # identify and harmonize all data types,
+    # from the order in which they appear in database columns
+    db_columns = meta_columns + data_columns
+
+    uuid_column = db_columns.index('sample_uuid')
+    sample_uuids = [rec[uuid_column] for rec in records]   # list(str)
+
+    # build dictionary of measurement sets to split out sensor records
+    # and identify Lt, Ed, Ls signals
+    # dict key is the uuid, maintain order of database result (oldest first)
+    sets = OrderedDict()
+
+    for uuid in unique(sample_uuids):
+        # fetch all records with this uuid
+        uuid_set_indices = [j for j, x in enumerate(sample_uuids) if x == uuid]
+        r = records[uuid_set_indices[0]]          # first record - to grab metadata from
+        if len(uuid_set_indices) != 3:
+            # skip incomplete or corrupt record
+            log.warning(f"Only {len(uuid_set_indices)} records found with uuid={uuid}, skipping this sample.")
+            continue
+
+        sensor_id_ix = db_columns.index('sensor_id')
+        inttime_ix =   db_columns.index('inttime')
+        spectrum_index = db_columns.index('measurement')
+        sensor_ids =   []
+        inttimes =     []
+        spectra =      []
+        intensities =  []
+        corrupt = False
+
+        for j in uuid_set_indices:
+            sensor_ids.append(records[j][sensor_id_ix])
+            inttime =         records[j][inttime_ix]
+            inttimes.append(inttime)
+
+            spectrum = records[j][spectrum_index] # comma+space-separated string
+            spectrum = spectrum.replace("[","").replace("]","").split(", ")
+            if 'None' in spectrum:
+                # skip incomplete measurements
+                corrupt = True
+            else:
+                spectrum = [int(s) for s in spectrum]
+                spectra.append(spectrum)
+                # get average uncalibrated intensity normalised by integration time to determine signal strength
+                intensities.append(nanmean(spectrum) / float(inttime))
+
+        if corrupt:
+            log.warning(f"None values found in at least one uuid={uuid} spectrum, skipping this sample.")
+            continue
+
+        # add measurement set with metadata
+        record_time = datetime.datetime.strptime(r[db_columns.index('gps_time')], '%Y-%m-%d %H:%M:%S.%f')
+
+        sets[uuid] = {'gps_time':    record_time,
+                      'datetag2':    float(datetime.datetime.strftime(record_time, '%Y%j')),
+                      'timetag2':    float(datetime.datetime.strftime(record_time, "%H%M%S.%f")[:-3]),
+                      'latitude':    r[db_columns.index('gps_lat')],
+                      'longitude':   r[db_columns.index('gps_long')],
+                      'gps_speed':   r[db_columns.index('gps_speed')],
+                      'tilt_avg':    r[db_columns.index('tilt_avg')],
+                      'tilt_std':    r[db_columns.index('tilt_std')],
+                      'rel_view_az': r[db_columns.index('rel_view_az')],
+                      'intensities': intensities,
+                      'sensor_ids':  sensor_ids,
+                      'inttimes':    inttimes,
+                      'spectra':     spectra
+                     }
+
+    # determine which sensor is Lt, Ls, Ed (increasing order of intensity)
+    sensors_flat =     [x for k,v in sets.items() for x in v['sensor_ids']]
+    intensities_flat = [x for k,v in sets.items() for x in v['intensities']]
+    unique_sensors = unique(sensors_flat)
+
+    sensor_map = {}
+    for s in unique_sensors:
+        sensor_map[s] = 0
+    for s, i in zip(sensors_flat, intensities_flat):
+        sensor_map[s] += i
+
+    sensors = {}
+    sensors['lt'] = min(sensor_map, key=sensor_map.get)
+    sensors['ed'] = max(sensor_map, key=sensor_map.get)
+    sensors['ls'] = list(set(unique_sensors) - set([lt, ed]))[0]
+
+    return sets, sensors
 
 
 def csv_from_web_request(conf, start_time, end_time, platform_id):
@@ -241,18 +268,13 @@ def identify_records(db_dict, start_time=None, end_time=None):
     conn, cur = db_func.connect_db(db_dict)
     conn.set_trace_callback(log.info)
 
-    # query number of radiometry samples in database
-    sql_n_total = """SELECT count(*) FROM sorad_metadata WHERE n_rad_obs > 0"""
-    cur.execute(sql_n_total)
-    n_total = cur.fetchone()[0]
-
     # query records in timeframe
     # SELECT gps_time FROM sorad_metadata WHERE gps_time BETWEEN '2025-09-30 08:00:00' and '2025-09-30 12:00:00'
     sql = """SELECT meta.*, rad.*
               FROM sorad_metadata meta
                LEFT JOIN sorad_radiometry rad
                 ON rad.metadata_id = meta.id_
-             WHERE meta.n_rad_obs > 0
+             WHERE meta.n_rad_obs = 3
               AND meta.gps_time BETWEEN ? and ?
              ORDER BY meta.gps_time ASC
            """
@@ -268,7 +290,7 @@ def identify_records(db_dict, start_time=None, end_time=None):
     cur.execute(sql, (start_str, end_str))
     returned = cur.fetchall()
     conn.close()
-    log.info(f"{len(returned)} results returned from database")
+    log.info(f"{len(returned)} complete records returned from database.")
 
     return returned
 
