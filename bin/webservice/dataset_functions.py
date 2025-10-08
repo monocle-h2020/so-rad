@@ -37,7 +37,7 @@ def get_file_lists(conf, mask='*.csv'):
     filetimes = []
     filelist = []
     filemods = []
-    pat = r"(\w{9})_(\d{8}T\d{6})-(\d{8}T\d{6}).\w{3}"
+    pat = r"(\w{9})_(\d{8}T\d{6})-(\d{8}T\d{6})_\w{2}.\w{3}"
     for file in filelist_read:
         match = re.match(pat, os.path.basename(file))
         if match:

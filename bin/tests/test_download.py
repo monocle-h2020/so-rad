@@ -90,15 +90,16 @@ if __name__ == '__main__':
     log.info(f"Requesting database entries from {start_time.isoformat()} to {end_time.isoformat()}")
 
     platform_id = conf['EXPORT']['platform_id']
+    platform_uuid = conf['EXPORT']['platform_uuid']
     outfile = os.path.join(conf['DOWNLOAD'].get('storage_path'),
                           df.filename_from_dates(platform_id,
                                                  start_time, end_time,
-                                                 format='csv'))
+                                                 format=args.format"))
 
-    if args.format='csv':
-        job = sorad_q.enqueue(df.csv_from_web_request, conf, start_time, end_time, platform_id)
-    elif args.format='hdf':
-        job = sorad_q.enqueue(df.hdf_from_web_request, conf, start_time, end_time, platform_id)
+    if args.format == 'csv':
+        job = sorad_q.enqueue(df.csv_from_web_request, conf, start_time, end_time, platform_id, platform_uuid)
+    elif args.format == 'hdf':
+        job = sorad_q.enqueue(df.hdf_from_web_request, conf, start_time, end_time, platform_id, platform_uuid)
 
     current_status = job.get_status()
 

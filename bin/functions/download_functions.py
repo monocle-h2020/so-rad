@@ -23,7 +23,7 @@ log = logging.getLogger('download')
 #log.setLevel('DEBUG')
 
 
-def hdf_from_web_request(conf, start_time, end_time, platform_id):
+def hdf_from_web_request(conf, start_time, end_time, platform_id, platform_uuid):
     """
     Handle an hdf generation request from the web service (via redis queue).
     conf is the config read by configparser containing 'DATABASE' and 'DOWNLOAD' sections
@@ -48,7 +48,7 @@ def hdf_from_web_request(conf, start_time, end_time, platform_id):
                                                             start_time, end_time,
                                                             format='hdf'))
 
-        save_to_hdf(sets, sensors, destination_file, platform_id)
+        save_to_hdf(sets, sensors, destination_file, platform_id, platform_uuid)
 
         log.info(f"Saved {destination_file}")
 
@@ -56,7 +56,7 @@ def hdf_from_web_request(conf, start_time, end_time, platform_id):
         log.exception(err)
 
 
-def save_to_hdf(sets, sensors, destination_file, platform_id):
+def save_to_hdf(sets, sensors, destination_file, platform_id, platform_uuid):
     """
     Save records to a hdf format, e.g. for ingestion by HyperCP
     """
@@ -135,7 +135,7 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
     LT.attrs['INTTIME_UNITS'] = 'ms'
 
     # write to file
-    f.attrs["L1A_FILENAME"] = os.path.basename(destination_file)
+    f.attrs["L0_FILENAME"] = os.path.basename(destination_file)
     f.close()
 
 
@@ -260,7 +260,7 @@ def parse_records(records, meta_columns, data_columns):
     return sets, sensors
 
 
-def csv_from_web_request(conf, start_time, end_time, platform_id):
+def csv_from_web_request(conf, start_time, end_time, platform_id, platform_uuid):
     """
     Handle a csv generation request from the web service (via redis queue).
     conf is the config read by configparser containing 'DATABASE' and 'DOWNLOAD' sections
@@ -283,7 +283,7 @@ def csv_from_web_request(conf, start_time, end_time, platform_id):
                                                    start_time, end_time,
                                                    format='csv'))
 
-        save_to_csv(records, outfile, meta_columns, data_columns)
+        save_to_csv(records, outfile, meta_columns, data_columns, platform_id, platform_uuid)
 
         log.info(f"Saved {outfile}")
 
@@ -295,7 +295,7 @@ def filename_from_dates(platform_id, start_time, end_time, format='csv'):
     """Generate filename from dates"""
     start_str = datetime.datetime.strftime(start_time, "%Y%m%dT%H%M%S")
     end_str =   datetime.datetime.strftime(end_time,   "%Y%m%dT%H%M%S")
-    out_filepath = f"{platform_id}_{start_str}-{end_str}.{format}"
+    out_filepath = f"{platform_id}_{start_str}-{end_str}_L0.{format}"
     return out_filepath
 
 
@@ -304,13 +304,13 @@ def save_to_csv(records, destination_file, meta_columns, data_columns):
     Save records to a csv file
     """
     # adapt header to database columns
-    header = ",".join(meta_columns+data_columns)
-    meas_index = len(meta_columns) + data_columns.index('measurement') # where is the spectrum array
+    header = [platform_id, platform_uuid] + ",".join(meta_columns+data_columns)
 
     with open(destination_file, 'w') as op:
         op.write(header + '\n')
         for r in records:
-             dataline = ",".join([str(v).replace("[","").replace("]","") for v in r])
+             dataline = [platform_id, platform_uuid] + \
+                        ",".join([str(v).replace("[","").replace("]","") for v in r])
              op.write(dataline + '\n')
 
 
