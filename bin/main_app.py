@@ -132,7 +132,7 @@ def init_all(conf):
 
     # set up data export(s)
     # TODO: include setup and closure in the init, start_all and stop_all functions
-    export = initialisation.export_init(conf['EXPORT'], db)
+    export = initialisation.export_init(conf, db)
     if not export['used']:
         log.info("No data export configured")
         rf.store(redis_client, 'upload_status', 'disabled', expires=30)

@@ -91,15 +91,29 @@ if __name__ == '__main__':
 
     platform_id = conf['EXPORT']['platform_id']
     platform_uuid = conf['EXPORT']['platform_uuid']
-    outfile = os.path.join(conf['DOWNLOAD'].get('storage_path'),
-                          df.filename_from_dates(platform_id,
-                                                 start_time, end_time,
-                                                 format=args.format"))
+    storage_path = conf['DOWNLOAD'].get('storage_path')
+    database_path = conf['DATABASE'].get('database_path')
+    outfile = os.path.join(storage_path,
+                           df.filename_from_dates(platform_id,
+                                                  start_time, end_time,
+                                                  format=args.format"))
 
     if args.format == 'csv':
-        job = sorad_q.enqueue(df.csv_from_web_request, conf, start_time, end_time, platform_id, platform_uuid)
+        job = sorad_q.enqueue(df.csv_from_web_request,
+                                           storage_path,
+                                           database_path,
+                                           start_time,
+                                           end_time,
+                                           platform_id,
+                                           platform_uuid)
     elif args.format == 'hdf':
-        job = sorad_q.enqueue(df.hdf_from_web_request, conf, start_time, end_time, platform_id, platform_uuid)
+        job = sorad_q.enqueue(df.hdf_from_web_request,
+                                           storage_path,
+                                           database_path,
+                                           start_time,
+                                           end_time,
+                                           platform_id,
+                                           platform_uuid)
 
     current_status = job.get_status()
 

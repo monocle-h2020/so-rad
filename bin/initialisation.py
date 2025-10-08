@@ -470,13 +470,15 @@ def sample_init(sample_conf):
     return sample
 
 
-def export_init(export_config, db_dict):
+def export_init(conf, db_dict):
     """
     Read export config settings needed to run export thread
     : export_config is the [EXPORT] section in the config file
     : export is a dictionary containing the configuration and manager
     : db_dict is a dictionary containing the database configuration
     """
+    export_config = conf['EXPORT']
+    download_config = conf['DOWNLOAD']
     export = {}
     # Get all the TPR variables from the config file
     export['used'] = export_config.getboolean('use_export')
@@ -495,6 +497,8 @@ def export_init(export_config, db_dict):
     export['license']           = export_config.get('license')
     export['license_reference'] = export_config.get('license_reference')
     export['platform_uuid']     = export_config.get('platform_uuid')
+
+    export['storage_path']      = download_config.get('storage_path')
 
     if not export['used']:
         log.info(f"Export disabled in config")

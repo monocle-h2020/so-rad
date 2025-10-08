@@ -15,12 +15,17 @@ import datetime
 import functions.redis_functions as rf
 from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
 from functions.check_functions import check_internet, check_remote_data_store
+import functions.download_functions as df
+from rq import Queue
+from redis import Redis
 
 # initiate logging
 log = logging.getLogger('export')
 # initiate redis connection
 redis_client = rf.init()
 
+# link to or create redis queue 'sorad_q'
+sorad_q = Queue('sorad_q', connection=Redis())
 
 class ParseExportManager(object):
     """
@@ -34,6 +39,9 @@ class ParseExportManager(object):
         self.export_dict = export_dict
         self.db_dict = db_dict
 
+        self.storage_path  = export_dict['storage_path']
+        self.database_path = db_dict['file']
+
         self.updated = None  # typically a datetime to indicate last time the class instance values were updated
         self.thread = None
         self.started = False
@@ -41,6 +49,7 @@ class ParseExportManager(object):
         self.sleep_interval = 1.0  # minimum interval between cycles
         self.upload_interval = int(export_dict['data_upload_interval_sec'])
         self.status_update_interval = int(export_dict['status_update_interval_sec'])
+        self.hdf_creation_interval_mins = 60
         self.connection_retry_interval = 300
 
         self.n_total = None
@@ -53,6 +62,8 @@ class ParseExportManager(object):
         self.last_data_export = datetime.datetime.now() - datetime.timedelta(seconds=self.upload_interval)
         self.last_connectivity_check_time = datetime.datetime.now() - datetime.timedelta(seconds=self.connection_retry_interval)
         self.last_connectivity_check_result = False
+        # on initialisation set the last hdf creation time to the top of the current hour
+        self.last_hdf_requested = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
 
     def update_values(self):
         """
@@ -100,6 +111,21 @@ class ParseExportManager(object):
         export_result = None
 
         while not self.stop_monitor:
+
+            # hdf generation
+            if datetime.datetime.now() > (self.last_hdf_requested + datetime.timedelta(minutes=60)):
+                try:
+                    hdf_start_time = self.last_hdf_requested
+                    hdf_end_time = self.last_hdf_requested.replace(minute=59, second=59, microsecond=999999)
+                    log.info(f"Requesting HDF dataset from {hdf_start_time.isoformat()} to {hdf_end_time.isoformat()}")
+                    platform_id = self.export_dict['platform_id']
+                    platform_uuid = self.export_dict['platform_uuid']
+                    job = sorad_q.enqueue(df.hdf_from_web_request, self.storage_path, self.database_path,
+                                                                   start_time, end_time, platform_id, platform_uuid)
+                    self.last_hdf_requested = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
+                    log.info(job)
+                except Exception as err:
+                    log.exception(err)
 
             # check how many samples need uploading, upload a batch and check again
             if self.last_db_check + datetime.timedelta(seconds=self.upload_interval) < datetime.datetime.now():

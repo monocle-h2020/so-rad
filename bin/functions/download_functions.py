@@ -23,15 +23,17 @@ log = logging.getLogger('download')
 #log.setLevel('DEBUG')
 
 
-def hdf_from_web_request(conf, start_time, end_time, platform_id, platform_uuid):
+def hdf_from_web_request(storage_path, database_path,
+                         start_time, end_time,
+                         platform_id, platform_uuid,
+                         save_if_empty=False):
     """
     Handle an hdf generation request from the web service (via redis queue).
     conf is the config read by configparser containing 'DATABASE' and 'DOWNLOAD' sections
     """
-    data_folder = conf['DOWNLOAD'].get('storage_path')
-    logfilename = os.path.join(data_folder, 'csv_log.txt')
-    db_dict = {'file': conf['DATABASE'].get('database_path')}
-    platform_id = conf['EXPORT'].get('platform_id')
+    logfilename = os.path.join(storage_path, 'csv_log.txt')
+    # make a dummy db_dict just to get db cursor
+    db_dict = {'file': database_path}
 
     try:
         log = init_job_logger(logfilename)
@@ -41,9 +43,16 @@ def hdf_from_web_request(conf, start_time, end_time, platform_id, platform_uuid)
         conn.close()
 
         records = identify_records(db_dict, start_time, end_time)
-        sets, sensors = parse_records(records, meta_columns, data_columns)
+        if len(records) == 0 and not save_if_empty:
+            log.info(f"No records in timeframe")
+            return
 
-        destination_file = os.path.join(data_folder,
+        sets, sensors = parse_records(records, meta_columns, data_columns)
+        if len(sets) == 0 and not save_if_empty:
+            log.info(f"No complete samples in timeframe")
+            return
+
+        destination_file = os.path.join(storage_path,
                                         filename_from_dates(platform_id,
                                                             start_time, end_time,
                                                             format='hdf'))
@@ -260,14 +269,17 @@ def parse_records(records, meta_columns, data_columns):
     return sets, sensors
 
 
-def csv_from_web_request(conf, start_time, end_time, platform_id, platform_uuid):
+def csv_from_web_request(storage_path, database_path,
+                         start_time, end_time,
+                         platform_id, platform_uuid,
+                         save_if_empty=False):
     """
     Handle a csv generation request from the web service (via redis queue).
     conf is the config read by configparser containing 'DATABASE' and 'DOWNLOAD' sections
     """
-    data_folder = conf['DOWNLOAD'].get('storage_path')
-    logfilename = os.path.join(data_folder, 'csv_log.txt')
-    db_dict = {'file': conf['DATABASE'].get('database_path')}
+    logfilename = os.path.join(storage_path, 'csv_log.txt')
+    # make a dummy db_dict just to get db cursor
+    db_dict = {'file': database_path}
 
     try:
         log = init_job_logger(logfilename)
@@ -277,8 +289,11 @@ def csv_from_web_request(conf, start_time, end_time, platform_id, platform_uuid)
         conn.close()
 
         records = identify_records(db_dict, start_time, end_time)
+        if len(records) == 0 and not save_if_empty:
+            log.info(f"No records in timeframe")
+            return
 
-        outfile = os.path.join(data_folder,
+        outfile = os.path.join(storage_path,
                                filename_from_dates(platform_id,
                                                    start_time, end_time,
                                                    format='csv'))
