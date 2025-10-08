@@ -30,26 +30,31 @@ def get_file_lists(conf, mask='*.csv'):
     """
     list csv or hdf data files that have already been prepared
     """
-    filelist = glob.glob(os.path.join(conf['DOWNLOAD']['storage_path'], mask))
+    filelist_read = glob.glob(os.path.join(conf['DOWNLOAD']['storage_path'], mask))
     # get image store size
     total_bytes = 0
     filesizes = []
-    for file in filelist:
-        filesizes.append(os.path.getsize(file))
-    # get image timestamps from filenames (to get observation trigger times)
     filetimes = []
+    filelist = []
+    filemods = []
     pat = r"(\w{9})_(\d{8}T\d{6})-(\d{8}T\d{6}).\w{3}"
-    for file in filelist:
+    for file in filelist_read:
         match = re.match(pat, os.path.basename(file))
         if match:
             filetimes.append(datetime.datetime.strptime(match.group(2), '%Y%m%dT%H%M%S'))
+            filesizes.append(os.path.getsize(file))
+            filelist.append(file)
+            filemods.append(datetime.datetime.strftime(
+                                     datetime.datetime.fromtimestamp(os.path.getmtime(file)),
+                                     '%Y%m%dT%H%M%S'))
 
     # sort filelist by observation timestamp
     filelist  = array(filelist)[argsort(filetimes)]
     filesizes = array(filesizes)[argsort(filetimes)]
     filetimes = array(filetimes)[argsort(filetimes)]
+    filemods =  array(filemods)[argsort(filetimes)]
 
-    return filelist, filesizes, filetimes
+    return filelist, filesizes, filetimes, filemods
 
 def queue_info(queue):
     """
@@ -80,8 +85,8 @@ def download_main(common, conf):
 
         print(0)
         try:
-            csv_filelist, csv_filesizes, csv_filetimes = get_file_lists(conf, mask='*.csv')
-            hdf_filelist, hdf_filesizes, hdf_filetimes = get_file_lists(conf, mask='*.hdf')
+            csv_filelist, csv_filesizes, csv_filetimes, csv_filemods = get_file_lists(conf, mask='*.csv')
+            hdf_filelist, hdf_filesizes, hdf_filetimes, hdf_filemods = get_file_lists(conf, mask='*.hdf')
             filesizes = list(csv_filesizes) + list(hdf_filesizes)
             dataset_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
         except Exception as err:
@@ -105,9 +110,22 @@ def download_main(common, conf):
                     print(request.form['make_csv_end'])
                     csv_start = datetime.datetime.strptime(request.form['make_csv_start'], "%Y-%m-%dT%H:%M")
                     csv_end = datetime.datetime.strptime(request.form['make_csv_end'], "%Y-%m-%dT%H:%M")
-                    print(f"{csv_start} - {csv_end} requested")
-                    #name_to_queue = df.filename_from_dates(common['platform_id'],
+                    print(f"CSV record {csv_start} - {csv_end} requested")
                     job = sorad_q.enqueue(df.csv_from_web_request, conf,
+                                          csv_start, csv_end, common['platform_id'])
+                    flash(f"Job {job.id} was added to the processing queue")
+
+                except Exception as err:
+                    print(err)
+
+            elif 'make_hdf' in request.form.keys():
+                try:
+                    print(request.form['make_csv_start'])
+                    print(request.form['make_csv_end'])
+                    csv_start = datetime.datetime.strptime(request.form['make_csv_start'], "%Y-%m-%dT%H:%M")
+                    csv_end = datetime.datetime.strptime(request.form['make_csv_end'], "%Y-%m-%dT%H:%M")
+                    print(f"HDF record {csv_start} - {csv_end} requested")
+                    job = sorad_q.enqueue(df.hdf_from_web_request, conf,
                                           csv_start, csv_end, common['platform_id'])
                     flash(f"Job {job.id} was added to the processing queue")
 
@@ -118,15 +136,15 @@ def download_main(common, conf):
                 for f in csv_filelist:
                     if os.path.exists(f):
                         os.remove(f)
-                csv_filelist, csv_filesizes, csv_filetimes = get_file_lists(conf, mask='*.csv')
+                csv_filelist, csv_filesizes, csv_filetimes, csv_filemods = get_file_lists(conf, mask='*.csv')
                 filesizes = list(csv_filesizes) + list(hdf_filesizes)
                 dataset_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
 
             elif 'clear_hdf_storage' in request.form.keys():
-                for f in filelist:
+                for f in hdf_filelist:
                     if os.path.exists(f):
                         os.remove(f)
-                hdf_filelist, hdf_filesizes, hdf_filetimes = get_file_lists(conf, '*.hdf')
+                hdf_filelist, hdf_filesizes, hdf_filetimes, hdf_filemods = get_file_lists(conf, mask='*.hdf')
                 filesizes = list(csv_filesizes) + list(hdf_filesizes)
                 dataset_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
 
@@ -154,8 +172,8 @@ def download_main(common, conf):
                         filepath = os.path.join(rootpath, fileselected)
                         if os.path.exists(filepath):
                             os.remove(filepath)
-                            csv_filelist, csv_filesizes, csv_filetimes = get_file_lists(conf, mask='*.csv')
-                            hdf_filelist, hdf_filesizes, hdf_filetimes = get_file_lists(conf, mask='*.hdf')
+                            csv_filelist, csv_filesizes, csv_filetimes, csv_filemods = get_file_lists(conf, mask='*.csv')
+                            hdf_filelist, hdf_filesizes, hdf_filetimes, hdf_filemods = get_file_lists(conf, mask='*.hdf')
                             filesizes = list(csv_filesizes) + list(hdf_filesizes)
                             dataset_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
                         else:
@@ -169,21 +187,27 @@ def download_main(common, conf):
         if dataset_vals['n_datasets'] < dataset_vals['n_datasets_shown']:
             dataset_vals['n_datasets_shown'] = dataset_vals['n_datasets']
 
-        try:
-            csv_filenames_short = [os.path.basename(f) for f in csv_filelist]
-            csv_filenames_short.sort()
-            csv_filenames_short.reverse()
-            dataset_vals['csv_dataset_list'] = csv_filenames_short[0:dataset_vals['n_datasets_shown']]
-            dataset_vals['csv_dataset_sizes'] = [os.path.getsize(os.path.join(conf['DOWNLOAD']['storage_path'],file))/1024. for file in csv_filenames_short]
-        except Exception as err:
-            print(err)
+        csv_filenames_short = [os.path.basename(f) for f in csv_filelist]
+        csv_filenames_short.sort()
+        csv_filenames_short.reverse()
+        dataset_vals['csv_dataset_list'] = csv_filenames_short[0:dataset_vals['n_datasets_shown']]
+        dataset_vals['csv_dataset_sizes'] = [os.path.getsize(os.path.join(conf['DOWNLOAD']['storage_path'],file))/1024. for file in csv_filenames_short]
+        dataset_vals['csv_dataset_mods'] = list(csv_filemods)
 
         hdf_filenames_short = [os.path.basename(f) for f in hdf_filelist]
         hdf_filenames_short.sort()
         hdf_filenames_short.reverse()
         dataset_vals['hdf_dataset_list'] = hdf_filenames_short[0:dataset_vals['n_datasets_shown']]
         dataset_vals['hdf_dataset_sizes'] = [os.path.getsize(os.path.join(conf['DOWNLOAD']['storage_path'],file))/1024. for file in hdf_filenames_short]
+        dataset_vals['hdf_dataset_mods'] = list(hdf_filemods)
 
+        print(dataset_vals)
+
+
+        print(3)
+        for m, s, c in zip(dataset_vals['hdf_dataset_list'], dataset_vals['hdf_dataset_sizes'], dataset_vals['hdf_dataset_mods']):
+            print(m,s,c)
+        print(4)
         try:
             return render_template('downloads.html',
                                    common=common,
