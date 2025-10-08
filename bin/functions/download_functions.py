@@ -97,6 +97,7 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
     meta.attrs['TILT_STD_UNITS'] = 'degrees'
     meta.create_dataset('GPS_SPEED', data=[v['gps_speed'] for k,v in sets.items()], dtype='f')
     meta.attrs['GPS_SPEED_UNITS'] = 'm/s'
+    meta.create_dataset('SAMPLE_UUID', data=[v['sample_uuid'] for k,v in sets.items()], dtype=h5py.string_dtype())
 
     # Sensor groups
     # naming convention: ES (ed), LI (LS), LT (lt)
@@ -109,7 +110,7 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
     LI.create_dataset('L0', data= [v['ls'] for k,v in sets.items()], dtype='i8')
     LI.attrs['L0_units'] = 'count'
     LI.create_dataset('INTTIME', data= [v['ls_inttime'] for k,v in sets.items()], dtype='i8')
-    LI.attrs['integration_time_units'] = 'ms'
+    LI.attrs['INTTIME_UNITS'] = 'ms'
 
     ES  = f.create_group(f"SAM_{sensors['ed']}.ini")
     ES.create_dataset('DATETAG', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
@@ -120,7 +121,7 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
     ES.create_dataset('L0', data= [v['ed'] for k,v in sets.items()], dtype='i8')
     ES.attrs['L0_units'] = 'count'
     ES.create_dataset('INTTIME', data= [v['ed_inttime'] for k,v in sets.items()], dtype='i8')
-    ES.attrs['integration_time_units'] = 'ms'
+    ES.attrs['INTTIME_UNITS'] = 'ms'
 
     LT  = f.create_group(f"SAM_{sensors['lt']}.ini")
     LT.create_dataset('DATETAG', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
@@ -131,7 +132,7 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
     LT.create_dataset('L0', data= [v['lt'] for k,v in sets.items()], dtype='i8')
     LT.attrs['L0_units'] = 'count'
     LT.create_dataset('INTTIME', data= [v['lt_inttime'] for k,v in sets.items()], dtype='i8')
-    LT.attrs['integration_time_units'] = 'ms'
+    LT.attrs['INTTIME_UNITS'] = 'ms'
 
     # write to file
     f.attrs["L1A_FILENAME"] = os.path.basename(destination_file)
@@ -207,7 +208,8 @@ def parse_records(records, meta_columns, data_columns):
         # add measurement set with metadata
         record_time = datetime.datetime.strptime(r[db_columns.index('gps_time')], '%Y-%m-%d %H:%M:%S.%f')
 
-        sets[uuid] = {'gps_time':    record_time,
+        sets[uuid] = {'sample_uuid': uuid,
+                      'gps_time':    record_time,
                       'datetag2':    float(datetime.datetime.strftime(record_time, '%Y%j')),
                       'timetag2':    float(datetime.datetime.strftime(record_time, "%H%M%S.%f")[:-3]),
                       'latitude':    r[db_columns.index('gps_lat')],
