@@ -30,7 +30,7 @@ def get_file_lists(conf, mask='*.csv'):
     """
     list csv or hdf data files that have already been prepared
     """
-    filelist_read = glob.glob(os.path.join(conf['DOWNLOAD']['storage_path'], mask))
+    filelist_read = glob.glob(os.path.join(conf['DOWNLOAD'].get('storage_path'), mask))
     # get image store size
     total_bytes = 0
     filesizes = []
@@ -73,6 +73,11 @@ def download_main(common, conf):
     Show datasets available for download
     """
     try:
+        print(-2)
+        storage_path = conf['DOWNLOAD'].get('storage_path')
+        database_path = conf['DATABASE'].get('database_path')
+        print(-1)
+
         client = redis_init()
         if client is None:
            raise Exception("Redis not initialised")
@@ -111,8 +116,8 @@ def download_main(common, conf):
                     csv_start = datetime.datetime.strptime(request.form['make_csv_start'], "%Y-%m-%dT%H:%M")
                     csv_end = datetime.datetime.strptime(request.form['make_csv_end'], "%Y-%m-%dT%H:%M")
                     print(f"CSV record {csv_start} - {csv_end} requested")
-                    job = sorad_q.enqueue(df.csv_from_web_request, conf,
-                                          csv_start, csv_end, common['platform_id'])
+                    job = sorad_q.enqueue(df.csv_from_web_request, storage_path, database_path,
+                                          csv_start, csv_end, common['platform_id'], common['platform_uuid'])
                     flash(f"Job {job.id} was added to the processing queue")
 
                 except Exception as err:
@@ -125,8 +130,8 @@ def download_main(common, conf):
                     csv_start = datetime.datetime.strptime(request.form['make_csv_start'], "%Y-%m-%dT%H:%M")
                     csv_end = datetime.datetime.strptime(request.form['make_csv_end'], "%Y-%m-%dT%H:%M")
                     print(f"HDF record {csv_start} - {csv_end} requested")
-                    job = sorad_q.enqueue(df.hdf_from_web_request, conf,
-                                          csv_start, csv_end, common['platform_id'])
+                    job = sorad_q.enqueue(df.hdf_from_web_request, storage_path, database_path,
+                                          csv_start, csv_end, common['platform_id'], common['platform_uuid'])
                     flash(f"Job {job.id} was added to the processing queue")
 
                 except Exception as err:

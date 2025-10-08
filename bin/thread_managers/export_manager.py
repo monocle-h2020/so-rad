@@ -121,7 +121,7 @@ class ParseExportManager(object):
                     platform_id = self.export_dict['platform_id']
                     platform_uuid = self.export_dict['platform_uuid']
                     job = sorad_q.enqueue(df.hdf_from_web_request, self.storage_path, self.database_path,
-                                                                   start_time, end_time, platform_id, platform_uuid)
+                                                                   hdf_start_time, hdf_end_time, platform_id, platform_uuid)
                     self.last_hdf_requested = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
                     log.info(job)
                 except Exception as err:
