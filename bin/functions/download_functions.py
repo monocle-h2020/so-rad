@@ -83,7 +83,7 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
 
     # add datasets
     n_samples = len(sets)
-    meta.create_dataset('DATETAG2', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
+    meta.create_dataset('DATETAG', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
     meta.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()], dtype='f')
     meta.create_dataset('LATITUDE', data=[v['latitude'] for k,v in sets.items()], dtype='f')
     meta.attrs['LATITUDE_UNITS'] = 'degrees'
@@ -100,31 +100,37 @@ def save_to_hdf(sets, sensors, destination_file, platform_id):
 
     # Sensor groups
     # naming convention: ES (ed), LI (LS), LT (lt)
-    LI  = f.create_group(sensors['ls'])
+    LI  = f.create_group(f"SAM_{sensors['ls']}.ini")
+    LI.create_dataset('DATETAG', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
+    LI.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()], dtype='f')
     LI.attrs['FrameType'] = str(sensors['ls'])
     LI.attrs['RadianceTerm1'] = 'LI'   # Satlantic naming legacy
     LI.attrs['RadianceTerm2'] = 'Ls'   # Gordon/Mobley naming legacy
     LI.create_dataset('L0', data= [v['ls'] for k,v in sets.items()], dtype='i8')
     LI.attrs['L0_units'] = 'count'
-    LI.create_dataset('integration_time', data= [v['ls'] for k,v in sets.items()], dtype='i8')
+    LI.create_dataset('INTTIME', data= [v['ls_inttime'] for k,v in sets.items()], dtype='i8')
     LI.attrs['integration_time_units'] = 'ms'
 
-    ES  = f.create_group(sensors['ed'])
+    ES  = f.create_group(f"SAM_{sensors['ed']}.ini")
+    ES.create_dataset('DATETAG', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
+    ES.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()], dtype='f')
     ES.attrs['FrameType'] = str(sensors['ed'])
     ES.attrs['RadianceTerm1'] = 'ES'   # Satlantic naming legacy
     ES.attrs['RadianceTerm2'] = 'Ed'   # Gordon/Mobley naming legacy
     ES.create_dataset('L0', data= [v['ed'] for k,v in sets.items()], dtype='i8')
     ES.attrs['L0_units'] = 'count'
-    ES.create_dataset('integration_time', data= [v['ed'] for k,v in sets.items()], dtype='i8')
+    ES.create_dataset('INTTIME', data= [v['ed_inttime'] for k,v in sets.items()], dtype='i8')
     ES.attrs['integration_time_units'] = 'ms'
 
-    LT  = f.create_group(sensors['lt'])
+    LT  = f.create_group(f"SAM_{sensors['lt']}.ini")
+    LT.create_dataset('DATETAG', data=[v['datetag2'] for k,v in sets.items()], dtype='f')
+    LT.create_dataset('TIMETAG2', data=[v['timetag2'] for k,v in sets.items()], dtype='f')
     LT.attrs['FrameType'] = str(sensors['lt'])
     LT.attrs['RadianceTerm1'] = 'LT'   # Satlantic naming legacy
     LT.attrs['RadianceTerm2'] = 'Lt'   # Gordon/Mobley naming legacy
     LT.create_dataset('L0', data= [v['lt'] for k,v in sets.items()], dtype='i8')
     LT.attrs['L0_units'] = 'count'
-    LT.create_dataset('integration_time', data= [v['lt'] for k,v in sets.items()], dtype='i8')
+    LT.create_dataset('INTTIME', data= [v['lt_inttime'] for k,v in sets.items()], dtype='i8')
     LT.attrs['integration_time_units'] = 'ms'
 
     # write to file
@@ -146,13 +152,18 @@ def parse_records(records, meta_columns, data_columns):
 
     uuid_column = db_columns.index('sample_uuid')
     sample_uuids = [rec[uuid_column] for rec in records]   # list(str)
-
     # build dictionary of measurement sets to split out sensor records
     # and identify Lt, Ed, Ls signals
-    # dict key is the uuid, maintain order of database result (oldest first)
-    sets = OrderedDict()
+    # dict key is the uuid
+    # a little extra work is needed to ensure we maintain the sort order (np.unique does not)
+    unique_sample_uuids = []
+    for sample_uuid in sample_uuids:
+        if sample_uuid not in unique_sample_uuids:
+            unique_sample_uuids.append(sample_uuid)
 
-    for uuid in unique(sample_uuids):
+    sets = OrderedDict.fromkeys(unique_sample_uuids)
+
+    for uuid in unique_sample_uuids:
         # first identify all records with this uuid
         uuid_set_indices = [j for j, x in enumerate(sample_uuids) if x == uuid]
         # first record in sample - to grab metadata from
