@@ -196,7 +196,7 @@ def parse_records(records, meta_columns, data_columns):
 
         for j in uuid_set_indices:
             sensor_ids.append(records[j][sensor_id_ix])
-            inttime =         records[j][inttime_ix]
+            inttime = records[j][inttime_ix]
             inttimes.append(inttime)
 
             spectrum = records[j][spectrum_index] # comma+space-separated string
@@ -239,6 +239,7 @@ def parse_records(records, meta_columns, data_columns):
                 sets[uuid][key] = nan
 
     # determine which sensor is Lt, Ls, Ed (increasing order of intensity)
+    log.info([set['sensor_ids'] for set in sets])
     sensors_flat =     [x for k,v in sets.items() for x in v['sensor_ids']]
     intensities_flat = [x for k,v in sets.items() for x in v['intensities']]
     unique_sensors = unique(sensors_flat)

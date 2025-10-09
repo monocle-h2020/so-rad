@@ -62,7 +62,7 @@
      </tr>
      <tr>
        <td> {{ formdata['maximum_relative_azimuth_deg']['label'] }}        </td>
-       <td align="right"> <input type = "number" min="-1" max="181" step="1" value = {{ formdata['maximum_relative_azimuth_deg']['setting'] }} name = "maxnimum_relative_azimuth_deg"/>       </td>
+       <td align="right"> <input type = "number" min="-1" max="181" step="1" value = {{ formdata['maximum_relative_azimuth_deg']['setting'] }} name = "maximum_relative_azimuth_deg"/>       </td>
        <td> {{ formdata['maximum_relative_azimuth_deg']['postlabel'] }}    </td>
        <td> {{ formdata['maximum_relative_azimuth_deg']['comment'] }}    </td>
      </tr>
@@ -89,6 +89,12 @@
        <td align="right"> <input type="checkbox" id="use_export" name="use_export" value="use_export_selected" {{ formdata['use_export']['checked'] }}> <label for="use_export"> Upload data </label> </td>
        <td> {{ formdata['use_export']['postlabel'] }}    </td>
        <td> {{ formdata['use_export']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['use_downloads']['label'] }}  </td>
+       <td align="right"> <input type="checkbox" id="use_downloads" name="use_downloads" value="use_downloads_selected" {{ formdata['use_downloads']['checked'] }}> <label for="use_downloads"> Generate datasets </label> </td>
+       <td> {{ formdata['use_downloads']['postlabel'] }}    </td>
+       <td> {{ formdata['use_downloads']['comment'] }}    </td>
      </tr>
 
     </table>

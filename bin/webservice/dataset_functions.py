@@ -161,7 +161,7 @@ def download_main(common, conf):
                 for key in request.form.keys():
                     if 'download_' in key:
                         fileselected = '_'.join(key.split('_')[1:])
-                        print(f"File delete request: {fileselected}")
+                        print(f"File download request: {fileselected}")
                         if os.path.basename(fileselected)[-3:] in ['csv', 'hdf']:
                             rootpath = conf['DOWNLOAD']['storage_path']
                         else:

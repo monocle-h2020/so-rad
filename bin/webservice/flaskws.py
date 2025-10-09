@@ -88,17 +88,8 @@ def update_common_items():
     common['cw_limit_deg'] = float(conf['MOTOR']['cw_limit_deg'])
     common['ccw_limit_deg'] = float(conf['MOTOR']['ccw_limit_deg'])
     common['nrows'] = 100
-    camera_str = conf['CAMERA']['use_camera']
-    if camera_str.lower() == 'true':
-        common['use_camera'] = True
-    else:
-        common['use_camera'] = False
-    download_str = conf['DOWNLOAD']['use_downloads']
-    if download_str.lower() == 'true':
-        common['use_downloads'] = True
-    else:
-        common['use_downloads'] = False
-    return
+    common['use_camera'] = conf['CAMERA'].getboolean('use_camera')
+    common['use_downloads'] = conf['DOWNLOAD'].getboolean('use_downloads')
 
 update_common_items()
 
@@ -647,13 +638,19 @@ def collect_settings_formdata():
                                   'comment':   'Must be set to a valid email address'},
                 'use_export':
                                   {'label':    'Upload records in near real-time',
-                                  'setting':   {'true': True, 'false': False}[conf['EXPORT']['use_export'].lower()],
-                                  'checked':   {'true': 'checked', 'false': None}[conf['EXPORT']['use_export'].lower()],
+                                  'setting':   conf['EXPORT'].getboolean('use_export'),
+                                  'checked':   {True: 'checked', False: None}[conf['EXPORT'].getboolean('use_export')],
                                   'postlabel': '',
-                                  'comment':   'Active when checked and system is connected to internet',
-                                  }
+                                  'comment':   'Active when checked and system is connected to internet'},
+                'use_downloads':
+                                  {'label':    'Generate hdf datasets every hour',
+                                  'setting':   conf['DOWNLOAD'].getboolean('use_downloads'),
+                                  'checked':   {True: 'checked', False: None}[conf['DOWNLOAD'].getboolean('use_downloads')],
+                                  'postlabel': '',
+                                  'comment':   'Set to automatically generate hourly L0 HDF datasets when So-Rad service is running.'}
          }
     return formdata
+
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
@@ -700,7 +697,7 @@ def settings():
                     flash(f"A new value for {key} was provided: {forminput[key]}")
                     updates[key] = forminput[key]
 
-            switchitems = ['use_export']
+            switchitems = ['use_export', 'use_downloads']
             for switch in switchitems:
                 if switch in request.form and formdata[switch]['setting'] is False:
                     # switch is set and differs from config => update
@@ -718,6 +715,7 @@ def settings():
 
             formdata = collect_settings_formdata()
 
+        print(9)
         return render_template('settings.html', formdata=formdata, common=common)
 
     except Exception as err:
