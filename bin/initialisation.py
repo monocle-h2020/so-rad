@@ -25,6 +25,7 @@ from thread_managers import rht_manager
 from thread_managers import gpio_manager
 from thread_managers import camera_manager
 from thread_managers import export_manager
+from thread_managers import datasets_manager
 from functions import db_functions
 log = logging.getLogger('init')   # report to root logger
 
@@ -89,18 +90,24 @@ def db_init(db_config):
     return db
 
 
-def datasets_init(download_config):
+def datasets_init(conf):
     """
     Read dataset generation / download config settings
-    : download_config is the [DOWNLOAD] section in the config file
     : dataset_dict is a dictionary containing the configuration and manager
     """
+    download_config = conf['DOWNLOAD']
+    db_config = conf['DATABASE']
+    export_config = conf['EXPORT']
+
     datasets = {}
     # Get all the TPR variables from the config file
-    datasets['used'] = download_config.getboolean('use_downloads')
-    datasets['storage_path'] = download_config.get('storage_path')
-    datasets['max_storage_gb'] = float(download_config.get('max_storage_gb'))
+    datasets['used'] =             download_config.getboolean('use_downloads')
+    datasets['storage_path'] =     download_config.get('storage_path')
+    datasets['max_storage_gb'] =   float(download_config.get('max_storage_gb'))
     datasets['storage_protocol'] = download_config.get('storage_protocol')
+    datasets['database_path'] =    db_config.get('database_path')
+    datasets['platform_id'] =      export_config.get('platform_id')
+    datasets['platform_uuid'] =    export_config.get('platform_uuid')
 
     if not datasets['used']:
         log.info(f"No periodic dataset dumps configured")
@@ -108,6 +115,8 @@ def datasets_init(download_config):
 
     if not os.path.exists(datasets['storage_path']):
         os.makedirs(datasets['storage_path'])
+
+    datasets['manager'] = datasets_manager.DatasetsManager(datasets)
 
     return datasets
 
@@ -478,7 +487,6 @@ def export_init(conf, db_dict):
     : db_dict is a dictionary containing the database configuration
     """
     export_config = conf['EXPORT']
-    download_config = conf['DOWNLOAD']
     export = {}
     # Get all the TPR variables from the config file
     export['used'] = export_config.getboolean('use_export')
@@ -491,14 +499,12 @@ def export_init(conf, db_dict):
     export['platform_id'] = export_config.get('platform_id')
     export['parse_clientkey'] = export_config.get('parse_clientkey')
 
-    export['platform_id']       = export_config.get('platform_id')
     export['owner_contact']     = export_config.get('owner_contact')
     export['operator_contact']  = export_config.get('operator_contact')
     export['license']           = export_config.get('license')
     export['license_reference'] = export_config.get('license_reference')
+    export['platform_id']       = export_config.get('platform_id')
     export['platform_uuid']     = export_config.get('platform_uuid')
-
-    export['storage_path']      = download_config.get('storage_path')
 
     if not export['used']:
         log.info(f"Export disabled in config")

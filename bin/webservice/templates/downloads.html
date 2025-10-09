@@ -49,13 +49,13 @@ Requests are added to a processing queue and results will appear here when refre
     <input type = "submit" value = "Delete all stored CSV datasets" name = "clear_csv_storage">
     <br>
     <table>
-    {% for m, s, c in zip(dataset_vals['csv_dataset_list'], dataset_vals['csv_dataset_sizes'], dataset_vals['csv_dataset_mods']) %}
       <tr>
         <th>File</th>
         <th>Size (kb)</th>
         <th>Modified</th>
         <th colspan=2>Actions</th>
      </tr>
+    {% for m, s, c in zip(dataset_vals['csv_dataset_list'], dataset_vals['csv_dataset_sizes'], dataset_vals['csv_dataset_mods']) %}
       <tr>
         <td align="left"> {{ m }} </td>
         <td align="right"> {{ '%0d' %s }} </td>
@@ -73,13 +73,13 @@ Requests are added to a processing queue and results will appear here when refre
     <input type = "submit" value = "Delete all stored HDF datasets" name = "clear_hdf_storage">
     <br>
     <table>
-    {% for m, s, c in zip(dataset_vals['hdf_dataset_list'], dataset_vals['hdf_dataset_sizes'], dataset_vals['hdf_dataset_mods']) %}
       <tr>
         <th>File</th>
         <th>Size (kb)</th>
         <th>Modified</th>
         <th colspan=2>Actions</th>
      </tr>
+    {% for m, s, c in zip(dataset_vals['hdf_dataset_list'], dataset_vals['hdf_dataset_sizes'], dataset_vals['hdf_dataset_mods']) %}
       <tr>
         <td align="left"> {{ m }} </td>
         <td align="right"> {{ '%0d' %s }} </td>

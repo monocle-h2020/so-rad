@@ -116,6 +116,8 @@ def download_main(common, conf):
                     csv_start = datetime.datetime.strptime(request.form['make_csv_start'], "%Y-%m-%dT%H:%M")
                     csv_end = datetime.datetime.strptime(request.form['make_csv_end'], "%Y-%m-%dT%H:%M")
                     print(f"CSV record {csv_start} - {csv_end} requested")
+                    dataset_vals['make_csv_start_current'] = datetime.datetime.strftime(csv_start, '%Y-%m-%dT%H:%M')
+                    dataset_vals['make_csv_end_current']   = datetime.datetime.strftime(csv_end, '%Y-%m-%dT%H:%M')
                     job = sorad_q.enqueue(df.csv_from_web_request, storage_path, database_path,
                                           csv_start, csv_end, common['platform_id'], common['platform_uuid'])
                     flash(f"Job {job.id} was added to the processing queue")
@@ -130,6 +132,8 @@ def download_main(common, conf):
                     csv_start = datetime.datetime.strptime(request.form['make_csv_start'], "%Y-%m-%dT%H:%M")
                     csv_end = datetime.datetime.strptime(request.form['make_csv_end'], "%Y-%m-%dT%H:%M")
                     print(f"HDF record {csv_start} - {csv_end} requested")
+                    dataset_vals['make_csv_start_current'] = datetime.datetime.strftime(csv_start, '%Y-%m-%dT%H:%M')
+                    dataset_vals['make_csv_end_current']   = datetime.datetime.strftime(csv_end, '%Y-%m-%dT%H:%M')
                     job = sorad_q.enqueue(df.hdf_from_web_request, storage_path, database_path,
                                           csv_start, csv_end, common['platform_id'], common['platform_uuid'])
                     flash(f"Job {job.id} was added to the processing queue")

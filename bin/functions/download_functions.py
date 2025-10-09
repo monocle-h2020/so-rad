@@ -314,18 +314,18 @@ def filename_from_dates(platform_id, start_time, end_time, format='csv'):
     return out_filepath
 
 
-def save_to_csv(records, destination_file, meta_columns, data_columns):
+def save_to_csv(records, destination_file, meta_columns, data_columns, platform_id, platform_uuid):
     """
     Save records to a csv file
     """
     # adapt header to database columns
-    header = [platform_id, platform_uuid] + ",".join(meta_columns+data_columns)
+    header = ",".join([platform_id, platform_uuid] + meta_columns + data_columns)
 
     with open(destination_file, 'w') as op:
         op.write(header + '\n')
         for r in records:
-             dataline = [platform_id, platform_uuid] + \
-                        ",".join([str(v).replace("[","").replace("]","") for v in r])
+             dataline = ",".join([platform_id, platform_uuid] + \
+                                 [str(v).replace("[","").replace("]","") for v in r])
              op.write(dataline + '\n')
 
 
