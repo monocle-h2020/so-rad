@@ -173,7 +173,13 @@ def parse_records(records, meta_columns, data_columns):
 
     sets = OrderedDict.fromkeys(unique_sample_uuids)
 
+    corrupted = []
+
     for uuid in unique_sample_uuids:
+        if uuid in corrupted:
+            # another record of this sample has been identified as corrupted
+            continue
+
         # first identify all records with this uuid
         uuid_set_indices = [j for j, x in enumerate(sample_uuids) if x == uuid]
         # first record in sample - to grab metadata from
@@ -182,6 +188,7 @@ def parse_records(records, meta_columns, data_columns):
         # skip incomplete samples
         if len(uuid_set_indices) != 3:
             log.warning(f"Only {len(uuid_set_indices)} records found with uuid={uuid}, skipping this sample.")
+            corrupted.append(uuid)
             continue
 
         # prepare to structure records for this sample
@@ -192,9 +199,11 @@ def parse_records(records, meta_columns, data_columns):
         inttimes =     []
         spectra =      []
         intensities =  []
-        corrupt = False
 
         for j in uuid_set_indices:
+            if uuid in corrupted:
+                continue
+
             sensor_ids.append(records[j][sensor_id_ix])
             inttime = records[j][inttime_ix]
             inttimes.append(inttime)
@@ -203,19 +212,21 @@ def parse_records(records, meta_columns, data_columns):
             spectrum = spectrum.replace("[","").replace("]","").split(", ")
             if 'None' in spectrum:
                 # skip incomplete measurements
-                corrupt = True
+                log.warning(f"None values found in at least one uuid={uuid} spectrum, skipping this sample.")
+                corrupted.append(uuid)
+                continue
             else:
                 spectrum = [int(s) for s in spectrum]
                 spectra.append(spectrum)
                 # get average uncalibrated intensity normalised by integration time to determine signal strength
                 intensities.append(nanmean(spectrum) / float(inttime))
 
-        if corrupt:
-            log.warning(f"None values found in at least one uuid={uuid} spectrum, skipping this sample.")
-            continue
-
         # add measurement set with metadata
         record_time = datetime.datetime.strptime(r[db_columns.index('gps_time')], '%Y-%m-%d %H:%M:%S.%f')
+
+        if uuid in corrupted:
+            del sets[uuid]
+            continue
 
         sets[uuid] = {'sample_uuid': uuid,
                       'gps_time':    record_time,
@@ -233,13 +244,11 @@ def parse_records(records, meta_columns, data_columns):
                       'spectra':     spectra,
                       'indices':     uuid_set_indices
                      }
-
         for key in ['tilt_avg', 'tilt_std', 'rel_view_az']:
             if sets[uuid][key] is None:
                 sets[uuid][key] = nan
 
     # determine which sensor is Lt, Ls, Ed (increasing order of intensity)
-    log.info([set['sensor_ids'] for set in sets])
     sensors_flat =     [x for k,v in sets.items() for x in v['sensor_ids']]
     intensities_flat = [x for k,v in sets.items() for x in v['intensities']]
     unique_sensors = unique(sensors_flat)
@@ -256,7 +265,7 @@ def parse_records(records, meta_columns, data_columns):
     sensors['ls'] = list(set(unique_sensors) - set([sensors['lt'], sensors['ed']]))[0]
 
     # assign radiance signals to sets
-    for uuid in unique(sample_uuids):
+    for uuid in sets.keys():
         ls_ix = sets[uuid]['sensor_ids'].index(sensors['ls'])
         lt_ix = sets[uuid]['sensor_ids'].index(sensors['lt'])
         ed_ix = sets[uuid]['sensor_ids'].index(sensors['ed'])
@@ -266,7 +275,6 @@ def parse_records(records, meta_columns, data_columns):
         sets[uuid]['ls_inttime'] = sets[uuid]['inttimes'][ls_ix]
         sets[uuid]['lt_inttime'] = sets[uuid]['inttimes'][lt_ix]
         sets[uuid]['ed_inttime'] = sets[uuid]['inttimes'][ed_ix]
-
     return sets, sensors
 
 
