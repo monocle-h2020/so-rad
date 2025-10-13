@@ -46,7 +46,7 @@ class DatasetsManager(object):
 
         self.stored_gb = None
         self.last_storage_check = None
-        self.storage_check_interval_sec = 60
+        self.storage_check_interval_sec = 3600  # every 60 mins
         self.check_storage()
 
         self.updated = None  # typically a datetime to indicate last time the class instance values were updated
