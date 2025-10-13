@@ -33,7 +33,7 @@ import functions.redis_functions as rf
 import functions.config_functions as cf_func
 from numpy import nan, max
 
-__version__ = 20250908.1
+__version__ = 20250930.1
 
 
 # initiate redis connection
@@ -131,13 +131,19 @@ def init_all(conf):
     cam = initialisation.camera_init(conf['CAMERA'])  # camera
 
     # set up data export(s)
-    # TODO: include setup and closure in the init, start_all and stop_all functions
-    export = initialisation.export_init(conf['EXPORT'], db)
+    export = initialisation.export_init(conf, db)
     if not export['used']:
         log.info("No data export configured")
         rf.store(redis_client, 'upload_status', 'disabled', expires=30)
     else:
         export['manager'].start()
+
+    # set up dataset generation
+    datasets = initialisation.datasets_init(conf)
+    if not datasets['used']:
+        log.info("No dataset generation configured")
+    else:
+        datasets['manager'].start()
 
     # collect info on which GPIO pins are being used to control peripherals
     gpios = []
@@ -216,16 +222,16 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.critical(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, datasets, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
 
     else:
         radiometry_manager = None
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export, datasets
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, datasets, conf, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger('stop')
     log.info("Stopping system modules")
@@ -235,6 +241,10 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     if export['manager'] is not None:
         log.info("Stopping export manager thread")
         export['manager'].stop()
+
+    if datasets['manager'] is not None:
+        log.info("Stopping datasets manager thread")
+        datasets['manager'].stop()
 
     # Stop the radiometry manager
     if radiometry_manager is not None:
@@ -372,7 +382,7 @@ def format_log_message(counter, ready, values):
 
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                   motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule,
-                  trigger_id, verbose):
+                  export, datasets, trigger_id, verbose):
     """run one measurement cycle
 
     : counter               - measurement cycle number, included for logging
@@ -431,7 +441,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             message = format_log_message(counter, ready, values)
             message += "Battery level critical, shutting down. Battery info: {0}".format(bat_manager)
             log.warning(message)
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=1800) # calls sys.exit after pausing for idle_time to prevent immediate restart
+            # calls sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr,
+                     rht, cam, power_schedule, export, datasets, conf, idle_time=1800)
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
 
@@ -709,11 +721,13 @@ def run():
         power_schedule = None
         export = None
         db_dict, rad, sample, gps, radiometry_manager,\
-            motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export = init_all(conf)
+            motor, battery, bat_manager, gpios, tpr, rht, \
+            cam, power_schedule, export, datasets = init_all(conf)
     except Exception as err:
         log.critical(f"Exception during initialisation: {err}. Stopping.")
+        log.exception(err)
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
-                 cam, power_schedule, export, conf, idle_time=120)
+                 cam, power_schedule, export, datasets, conf, idle_time=120)
 
     # the main program cycle will run at the following minimum interval
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -739,7 +753,7 @@ def run():
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule,
-                          trigger_id, args.verbose)
+                          export, datasets, trigger_id, args.verbose)
             if (time.perf_counter() - last_check_cycle_start) > main_check_cycle_sec:
                 log.info(f"Check cycle completed in {(time.perf_counter() - last_check_cycle_start):1.2f} s")
 
@@ -760,10 +774,12 @@ def run():
 
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, \
+                     rad, tpr, rht, cam, power_schedule, export, datasets, conf)
         except Exception:
             log.exception("Unhandled Exception")
-            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, conf, idle_time=120)
+            stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, \
+                     rad, tpr, rht, cam, power_schedule, export, datasets, conf, idle_time=120)
             raise
 
 if __name__ == '__main__':

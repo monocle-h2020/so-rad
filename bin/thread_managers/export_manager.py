@@ -15,6 +15,8 @@ import datetime
 import functions.redis_functions as rf
 from functions.export_functions import run_export, update_status_parse_server, identify_new_local_records
 from functions.check_functions import check_internet, check_remote_data_store
+import functions.download_functions as df
+from redis import Redis
 
 # initiate logging
 log = logging.getLogger('export')
@@ -24,7 +26,7 @@ redis_client = rf.init()
 
 class ParseExportManager(object):
     """
-    Parseserver export manager
+    Parseserver export manager: upload to remote server and automate generation of downloadable HDFs
     """
     def __init__(self, export_dict, db_dict):
         """
@@ -33,6 +35,8 @@ class ParseExportManager(object):
         """
         self.export_dict = export_dict
         self.db_dict = db_dict
+
+        self.database_path = db_dict['file']
 
         self.updated = None  # typically a datetime to indicate last time the class instance values were updated
         self.thread = None
@@ -94,7 +98,8 @@ class ParseExportManager(object):
     def run(self):
         """
         Main loop of the thread.
-        This will run and read new data and update the instance values
+        This will run and read new data and update the instance values.
+        It will also monitor storage volumes and remove older datasets as needed.
         """
         log.info("Starting Export manager thread")
         export_result = None

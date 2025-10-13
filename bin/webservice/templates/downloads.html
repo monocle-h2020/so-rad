@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+{% block content %}
+<div>
+  <h2>Dataset Downloads</h2>
+<br>
+</div>
+
+<style>
+img {
+     max-width: 90%;
+     height: auto;
+    }
+</style>
+
+Review, download and delete previously generated datasets through the options below,<br>
+or generate a dataset for a specific timeframe in either csv or hdf format.<br>
+Requests are added to a processing queue and results will appear here when refreshing this page.
+
+<p>{{ dataset_vals['queue_status_message'] }}</p>
+<p>{{ dataset_vals['stored_gb'] }} Gb stored out of {{ dataset_vals['max_storage_gb'] }} Gb allowed.</p>
+
+  <form action="/download" method = "POST">
+    <p>
+      <label for="make_csv_start">Generate downloadable dataset for timeframe:</label>
+      <input type="datetime-local" id="make_csv_start" name="make_csv_start" value={{dataset_vals['make_csv_start_current']}} />
+      <label for="make_csv_end"> to:</label>
+      <input type="datetime-local" id="make_csv_end" name="make_csv_end" value={{dataset_vals['make_csv_end_current']}} />
+      <input type = "submit" value = "Generate CSV" name="make_csv" />
+      <input type = "submit" value = "Generate HDF" name="make_hdf" />
+    </p>
+
+    <p> {{ dataset_vals['n_datasets'] }} Datasets available. List:
+      <input type = "number" value = {{ dataset_vals['n_datasets_shown'] }} name = "n_datasets_shown" size="6"/> 
+      <input type = "submit" value = "Confirm"/> or: 
+      <input type = "submit" value = "Show all" name="All"/>
+      <input type = "submit" value = "Show 100 most recent" name="100"/>
+    </p>
+
+    <p>
+    CSV datasets:
+    <br>
+    <input type = "submit" value = "Delete all stored CSV datasets" name = "clear_csv_storage">
+    <br>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Size (kb)</th>
+        <th>Modified</th>
+        <th colspan=2>Actions</th>
+     </tr>
+    {% for m, s, c in zip(dataset_vals['csv_dataset_list'], dataset_vals['csv_dataset_sizes'], dataset_vals['csv_dataset_mods']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} </td>
+        <td align="left"> {{ c }} </td>
+        <td> <input type = "submit" value = "Download dataset" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+    <p>
+    HDF datasets:
+    <br>
+    <input type = "submit" value = "Delete all stored HDF datasets" name = "clear_hdf_storage">
+    <br>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Size (kb)</th>
+        <th>Modified</th>
+        <th colspan=2>Actions</th>
+     </tr>
+    {% for m, s, c in zip(dataset_vals['hdf_dataset_list'], dataset_vals['hdf_dataset_sizes'], dataset_vals['hdf_dataset_mods']) %}
+      <tr>
+        <td align="left"> {{ m }} </td>
+        <td align="right"> {{ '%0d' %s }} </td>
+        <td align="left"> {{ c }} </td>
+        <td> <input type = "submit" value = "Download dataset" name = "download_{{ m }}"> </td>
+        <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
+      </tr>
+    {% endfor %}
+    </table>
+    </p>
+
+  </form>
+
+{% endblock %}
