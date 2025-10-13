@@ -153,9 +153,9 @@ class ParseExportManager(object):
                     self.last_connectivity_check_time = datetime.datetime.now()
                     time.sleep(self.sleep_interval)
                     continue
-            else:
-                time.sleep(self.sleep_interval)
-                continue
+            #else:
+            #    time.sleep(self.sleep_interval)
+            #    continue
 
             # data upload, unless an export/update just failed
             if (self.n_not_inserted > 0) and \
