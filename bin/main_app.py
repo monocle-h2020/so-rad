@@ -21,7 +21,7 @@ import logging
 import logging.handlers
 import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
-import functions.gps_functions as gps_func
+# import functions.gps_functions as gps_func  deprecated
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, \
                                       check_sun, check_battery, check_speed, \

@@ -16,7 +16,7 @@ import time
 import serial
 import serial.tools.list_ports as list_ports
 import logging
-from functions import gps_functions as gps_func
+# from functions import gps_functions as gps_func  # deprecated
 from thread_managers import radiometer_manager
 from thread_managers import battery_manager
 from thread_managers import tpr_manager
