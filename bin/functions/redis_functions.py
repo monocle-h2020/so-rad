@@ -136,6 +136,9 @@ def store(client, key, value, expires=30):
          (isinstance(value, dict)) or (isinstance(value, np.ndarray)):
         client.set(f"{key}_dtype", "pickle")
         pickleit=True
+    elif value is None:
+        client.set(f"{key}_dtype", "pickle")
+        pickleit=True
     else:
         log.warning(f"Setting dtype {type(value)} not implemented, using pickle")
         try:

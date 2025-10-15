@@ -170,7 +170,7 @@ def check_rel_az_limits(sample_dict, rel_azimuth):
         return False
     minaz = sample_dict['minimum_relative_azimuth_deg']
     maxaz = sample_dict['maximum_relative_azimuth_deg']
-    if minaz <= rel_azimuth <= maxaz:
+    if minaz <= abs(rel_azimuth) <= maxaz:
         return True
     else:
         return False
