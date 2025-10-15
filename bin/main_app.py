@@ -31,9 +31,10 @@ from functions.check_functions import check_gps, check_motor, check_sensors, \
 
 import functions.redis_functions as rf
 import functions.config_functions as cf_func
+from thread_managers import timed_actions
 from numpy import nan, max
 
-__version__ = 20250930.1
+__version__ = 20251015.1
 
 
 # initiate redis connection
@@ -154,6 +155,10 @@ def init_all(conf):
         gpios.append(power_schedule['power_schedule_gpio1'])
 
     # start individual monitoring threads
+
+    maintenance = {'manager': timed_actions.MaintenanceManager(conf['MISC'])}
+    maintenance['manager'].start()
+
     if battery['used']:
         bat_manager.start()
         time.sleep(0.1)
@@ -222,16 +227,17 @@ def init_all(conf):
                 raise Exception("One or more radiometers required were not found")
         except Exception as msg:
             log.critical(msg)
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, datasets, conf, idle_time=600)  # calls sys.exit after pausing for idle_time to prevent immediate restart
+            # call sys.exit after pausing for idle_time to prevent immediate restart
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, datasets, maintenance, conf, idle_time=600)
 
     else:
         radiometry_manager = None
 
     # Return all the dicts and manager objects
-    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export, datasets
+    return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule, export, datasets, maintenance
 
 
-def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, datasets, conf, idle_time=0):
+def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, cam, power_schedule, export, datasets, maintenance, conf, idle_time=0):
     """stop all processes in case of an exception"""
     log = logging.getLogger('stop')
     log.info("Stopping system modules")
@@ -245,6 +251,10 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     if datasets['manager'] is not None:
         log.info("Stopping datasets manager thread")
         datasets['manager'].stop()
+
+    if maintenance['manager'] is not None:
+        log.info("Stopping maintenance manager thread")
+        maintenance['manager'].stop()
 
     # Stop the radiometry manager
     if radiometry_manager is not None:
@@ -382,7 +392,7 @@ def format_log_message(counter, ready, values):
 
 def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                   motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule,
-                  export, datasets, trigger_id, verbose):
+                  export, datasets, maintenance, trigger_id, verbose):
     """run one measurement cycle
 
     : counter               - measurement cycle number, included for logging
@@ -443,9 +453,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             log.warning(message)
             # calls sys.exit after pausing for idle_time to prevent immediate restart
             stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr,
-                     rht, cam, power_schedule, export, datasets, conf, idle_time=1800)
+                     rht, cam, power_schedule, export, datasets, maintenance, conf, idle_time=1800)
             sys.exit(1)
-        values['batt_voltage'] = bat_manager.batt_voltage                                                                                     # just in case it didn't do that.
+        values['batt_voltage'] = bat_manager.batt_voltage
 
     # Check positioning
     ready['gps']  = check_gps(gps)
@@ -537,11 +547,15 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         # Fetch sun variables and determine optimal motor pointing angles
         try:
             values['solar_az'], values['solar_el'],\
-                values['motor_angles'] = azi_func.calculate_positions2(values['lat0'], values['lon0'],
-                                                                      0.0, values['dt'],
-                                                                      values['ship_bearing_mean'], motor,
-                                                                      values['motor_pos'],
-                                                                      relative_azimuth_target=sample['relative_azimuth_target'])
+                motor_angles = azi_func.calculate_positions2(values['lat0'], values['lon0'],
+                                                             0.0, values['dt'],
+                                                             values['ship_bearing_mean'], motor,
+                                                             values['motor_pos'],
+                                                             relative_azimuth_target=sample['relative_azimuth_target'])
+            if motor_angles is not None:
+                values['motor_angles'] = motor_angles
+            else:
+                raise(ValueError("No motor angles found"))
         except:
             log.warning(f"No pointing solution found. Is GPS info available?")
             ready['motor'] = False
@@ -609,7 +623,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                               relative_azimuth_target=sample['relative_azimuth_target'])
 
     # check achieved angle against configured limits
-    ready['rel_az_limits'] = check_rel_az_limits(sample, abs(values['rel_view_az']))
+    ready['rel_az_limits'] = check_rel_az_limits(sample, values['rel_view_az'])
 
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'],
@@ -720,14 +734,15 @@ def run():
         cam = None
         power_schedule = None
         export = None
+        maintenance = None
         db_dict, rad, sample, gps, radiometry_manager,\
             motor, battery, bat_manager, gpios, tpr, rht, \
-            cam, power_schedule, export, datasets = init_all(conf)
+            cam, power_schedule, export, datasets, maintenance = init_all(conf)
     except Exception as err:
         log.critical(f"Exception during initialisation: {err}. Stopping.")
         log.exception(err)
         stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht,
-                 cam, power_schedule, export, datasets, conf, idle_time=120)
+                 cam, power_schedule, export, datasets, maintenance, conf, idle_time=120)
 
     # the main program cycle will run at the following minimum interval
     main_check_cycle_sec = conf['DEFAULT'].getint('main_check_cycle_sec')
@@ -753,7 +768,7 @@ def run():
         try:
             run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                           motor, battery, bat_manager, gpios, tpr, rht, cam, power_schedule,
-                          export, datasets, trigger_id, args.verbose)
+                          export, datasets, maintenance, trigger_id, args.verbose)
             if (time.perf_counter() - last_check_cycle_start) > main_check_cycle_sec:
                 log.info(f"Check cycle completed in {(time.perf_counter() - last_check_cycle_start):1.2f} s")
 
@@ -775,11 +790,11 @@ def run():
         except KeyboardInterrupt:
             log.info("Program interrupted, attempt to close all threads")
             stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, \
-                     rad, tpr, rht, cam, power_schedule, export, datasets, conf)
+                     rad, tpr, rht, cam, power_schedule, export, datasets, maintenance, conf)
         except Exception:
             log.exception("Unhandled Exception")
             stop_all(db_dict, radiometry_manager, gps, battery, bat_manager, \
-                     rad, tpr, rht, cam, power_schedule, export, datasets, conf, idle_time=120)
+                     rad, tpr, rht, cam, power_schedule, export, datasets, maintenance, conf, idle_time=120)
             raise
 
 if __name__ == '__main__':

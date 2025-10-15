@@ -46,6 +46,9 @@ def sync_clocks():
 
     """
     latest_gps, latest_gps_updated, expired = rf.retrieve(redis_client, 'gps_manager', freshness=5)
+    if latest_gps is None:
+        log.error(f"No GPS info available for time sync. Try again later")
+        return
 
     # Check that system timezone is UTC or Etc/UTC
     timezone_name = datetime.datetime.now(datetime.datetime.now().astimezone().tzinfo).tzname()
@@ -75,10 +78,11 @@ def sync_clocks():
         log.info(f"Set system time to {target_str}")
         cmd = f"sudo timedatectl --no-ask-password set-ntp false; sudo timedatectl --no-ask-password set-time '{target_str}'; sudo timedatectl --no-ask-password set-ntp true"
         proc = subprocess.run(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        log.debug(proc.stdout)
-        log.debug(proc.stderr)
-        log.info(f"System time adjusted by {delta_s} s")
-
+        if proc.returncode in [0, '0']:
+           log.info(f"System time adjusted by {delta_s} s")
+        else:
+           log.debug(proc.stdout)
+           log.warning(proc.stderr)
     else:
-        log.debug(f"System clock is within {abs(delta_s)} from GPS.")
+        log.info(f"System clock is within {abs(delta_s)} from GPS.")
 

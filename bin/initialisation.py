@@ -390,6 +390,16 @@ def rad_init(rad_config, ports):
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
+    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
+
+    if rad['use_gpio_control']:
+        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
+        rad['gpio1'] = rad_config.getint('gpio1')
+        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
+        if rad['gpio_protocol'] == 'rpi':
+            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
+        elif rad['gpio_protocol'] == 'gpiozero':
+            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
     if rad['n_sensors'] == 0:
         log.info("Radiometers not used. Update config file setting n_sensors to change this.")
@@ -426,16 +436,7 @@ def rad_init(rad_config, ports):
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers
     # using the pin info provided in the config file
-    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
-        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
-        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
-        if rad['gpio_protocol'] == 'rpi':
-            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
-        elif rad['gpio_protocol'] == 'gpiozero':
-            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
-
-        rad['gpio1'] = rad_config.getint('gpio1')
         rad['gpio_interface'].on(rad['gpio1'])
         time.sleep(5) # Wait to allow sensors to boot
 
