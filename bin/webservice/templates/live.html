@@ -11,7 +11,7 @@
 <div>
   <h2>Live status page</h2>
 </div>
-{% if common['so-rad_status']==true %}
+{% if common['so-rad_status'] %}
   <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
 {% else %}
   <div style="color:#000000;background-color:#ee1111;font-weight:bold">So-Rad service is not running</div>
@@ -56,7 +56,9 @@
       <tr>  <th>Driver temp</th>           <td><span id="driver_temp">...</span> C</td>      <td>    </td>   </tr>
       <tr>  <th>Control unit temp</th>     <td><span id="inside_temp">...</span> C</td>      <td>    </td>   </tr>
       <tr>  <th>Control unit RH</th>       <td><span id="inside_rh">...</span> %</td>        <td>    </td>   </tr>
+      {% if common['use_camera'] %}
       <tr>  <th>Last camera image</th>     <td colspan="2"><span id="last_picam_image">...</span>    </td>   </tr>
+      {% endif %}
   </table>
 </div>
 
@@ -68,9 +70,12 @@
      <td width=50%>
        <div id="map" style="width: 90%; height: 300px; margin:0 auto;"></div>
      </td>
+      {% if common['use_camera'] %}
      <td width=50% align="center">
         <img src="{{ url_for('serve_img', quality=70) }}" width="90%" valign="middle"></p>
      </td>
+      {% endif %}
+
    </table>
 </div>
 
