@@ -88,8 +88,11 @@ class ParseExportManager(object):
         self.stop_monitor = True
         time.sleep(1*self.sleep_interval)
         log.info(self.thread)
-        self.thread.join(2*self.sleep_interval)
-        log.info("Export manager running = {0}".format(self.thread.is_alive()))
+        try:
+            self.thread.join(2*self.sleep_interval)
+            log.info("Export manager running = {0}".format(self.thread.is_alive()))
+        except AttributeError:
+            pass
         self.started = False
 
     def __del__(self):
@@ -153,9 +156,9 @@ class ParseExportManager(object):
                     self.last_connectivity_check_time = datetime.datetime.now()
                     time.sleep(self.sleep_interval)
                     continue
-            else:
-                time.sleep(self.sleep_interval)
-                continue
+            #else:
+            #    time.sleep(self.sleep_interval)
+            #    continue
 
             # data upload, unless an export/update just failed
             if (self.n_not_inserted > 0) and \

@@ -97,7 +97,7 @@ if __name__ == '__main__':
     log.info(f"{n_not_inserted} records pending upload")
     conn.close()
 
-    export_conf = export_init(conf['EXPORT'], db)
+    export_conf = export_init(conf, db)
 
     can_connect = check_remote_data_store(export_conf)[0]
     log.info(f"Connection to remote server: {can_connect}")

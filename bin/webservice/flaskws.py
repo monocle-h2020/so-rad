@@ -32,6 +32,9 @@ from control_functions import restart_service, stop_service, service_status, run
 from redis_functions import redis_init, redis_retrieve
 import dataset_functions
 import camera_functions
+import inspect
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
+from main_app import __version__ as sorad_sw_version
 
 # TODO: check safe_join
 
@@ -84,6 +87,7 @@ common = {}  # store some elements that are common to all pages
 
 def update_common_items():
     global common
+    common['sorad_sw_version'] = sorad_sw_version
     common['platform_id']  = conf['EXPORT']['platform_id']
     common['platform_uuid'] = conf['EXPORT']['platform_uuid']
     common['home_pos'] = float(conf['MOTOR']['home_pos'])
@@ -183,7 +187,7 @@ def get_from_db(db_path, n=10):
     cursor.execute(f"SELECT * FROM sorad_metadata ORDER BY id_ DESC LIMIT {int(n)}")
     results = cursor.fetchall()
     if len(results) == 0:
-        return None, None
+        return None
     conn.close()
     return results
 
@@ -232,9 +236,13 @@ def redis_live():
             except:
                 redisvals[key] = ''
 
-        values, values_updated = redis_retrieve(client, 'values', freshness=None)
+        try:
+            values, values_updated = redis_retrieve(client, 'values', freshness=None)
+            redisvals['values_updated'] = values_updated
+        except:
+            print("Could not retrieve values dict from redis")
+            values = {}
 
-        redisvals['values_updated'] = values_updated
         for key in values.keys():
             if key in ['speed',
                        'nsat0',
@@ -425,6 +433,7 @@ def control():
 @app.route('/latest', methods=['GET', 'POST'])
 def latest():
     """Show latest instrument status"""
+    print(0)
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -444,6 +453,8 @@ def latest():
         timeseries = {}
         labels = []
 
+        print(1)
+
         logrows = read_log(log_file_location, n=common['nrows'], reverse=True)
         if logrows is not None and len(logrows) > 0:
             print(f"read {len(logrows)} log rows")
@@ -459,6 +470,7 @@ def latest():
             flash("Log file not found.")
             common['systemlog'] = False
 
+        print(2)
         if len(logvalues) > 0:
             labels = [lrow['timestr'] for lrow in logvalues]
             print(f"{len(labels)} timestamps with orientation data read from service log")
@@ -485,19 +497,25 @@ def latest():
             flash("No recent system status information read from log file. Try increasing the number of rows read or consult system logs")
             common['systemlog'] = False
 
+        print(3)
         # info from db
         dbrows = get_from_db(db_path, n=1)
         if dbrows is not None and len(dbrows) > 0:
+            print(3.1)
+            print(dbrows)
             dbtable = dict(dbrows[0])
             for key, val in dbtable.items():
                 if val is None:
                     dbtable[key] = ""
         else:
+            print(3.2)
             flash("Database file not found or database empty.")
             common['dbreads'] = False
 
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
+
+        print(4)
 
         try:
             return render_template('latest.html', logvalues=logvalues, dbtable=dbtable,

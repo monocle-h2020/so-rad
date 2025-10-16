@@ -15,22 +15,31 @@ import functions.config_functions as cf
 import functions.redis_functions as rf
 import numpy as np
 
-sleep_interval = 2
+sleep_interval = 0.5
 
 def main():
     c = rf.init()
     try:
         while True:
+            os.system('clear')
+            # individual redis keys
             log.info(f"====================================================")
-            for k in ['counter', 'disk_free_gb', 'system_status', 'sampling_status']:
+            for k in ['counter', 'disk_free_gb', 'system_status', 'sampling_status',
+                      'gps_manager']:
                 r, u, stale = rf.retrieve(c, k, freshness=None)
                 if r is None:
                     r = 'None'  # this is just to allow formatting
                 stale_str = {True:'STALE', False:'', None:'missing'}[stale]
-                log.info(f"{k:<20} {r:>20}\t updated: {u}  {stale_str}")
+                if isinstance(r, dict):
+                    for kk, vv in r.items():
+                        if isinstance(vv, datetime.datetime):
+                            vv = datetime.datetime.strftime(vv, '%Y%m%d %H%M%S')
+                        log.info(f"{kk:<20} {vv:>20}\t updated: {u}  {stale_str}")
+                else:
+                    log.info(f"{k:<20} {r:>20}\t updated: {u}  {stale_str}")
 
             log.info(f"- - - - - - - - - - - - - - - - - - - - - - - - - - -")
-
+            # combined values dict (to be made obsolete at some point)
             r, u, stale = rf.retrieve(c, 'values', freshness=None)
             for k in ['lat0', 'lon0', 'alt0', 'headMot', 'relPosHeading', 'accHeading', 'fix',
                       'flags_headVehValid', 'flags_diffSolN', 'flags_gnssFixOK', 'speed', 'nsat0',
