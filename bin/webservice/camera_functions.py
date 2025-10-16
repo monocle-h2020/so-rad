@@ -4,9 +4,7 @@
 Camera functions for So-Rad web interface
 """
 
-from flask import Flask, render_template, abort, \
-                  flash, redirect, url_for, request,\
-                  Markup, jsonify, send_file
+from flask import render_template, flash, url_for, request, send_file
 from jinja2 import TemplateNotFound
 import os
 import datetime
@@ -43,7 +41,7 @@ def get_file_lists(conf):
 
     # get image timestamps from filenames (to get observation trigger times)
     filetimes = []
-    pat = '.*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}).*'
+    pat = r'.*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}).*'
     for file in filelist:
         match = re.match(pat, file)
         if match:

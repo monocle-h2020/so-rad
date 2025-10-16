@@ -6,7 +6,7 @@ Connect to db to provide latest activity from solar tracking radiometry platform
 
 from flask import Flask, render_template, abort, \
                   flash, redirect, url_for, request,\
-                  Markup, jsonify, send_file
+                  jsonify, send_file
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -14,8 +14,10 @@ import sys
 import os
 from forms import LoginForm
 from flask_login import LoginManager, current_user, login_user, logout_user, UserMixin, login_required
+from markupsafe import Markup
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.urls import url_parse
+#from werkzeug.urls import url_parse
+from urllib.parse import urlparse as url_parse
 import uuid
 from math import sin, cos, radians
 import datetime
@@ -115,7 +117,7 @@ def save_updates_to_local_config(updates):
             flash(f"Failed to write local config file: {err}")
 
     # keep a record of changes made by operator through the web interface
-    with open(web_log_file_location, "a") as wlf:
+    with open(web_log_file_location, "a+") as wlf:
         for key, val in updates.items():
             log_line = f"{datetime.datetime.now()},{key},{val}\n"
             wlf.write(log_line)
