@@ -285,24 +285,27 @@ def update_system_values(gps, values, tpr=None, rht=None, motor=None, redis=Fals
     values['speed'] = gps['manager'].speed
     values['nsat0'] = gps['manager'].satellite_number
     values['pi_temp'] = check_pi_cpu_temperature()
-    if (tpr is not None) and (tpr['manager'] is not None):
-        log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
-        values['tilt_avg'] = tpr['manager'].tilt_avg
-        values['tilt_std'] = tpr['manager'].tilt_std
-    if (rht is not None) and (rht['manager'] is not None):
-        rh_time, rh, temp = rht['manager'].update_rht_single()
-        log.debug("Temp: {0}C RH: {1}%".format(temp, rh))
-        values['inside_temp'] = temp
-        values['inside_rh'] =   rh
+    if tpr is not None:
+        if (tpr['used']) and (tpr['manager'] is not None):
+            log.debug("Tilt: {0} ({1})".format(tpr['manager'].tilt_avg, tpr['manager'].tilt_std))
+            values['tilt_avg'] = tpr['manager'].tilt_avg
+            values['tilt_std'] = tpr['manager'].tilt_std
+            if redis:
+                rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
+                rf.store(redis_client, 'tilt_std', tpr['manager'].tilt_std, expires=30)
+                rf.store(redis_client, 'tilt_updated', tpr['manager'].avg_updated, expires=30)
+    if rht is not None:
+        if (rht['used']) and (rht['manager'] is not None):
+            rh_time, rh, temp = rht['manager'].update_rht_single()
+            log.debug("Temp: {0}C RH: {1}%".format(temp, rh))
+            values['inside_temp'] = temp
+            values['inside_rh'] =   rh
     if (motor is not None) and (motor['used']):
         values['driver_temp'], values['motor_temp'] =  motor_func.motor_temp_read(motor)
 
     # update redis?
     if redis:
         rf.store(redis_client, 'values', values, expires=30)
-        rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
-        rf.store(redis_client, 'tilt_std', tpr['manager'].tilt_std, expires=30)
-        rf.store(redis_client, 'tilt_updated', tpr['manager'].avg_updated, expires=30)
 
     return values
 
@@ -452,6 +455,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
         if motor['used'] and not power_saving_active:
             ready['motor'], values['motor_alarm'] = check_motor(motor)  # check for motor alarms
             values['motor_pos'] = motor_func.get_motor_pos(motor['serial'])
+            if values['motor_pos'] is None:
+                motor_comm_errors, mce_updated, mce_status = rf.retrieve(redis_client, 'motor_comm_errors', freshness=None)
+                rf.store(redis_client, 'motor_comm_errors', motor_comm_errors+1, expires=30)
             try:
                 values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
             except:
@@ -459,7 +465,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             if values['motor_pos'] is None:
                 ready['motor'] = False
                 message = format_log_message(counter, ready, values)
-                message += " | Motor position not read."
+                message += f" | Motor position not read ({motor_comm_errors+1})."
                 log.warning(message)
                 return trigger_id
         elif motor['used'] and power_saving_active:
@@ -535,6 +541,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                     moving, values['motor_pos'] = motor_func.motor_moving(motor['serial'], target_pos,
                                                                           tolerance=motor['steps_per_degree']*3)
                     if moving is None:
+                        motor_comm_errors, mce_updated, mce_status = rf.retrieve(redis_client, 'motor_comm_errors', freshness=None)
+                        rf.store(redis_client, 'motor_comm_errors', motor_comm_errors+1, expires=30)
                         moving = True
                     log.info(f"{counter} | ..moving motor.. {values['motor_pos']} --> {target_pos} (check again in 2s)")
                     if time.time()-t0 > 5:
@@ -668,7 +676,7 @@ def run():
     counter = 0
     remote_update_timer = time.perf_counter() - 60.0  # armed
     export_result = True  # tracks whether exporting has been succesful
-
+    rf.store(redis_client, 'motor_comm_errors', 0, expires=30)
 
     # TODO: replace with some sort of scheduler for better clock synchronization
     # TODO: periodically update config (timings/limits only) from remotely fetched config_local file
@@ -757,6 +765,24 @@ def run():
             else:
                 log.debug(f"{counter} | No data upload action taken for {time.perf_counter()-remote_update_timer:4.1f} s")
                 rf.store(redis_client, 'upload_status', 'idle', expires=30)
+
+            motor_comm_errors, mce_updated, mce_status = rf.retrieve(redis_client, 'motor_comm_errors', freshness=None)
+            if motor['used'] and motor_comm_errors > 9:
+                log.info(f"Re-initialising motor and radiometer connections after 10 failures")
+                ports = list_ports.comports()
+                motor = initialisation.motor_init(conf['MOTOR'], ports)
+                rf.store(redis_client, 'motor_comm_errors', 0, expires=30)
+                #rad, Rad__manager = initialisation.rad_init(conf['RADIOMETERS'], ports)
+                #if Rad_manager is not None:
+                #    log.info("Starting radiometry manager")
+                #    try:
+                #        radiometry_manager = Rad_manager(rad)
+                #        time.sleep(1.0)
+                #        rad['ed_sampling'] = radiometry_manager.ed_sampling  # if the Ed sensor is not identified, disable this feature
+                #        if len(radiometry_manager.sams) < rad['n_sensors']:
+                #            raise Exception("One or more radiometers required were not found")
+                #else:
+                #    radiometry_manager = None
 
             time_to_sleep = main_check_cycle_sec - (time.perf_counter() - last_check_cycle_start)
 

@@ -347,6 +347,9 @@ def rad_init(rad_config, ports):
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
+    rad['ports'] = [rad_config.get('port1')]
+    rad['ports'].append(rad_config.get('port2'))
+    rad['ports'].append(rad_config.get('port3'))
 
     if rad['n_sensors'] == 0:
         log.info("Radiometers not used. Update config file setting n_sensors to change this.")
@@ -373,12 +376,16 @@ def rad_init(rad_config, ports):
                     found = True
             if not found:
                 log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
-        if len(rad['ports']) < rad['n_sensors']:
-            log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
+    else:
+        log.info("Port autodetect disabled, using manual configuration")
 
-        for i, p in enumerate(rad['ports']):
-            rad[f'port{i+1}'] = p
-        log.info("Radiometers configured on ports: {0}".format(", ".join(rad['ports'])))
+    if len(rad['ports']) < rad['n_sensors']:
+        log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
+
+    for i, p in enumerate(rad['ports']):
+        rad[f'port{i+1}'] = p
+
+    log.info("Radiometers configured on ports: {0}".format(", ".join(rad['ports'])))
 
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers
