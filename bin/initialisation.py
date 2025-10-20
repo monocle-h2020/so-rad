@@ -379,9 +379,6 @@ def rad_init(rad_config, ports):
     rad['n_sensors'] = rad_config.getint('n_sensors')
     rad['rad_interface'] = rad_config.get('rad_interface').lower()
     rad['pytrios_path'] = rad_config.get('pytrios_path')
-    #rad['port1'] = rad_config.get('port1')
-    #rad['port2'] = rad_config.get('port2')
-    #rad['port3'] = rad_config.get('port3')
     rad['sampling_interval'] = rad_config.getint('sampling_interval')
     rad['ed_sampling'] = rad_config.getboolean('ed_sampling')
     rad['ed_sampling_interval'] = rad_config.getint('ed_sampling_interval')
@@ -390,8 +387,8 @@ def rad_init(rad_config, ports):
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
-    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
 
+    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
         rad['gpio_protocol'] = rad_config.get('gpio_protocol')
         rad['gpio1'] = rad_config.getint('gpio1')
@@ -426,12 +423,19 @@ def rad_init(rad_config, ports):
                     found = True
             if not found:
                 log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
-        if len(rad['ports']) < rad['n_sensors']:
-            log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
+    else:
+        log.info("Port autodetect disabled, using manual configuration")
+        rad['ports'] = [rad_config.get('port1')]
+        rad['ports'].append(rad_config.get('port2'))
+        rad['ports'].append(rad_config.get('port3'))
 
-        for i, p in enumerate(rad['ports']):
-            rad[f'port{i+1}'] = p
-        log.info("Radiometers configured on ports: {0}".format(", ".join(rad['ports'])))
+    if len(rad['ports']) < rad['n_sensors']:
+        log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
+
+    for i, p in enumerate(rad['ports']):
+        rad[f'port{i+1}'] = p
+
+    log.info("Radiometers configured on ports: {0}".format(", ".join(rad['ports'])))
 
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers

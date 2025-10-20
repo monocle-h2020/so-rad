@@ -318,19 +318,25 @@ def get_motor_pos(motor_serial_port):
     :return: motor_pos
     :rtype: int
     """
-    # Get motor position command
-    get_motor_pos_com = "010300C600022436"  # address ID is assumed to be 01
+    try:
+        # Get motor position command
+        get_motor_pos_com = "010300C600022436"  # address ID is assumed to be 01
 
-    # Send the command to the motor to fetch its current position
-    motor_serial_port.flushInput()
-    motor_serial_port.flushOutput()
-    motor_serial_port.write(codecs.decode(get_motor_pos_com, 'hex'))
-    # Read the response
-    time.sleep(0.2)
-    a = motor_serial_port.in_waiting
+        # Send the command to the motor to fetch its current position
+        motor_serial_port.flushInput()
+        motor_serial_port.flushOutput()
 
-    # read response of location
-    motor_pos = motor_serial_port.read(size=a)
+        motor_serial_port.write(codecs.decode(get_motor_pos_com, 'hex'))
+        # Read the response
+        time.sleep(0.2)
+        a = motor_serial_port.in_waiting
+
+        # read response of location
+        motor_pos = motor_serial_port.read(size=a)
+
+    except:
+        log.info("Motor communication error.")
+        return None
 
     # convert the response into step num
     motor_pos = codecs.encode(motor_pos, 'hex')
