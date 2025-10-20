@@ -768,8 +768,6 @@ def run():
 
     # Repeat indefinitely until program is closed
     counter = 0
-    remote_update_timer = time.perf_counter() - 60.0  # armed
-    export_result = True  # tracks whether exporting has been succesful
     rf.store(redis_client, 'motor_comm_errors', 0, expires=30)
 
     # TODO: replace with some sort of scheduler for better clock synchronization
