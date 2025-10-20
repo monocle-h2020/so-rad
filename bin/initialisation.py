@@ -16,7 +16,7 @@ import time
 import serial
 import serial.tools.list_ports as list_ports
 import logging
-from functions import gps_functions as gps_func
+# from functions import gps_functions as gps_func  # deprecated
 from thread_managers import radiometer_manager
 from thread_managers import battery_manager
 from thread_managers import tpr_manager
@@ -24,6 +24,8 @@ from thread_managers import gps_manager
 from thread_managers import rht_manager
 from thread_managers import gpio_manager
 from thread_managers import camera_manager
+from thread_managers import export_manager
+from thread_managers import datasets_manager
 from functions import db_functions
 log = logging.getLogger('init')   # report to root logger
 
@@ -87,6 +89,38 @@ def db_init(db_config):
 
     return db
 
+
+def datasets_init(conf):
+    """
+    Read dataset generation / download config settings
+    : dataset_dict is a dictionary containing the configuration and manager
+    """
+    download_config = conf['DOWNLOAD']
+    db_config = conf['DATABASE']
+    export_config = conf['EXPORT']
+
+    datasets = {}
+    # Get all the TPR variables from the config file
+    datasets['used'] =             download_config.getboolean('use_downloads')
+    datasets['storage_path'] =     download_config.get('storage_path')
+    datasets['max_storage_gb'] =   float(download_config.get('max_storage_gb'))
+    datasets['storage_protocol'] = download_config.get('storage_protocol')
+    datasets['database_path'] =    db_config.get('database_path')
+    datasets['platform_id'] =      export_config.get('platform_id')
+    datasets['platform_uuid'] =    export_config.get('platform_uuid')
+
+    if not datasets['used']:
+        log.info(f"No periodic dataset dumps configured")
+        return datasets
+
+    if not os.path.exists(datasets['storage_path']):
+        os.makedirs(datasets['storage_path'])
+
+    datasets['manager'] = datasets_manager.DatasetsManager(datasets)
+
+    return datasets
+
+
 def camera_init(camera_config):
     """
     Read Camera config settings and initialise camera manager
@@ -103,12 +137,15 @@ def camera_init(camera_config):
     cam['resolution'] = camera_config.get('resolution')
     cam['interval'] = camera_config.getint('interval')
     cam['storage_path'] = camera_config.get('storage_path')
+    cam['max_storage_gb'] = float(camera_config.get('max_storage_gb'))
+    cam['storage_protocol'] = camera_config.get('storage_protocol')
 
     if not cam['used']:
         log.info(f"Camera disabled in config")
         return cam
 
     assert cam['interface'].lower() in ['soradcam', ]
+    assert os.path.exists(cam['storage_path'])
 
     # Return the configuration dict and initialise relevant manager class
     if cam['interface'] == 'soradcam':
@@ -130,6 +167,7 @@ def motor_init(motor_config, ports):
     motor['baud'] = motor_config.getint('baud')
     motor['steps_per_degree'] = float(motor_config.get('steps_per_degree'))
     motor['adjust_mode'] = motor_config.get('adjust_mode').lower()
+    motor['port'] = None
     assert motor['adjust_mode'] in ['sampling', 'always']
 
     if not motor['used']:
@@ -266,18 +304,23 @@ def rht_init(rht_config):
     rht['used'] = rht_config.getboolean('use_rht')
     rht['interface'] = rht_config.get('protocol').lower()
     rht['pin'] = rht_config.getint('pin')
+    rht['address'] = rht_config.getint('address')
     rht['sampling_time'] = rht_config.getint('sampling_time')
     rht['manager'] = None
+    rht['update_interval'] = rht_config.getint('update_interval')
 
     if not rht['used']:
         log.info(f"RHT sensor disabled in config")
         return rht
 
-    assert rht['interface'].lower() in ['ada_dht22', 'ada_cp_dht']
+    assert rht['interface'].lower() in ['ada_dht22', 'ada_cp_dht', 'amt2301b']
 
     # Return the configuration dict and initialise relevant manager class
     if rht['interface'] in ['ada_dht22', 'ada_cp_dht']:
         rht['manager'] = rht_manager.Ada_dht22(rht)
+
+    if rht['interface'] in ['amt2301b']:
+        rht['manager'] = rht_manager.Ada_amt2301b(rht)
 
     return rht
 
@@ -336,9 +379,6 @@ def rad_init(rad_config, ports):
     rad['n_sensors'] = rad_config.getint('n_sensors')
     rad['rad_interface'] = rad_config.get('rad_interface').lower()
     rad['pytrios_path'] = rad_config.get('pytrios_path')
-    #rad['port1'] = rad_config.get('port1')
-    #rad['port2'] = rad_config.get('port2')
-    #rad['port3'] = rad_config.get('port3')
     rad['sampling_interval'] = rad_config.getint('sampling_interval')
     rad['ed_sampling'] = rad_config.getboolean('ed_sampling')
     rad['ed_sampling_interval'] = rad_config.getint('ed_sampling_interval')
@@ -347,9 +387,16 @@ def rad_init(rad_config, ports):
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
-    rad['ports'] = [rad_config.get('port1')]
-    rad['ports'].append(rad_config.get('port2'))
-    rad['ports'].append(rad_config.get('port3'))
+
+    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
+    if rad['use_gpio_control']:
+        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
+        rad['gpio1'] = rad_config.getint('gpio1')
+        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
+        if rad['gpio_protocol'] == 'rpi':
+            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
+        elif rad['gpio_protocol'] == 'gpiozero':
+            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
 
     if rad['n_sensors'] == 0:
         log.info("Radiometers not used. Update config file setting n_sensors to change this.")
@@ -378,6 +425,9 @@ def rad_init(rad_config, ports):
                 log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
     else:
         log.info("Port autodetect disabled, using manual configuration")
+        rad['ports'] = [rad_config.get('port1')]
+        rad['ports'].append(rad_config.get('port2'))
+        rad['ports'].append(rad_config.get('port3'))
 
     if len(rad['ports']) < rad['n_sensors']:
         log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
@@ -390,16 +440,7 @@ def rad_init(rad_config, ports):
 
     # If GPIO control is selected turn on the GPIO pin for the radiometers
     # using the pin info provided in the config file
-    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:
-        rad['gpio_protocol'] = rad_config.get('gpio_protocol')
-        assert rad['gpio_protocol'] in  ['rpi', 'gpiozero']
-        if rad['gpio_protocol'] == 'rpi':
-            rad['gpio_interface'] = gpio_manager.RpiManager()       # select manager and initialise
-        elif rad['gpio_protocol'] == 'gpiozero':
-            rad['gpio_interface'] = gpio_manager.GpiozeroManager()  # select manager and initialise
-
-        rad['gpio1'] = rad_config.getint('gpio1')
         rad['gpio_interface'].on(rad['gpio1'])
         time.sleep(5) # Wait to allow sensors to boot
 
@@ -439,6 +480,48 @@ def sample_init(sample_conf):
     # Get the sampling variables from the config file
     sample['sampling_speed_limit'] = float(sample_conf.get('sampling_speed_limit'))
     sample['solar_elevation_limit'] = float(sample_conf.get('solar_elevation_limit'))
+    sample['relative_azimuth_target'] = float(sample_conf.get('relative_azimuth_target'))
+    sample['minimum_relative_azimuth_deg'] = sample_conf.getint('minimum_relative_azimuth_deg')
+    sample['maximum_relative_azimuth_deg'] = sample_conf.getint('maximum_relative_azimuth_deg')
 
     # Return the sample dict
     return sample
+
+
+def export_init(conf, db_dict):
+    """
+    Read export config settings needed to run export thread
+    : export_config is the [EXPORT] section in the config file
+    : export is a dictionary containing the configuration and manager
+    : db_dict is a dictionary containing the database configuration
+    """
+    export_config = conf['EXPORT']
+    export = {}
+    # Get all the TPR variables from the config file
+    export['used'] = export_config.getboolean('use_export')
+    export['export_protocol'] = export_config.get('export_protocol')
+    export['data_upload_interval_sec'] = export_config.getint('data_upload_interval_sec')
+    export['status_update_interval_sec'] = export_config.getint('status_update_interval_sec')
+
+    export['parse_url'] = export_config.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
+    export['parse_app_id'] = export_config.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
+    export['platform_id'] = export_config.get('platform_id')
+    export['parse_clientkey'] = export_config.get('parse_clientkey')
+
+    export['owner_contact']     = export_config.get('owner_contact')
+    export['operator_contact']  = export_config.get('operator_contact')
+    export['license']           = export_config.get('license')
+    export['license_reference'] = export_config.get('license_reference')
+    export['platform_id']       = export_config.get('platform_id')
+    export['platform_uuid']     = export_config.get('platform_uuid')
+
+    if not export['used']:
+        log.info(f"Export disabled in config")
+        export['manager'] = None
+        return export
+
+    # Return the configuration dict and initialise relevant manager class
+    if export['export_protocol'] in ['parse_platform']:
+        export['manager'] = export_manager.ParseExportManager(export, db_dict)
+
+    return export

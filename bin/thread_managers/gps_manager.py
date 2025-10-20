@@ -17,6 +17,9 @@ import struct
 from numpy import min
 import math
 from pyubx2 import UBXReader
+from functions import redis_functions as rf
+
+redis_client = rf.init()
 
 log = logging.getLogger('gps')
 
@@ -46,7 +49,7 @@ class GPSSerialReader(threading.Thread):
         protocol = type(self.parent).__name__
 
         bitOfData = b''
-        timeToSleep = 0.1
+        timeToSleep = 0.05
         lineCount = 0
         serialReader = self.serial_port
         LotOfData = []
@@ -135,6 +138,10 @@ class GPSSerialReader(threading.Thread):
         if self.current_gps_dict is not None:
             for observer in self.observers:
                 observer.update(self.current_gps_dict)
+                try:
+                    observer.update_redis()
+                except Exception as err:
+                    log.debug(err)
 
 
 def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
@@ -225,10 +232,10 @@ def pyubx2_interface(dataDictionary, timeToSleep, serialReader, self, counter):
             dataDictionary['carrSoln'] = data.carrSoln
             dataDictionary['headVehValid'] = data.headVehValid
             dataDictionary['psmState'] = data.psmState
+            # pyubx2 update Nov(?) 2024 has changed difSoln to diffSoln
             try:
                 dataDictionary['diffSolN'] = data.diffSoln
-            except errmsg:
-                log.warning("diffSoln not reported, reading difSoln for backward compatibility")
+            except Exception as errmsg:
                 dataDictionary['diffSolN'] = data.difSoln
 
             dataDictionary['gnssFixOK'] = data.gnssFixOk
@@ -925,6 +932,21 @@ class PYUBX2(object):
         self.started = False
         log.info("Stopped PYUBX2 GPS manager")
 
+    def update_redis(self):
+        """Update a gps_dict in redis"""
+        self.redis_dict = {
+                          'heading': self.heading,
+                          'speed': self.speed,
+                          'lat': self.lat,
+                          'lon': self.lon,
+                          'alt': self.alt,
+                          'nsat': self.satellite_number,
+                          'datetime': self.datetime,
+                          'fix': self.fix,
+                          'last_update': self.last_update
+                          }
+        rf.store(redis_client, 'gps_manager', self.redis_dict, expires=5)
+
     def update(self, gps_dict):
         """
         Updates the gps info held by this class, a lock is used to prevent corruption.
@@ -956,7 +978,13 @@ class PYUBX2(object):
             self.height = gps_dict['height']
             self.hMSL = gps_dict['hMSL']
 
-            self.datetime = datetime.datetime(int(gps_dict['year']),int(gps_dict['month']),int(gps_dict['day']),int(gps_dict['hour']),int(gps_dict['min']),int(gps_dict['sec']),abs(int(gps_dict['nano'])))
+            self.datetime = datetime.datetime(int(gps_dict['year']),
+                                              int(gps_dict['month']),
+                                              int(gps_dict['day']),
+                                              int(gps_dict['hour']),
+                                              int(gps_dict['min']),
+                                              int(gps_dict['sec']),
+                                              abs(int(gps_dict['nano'])))
             self.hAcc = gps_dict['hAcc']
             self.vAcc = gps_dict['vAcc']
             self.velN = gps_dict['velN']
@@ -1237,6 +1265,21 @@ class RTKUBX(object):
         self.started = False
         log.info("Stopped RTK GPS manager")
 
+    def update_redis(self):
+        """Update a gps_dict in redis"""
+        self.redis_dict = {
+                          'heading': self.heading,
+                          'speed': self.speed,
+                          'lat': self.lat,
+                          'lon': self.lon,
+                          'alt': self.alt,
+                          'nsat': self.satellite_number,
+                          'datetime': self.datetime,
+                          'fix': self.fix,
+                          'last_update': self.last_update
+                          }
+        rf.store(redis_client, 'gps_manager', self.redis_dict, expires=5)
+
     def update(self, gps_dict):
         """
         Updates the gps info held by this class, a lock is used to prevent corruption.
@@ -1268,7 +1311,13 @@ class RTKUBX(object):
             self.height = gps_dict['height']
             self.hMSL = gps_dict['hMSL']
 
-            self.datetime = datetime.datetime(int(gps_dict['year']),int(gps_dict['month']),int(gps_dict['day']),int(gps_dict['hour']),int(gps_dict['min']),int(gps_dict['sec']),abs(int(gps_dict['nano'])))
+            self.datetime = datetime.datetime(int(gps_dict['year']),
+                                              int(gps_dict['month']),
+                                              int(gps_dict['day']),
+                                              int(gps_dict['hour']),
+                                              int(gps_dict['min']),
+                                              int(gps_dict['sec']),
+                                              abs(int(gps_dict['nano'])))
             self.hAcc = gps_dict['hAcc']
             self.vAcc = gps_dict['vAcc']
             self.velN = gps_dict['velN']
@@ -1466,6 +1515,21 @@ class NMEA0183(object):
         self.threads = []
         self.started = False
         log.info("Stopped GPS manager")
+
+    def update_redis(self):
+        """Update a gps_dict in redis"""
+        self.redis_dict = {
+                          'heading': self.heading,
+                          'speed': self.speed,
+                          'lat': self.lat,
+                          'lon': self.lon,
+                          'alt': self.alt,
+                          'nsat': self.satellite_number,
+                          'datetime': self.datetime,
+                          'fix': self.fix,
+                          'last_update': self.last_update
+                          }
+        rf.store(redis_client, 'gps_manager', self.redis_dict, expires=5)
 
     def update(self, gps_dict):
         """

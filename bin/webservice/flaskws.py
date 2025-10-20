@@ -4,7 +4,9 @@
 Connect to db to provide latest activity from solar tracking radiometry platform (So-Rad).
 """
 
-from flask import Flask, render_template, abort, flash, redirect, url_for, request, Markup, jsonify
+from flask import Flask, render_template, abort, \
+                  flash, redirect, url_for, request,\
+                  Markup, jsonify, send_file
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -20,11 +22,19 @@ import datetime
 import subprocess
 import redis
 import pickle
-
+import glob
+import threading
+import zipfile
 from log_functions import read_log, log2dict
-from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test
+from control_functions import restart_service, stop_service, service_status, run_gps_test, run_export_test, set_shellhub_access, run_motor_home_test
 from redis_functions import redis_init, redis_retrieve
+import dataset_functions
+import camera_functions
+import inspect
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
+from main_app import __version__ as sorad_sw_version
 
+# TODO: check safe_join
 
 def read_config():
     """uses local conf and global config_file objects"""
@@ -64,20 +74,26 @@ conf = read_config()
 update_config()
 
 log_file_location = conf['LOGGING'].get('log_file_location')
+web_log_file_location = os.path.join(os.path.dirname(log_file_location),
+                                     'web-log.txt')
+
 db_path = conf['DATABASE'].get('database_path')
+
 
 global common
 common = {}  # store some elements that are common to all pages
 
 def update_common_items():
     global common
+    common['sorad_sw_version'] = sorad_sw_version
     common['platform_id']  = conf['EXPORT']['platform_id']
     common['platform_uuid'] = conf['EXPORT']['platform_uuid']
     common['home_pos'] = float(conf['MOTOR']['home_pos'])
     common['cw_limit_deg'] = float(conf['MOTOR']['cw_limit_deg'])
     common['ccw_limit_deg'] = float(conf['MOTOR']['ccw_limit_deg'])
     common['nrows'] = 100
-    return
+    common['use_camera'] = conf['CAMERA'].getboolean('use_camera')
+    common['use_downloads'] = conf['DOWNLOAD'].getboolean('use_downloads')
 
 update_common_items()
 
@@ -102,7 +118,12 @@ def save_updates_to_local_config(updates):
         except Exception as err:
             flash(f"Failed to write local config file: {err}")
 
-    # need to re-read config file somehow and make conf global
+    # keep a record of changes made by operator through the web interface
+    with open(web_log_file_location, "a") as wlf:
+        for key, val in updates.items():
+            log_line = f"{datetime.datetime.now()},{key},{val}\n"
+            wlf.write(log_line)
+
     update_config()
     update_common_items()
     return
@@ -136,11 +157,6 @@ admin_hash = conf['FLASK']['admin_hash']
 users = {'admin': User('admin', 'bosh', admin_hash)}
 
 
-# to generate the password hash with a new installation do:
-# from werkzeug.security import generate_password_hash
-# generate_password_hash(pw)  #  where pw is the password provided to the operator.
-# then add this to the FLASK section of config-local.ini
-
 # define app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = conf['FLASK']['key1'] or str(uuid.uuid1())
@@ -169,7 +185,7 @@ def get_from_db(db_path, n=10):
     cursor.execute(f"SELECT * FROM sorad_metadata ORDER BY id_ DESC LIMIT {int(n)}")
     results = cursor.fetchall()
     if len(results) == 0:
-        return None, None
+        return None
     conn.close()
     return results
 
@@ -196,7 +212,7 @@ def index():
 
 @app.route('/redis_live', methods=['GET'])
 def redis_live():
-    """populate a live data section from redis"""
+    """populate a live data section from redis and display as json object"""
     try:
         client = redis_init()
         if client is None:
@@ -211,12 +227,20 @@ def redis_live():
                     'disk_free_gb',
                     'tilt_avg',
                     'tilt_std',
-                    'tilt_updated']:
-            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+                    'tilt_updated',
+                    'last_picam_image']:
+            try:
+                redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            except:
+                redisvals[key] = ''
 
-        values, values_updated = redis_retrieve(client, 'values', freshness=None)
-        # print(values)
-        redisvals['values_updated'] = values_updated
+        try:
+            values, values_updated = redis_retrieve(client, 'values', freshness=None)
+            redisvals['values_updated'] = values_updated
+        except:
+            print("Could not retrieve values dict from redis")
+            values = {}
+
         for key in values.keys():
             if key in ['speed',
                        'nsat0',
@@ -269,8 +293,18 @@ def live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
-        for key in ['system_status', 'sampling_status', 'counter', 'upload_status', 'samples_pending_upload', 'disk_free_gb', 'values']:
-            redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+        for key in ['system_status',
+                    'sampling_status',
+                    'counter',
+                    'upload_status',
+                    'samples_pending_upload',
+                    'disk_free_gb',
+                    'last_picam_image',
+                    'values']:
+            try:
+                redisvals[key], redisvals[f"{key}_updated"] = redis_retrieve(client, key, freshness=None)
+            except AttributeError:
+                redisvals[key] = ''
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
 
@@ -284,11 +318,29 @@ def live():
     except Exception as msg:
         return msg
 
+# serve image directly from redis
+@app.route('/camera_live/<int:quality>', methods=['GET'])
+@app.route("/camera_live/", defaults={"quality": 50})
+def serve_img(quality):
+    return camera_functions.latest_image(quality)
+
+
+@app.route('/camera', methods=['GET', 'POST'])
+@login_required
+def camera():
+    return camera_functions.camera_main(common, conf)
+
+
+@app.route('/download', methods=['GET', 'POST'])
+@login_required
+def download():
+    return dataset_functions.download_main(common, conf)
+
 
 @app.route('/control', methods=['GET', 'POST'])
 @login_required
 def control():
-    """Home page showing instrument status"""
+    """Control services, run tests etc"""
 
     selection = ''
     common['so-rad_status'], message = service_status('so-rad')
@@ -299,6 +351,7 @@ def control():
     selection = list(request.form.keys())[0]   # key = name
     flash(f"{selection} requested")
 
+    # if 'test' is included in the command name, only continue if the service is stopped
     if ('test' in selection) and (common['so-rad_status']):
         print("debug checkpoint")
         flash("Please stop the So-Rad service before running this command. If you already stopped the service, click the check button below to verify that the service has stopped.")
@@ -319,9 +372,28 @@ def control():
         flash(f"So-Rad service status: {message}")
         return render_template('control.html', common=common)
 
+    elif selection == 'motor_home_test':
+        # run a the motor_home test script.
+        status, messages = run_motor_home_test()
+        return render_template('control.html', messages=messages, common=common)
+
     elif selection == 'gps_test':
-        # run a so-rad test script.
+        # run gps test script.
         status, messages = run_gps_test()
+        return render_template('control.html', messages=messages, common=common)
+
+    # shellhub access
+    elif selection == 'shellhub_always':
+        # run a so-rad test script.
+        status, messages = set_shellhub_access(access='always')
+        return render_template('control.html', messages=messages, common=common)
+    elif selection == 'shellhub_session':
+        # run a so-rad test script.
+        status, messages = set_shellhub_access(access='session')
+        return render_template('control.html', messages=messages, common=common)
+    elif selection == 'shellhub_disable':
+        # run a so-rad test script.
+        status, messages = set_shellhub_access(access='disable')
         return render_template('control.html', messages=messages, common=common)
 
     elif selection == 'export_test':
@@ -358,7 +430,8 @@ def control():
 @app.route('/status', methods=['GET', 'POST'])
 @app.route('/latest', methods=['GET', 'POST'])
 def latest():
-    """Home page showing instrument status"""
+    """Show latest instrument status"""
+    print(0)
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -378,6 +451,8 @@ def latest():
         timeseries = {}
         labels = []
 
+        print(1)
+
         logrows = read_log(log_file_location, n=common['nrows'], reverse=True)
         if logrows is not None and len(logrows) > 0:
             print(f"read {len(logrows)} log rows")
@@ -387,19 +462,16 @@ def latest():
                     logrow_parsed = {}  # force new instance
                     logrow_parsed = log2dict(row, logrow_parsed)
                     logvalues.append(logrow_parsed)
-            #print(f"{len(logvalues)} system orientation log lines parsed")
-            #print(logvalues)
 
         else:
             print("Log file not found.")
             flash("Log file not found.")
             common['systemlog'] = False
 
+        print(2)
         if len(logvalues) > 0:
             labels = [lrow['timestr'] for lrow in logvalues]
-            print(labels)
-            #for lrow in logvalues:
-            #    print(lrow['timestr'])
+            print(f"{len(labels)} timestamps with orientation data read from service log")
             timeseries = {
                   'sun_azimuth':   [lr['sun_azimuth'] for lr in logvalues if 'sun_azimuth' in lr.keys()],
                   'motor_heading': [lr['motor_heading'] for lr in logvalues if 'motor_heading' in lr.keys()],
@@ -423,22 +495,32 @@ def latest():
             flash("No recent system status information read from log file. Try increasing the number of rows read or consult system logs")
             common['systemlog'] = False
 
+        print(3)
         # info from db
         dbrows = get_from_db(db_path, n=1)
         if dbrows is not None and len(dbrows) > 0:
+            print(3.1)
+            print(dbrows)
             dbtable = dict(dbrows[0])
+            for key, val in dbtable.items():
+                if val is None:
+                    dbtable[key] = ""
         else:
+            print(3.2)
             flash("Database file not found or database empty.")
             common['dbreads'] = False
 
         # read so-rad status
         common['so-rad_status'], message = service_status('so-rad')
 
+        print(4)
+
         try:
             return render_template('latest.html', logvalues=logvalues, dbtable=dbtable,
                                    labels=labels, timeseries=timeseries, common=common)
-        except:
-            flash("Unable to load the requested page")
+        except Exception as err:
+            flash("Unable to load the requested page. Excluding plotting.")
+
             return render_template('layout.html', common=common)
 
     except Exception as msg:
@@ -493,6 +575,7 @@ def logout():
 
 def collect_settings_formdata():
     """allow some system configurations to be updated through the web interface"""
+    global conf
     formdata = {
                 'ccw_limit_deg': {'label':     'Counter-clockwise turn limit',
                                   'setting':   int(conf['MOTOR']['ccw_limit_deg']),
@@ -517,8 +600,8 @@ def collect_settings_formdata():
                                   'setting':   int(conf['GPS']['gps_heading_correction']),
                                   'postlabel': 'degrees',
                                   'comment':   'normally 0 or 90',
-                                  'min':       -180,
-                                  'max':       180},
+                                  'min':       -181,
+                                  'max':       181},
                 'sampling_speed_limit':
                                   {'label':    'Minimum speed to allow sampling',
                                   'setting':   float(conf['SAMPLING']['sampling_speed_limit']),
@@ -526,6 +609,13 @@ def collect_settings_formdata():
                                   'comment':   '0 = no minimum speed',
                                   'min':       0,
                                   'max':       999},
+                'sampling_interval':
+                                  {'label':    'Interval between radiometric observations',
+                                  'setting':   int(conf['RADIOMETERS']['sampling_interval']),
+                                  'postlabel': 'seconds',
+                                  'comment':   'Normally >= 15 s',
+                                  'min':       10,
+                                  'max':       99999},
                 'solar_elevation_limit':
                                   {'label':    'Minimum sun elevation to allow sampling',
                                   'setting':   float(conf['SAMPLING']['solar_elevation_limit']),
@@ -533,55 +623,117 @@ def collect_settings_formdata():
                                   'comment':   'normally 30. Allowed range [-90, 90]',
                                   'min':       -90,
                                   'max':       90},
-                'sampling_interval':
-                                  {'label':    'Interval between radiometric observations',
-                                  'setting':   int(conf['RADIOMETERS']['sampling_interval']),
-                                  'postlabel': 'seconds',
-                                  'comment':   'Normally >= 15 s',
-                                  'min':       10,
-                                  'max':       99999}
+                'relative_azimuth_target':
+                                  {'label':    'Target viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['relative_azimuth_target']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'normally 135. Allowed range [0, 180]',
+                                  'min':       0,
+                                  'max':       180},
+                'minimum_relative_azimuth_deg':
+                                  {'label':    'Minimum viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['minimum_relative_azimuth_deg']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'For continuous sampling allow 0',
+                                  'min':       -1,
+                                  'max':       181},
+                'maximum_relative_azimuth_deg':
+                                  {'label':    'Maximum viewing azimuth relative to solar azimuth',
+                                  'setting':   float(conf['SAMPLING']['maximum_relative_azimuth_deg']),
+                                  'postlabel': 'degrees',
+                                  'comment':   'For continuous sampling allow 180',
+                                  'min':       -1,
+                                  'max':       181},
+                'operator_contact':
+                                  {'label':    'Operator contact email address',
+                                  'setting':   conf['EXPORT']['operator_contact'],
+                                  'postlabel': '',
+                                  'comment':   'Must be set to a valid email address'},
+                'owner_contact':
+                                  {'label':    'Data owner contact email address',
+                                  'setting':   conf['EXPORT']['owner_contact'],
+                                  'postlabel': '',
+                                  'comment':   'Must be set to a valid email address'},
+                'use_export':
+                                  {'label':    'Upload records in near real-time',
+                                  'setting':   conf['EXPORT'].getboolean('use_export'),
+                                  'checked':   {True: 'checked', False: None}[conf['EXPORT'].getboolean('use_export')],
+                                  'postlabel': '',
+                                  'comment':   'Active when checked and system is connected to internet'},
+                'use_downloads':
+                                  {'label':    'Generate hdf datasets every hour',
+                                  'setting':   conf['DOWNLOAD'].getboolean('use_downloads'),
+                                  'checked':   {True: 'checked', False: None}[conf['DOWNLOAD'].getboolean('use_downloads')],
+                                  'postlabel': '',
+                                  'comment':   'Set to automatically generate hourly L0 HDF datasets when So-Rad service is running.'}
          }
     return formdata
+
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
     forminput = {}
+    formdata = {}
     global conf
 
     try:
+        update_config()
         formdata = collect_settings_formdata()
 
         if request.method == 'POST':
             print(request.form)
             try:
-                forminput['ccw_limit_deg'] = int(request.form['ccw_limit_deg'])
-                forminput['cw_limit_deg']  = int(request.form['cw_limit_deg'])
-                forminput['home_pos']      = int(request.form['home_pos'])
+                # ensure correct data types for text inputs
+                forminput['ccw_limit_deg']             = int(request.form['ccw_limit_deg'])
+                forminput['cw_limit_deg']              = int(request.form['cw_limit_deg'])
+                forminput['home_pos']                  = int(request.form['home_pos'])
                 forminput['gps_heading_correction']    = int(request.form['gps_heading_correction'])
-                forminput['sampling_speed_limit']  = float(request.form['sampling_speed_limit'])
-                forminput['solar_elevation_limit'] = float(request.form['solar_elevation_limit'])
-                forminput['sampling_interval']     = int(request.form['sampling_interval'])
+                forminput['sampling_speed_limit']      = float(request.form['sampling_speed_limit'])
+                forminput['sampling_interval']         = int(request.form['sampling_interval'])
+                forminput['solar_elevation_limit']     = float(request.form['solar_elevation_limit'])
+                forminput['relative_azimuth_target']   = float(request.form['relative_azimuth_target'])
+                forminput['minimum_relative_azimuth_deg']   = float(request.form['minimum_relative_azimuth_deg'])
+                forminput['maximum_relative_azimuth_deg']   = float(request.form['maximum_relative_azimuth_deg'])
+                forminput['operator_contact']          = request.form['operator_contact']
+                forminput['owner_contact']             = request.form['owner_contact']
+
             except Exception:
                 raise
 
-            print(forminput)
             # process any updates
             updates = {}
-            for key, val in formdata.items():
+            for key, val in forminput.items():
                 if forminput[key] != formdata[key]['setting']:
-                    vmin = formdata[key]['min']
-                    vmax = formdata[key]['max']
-                    if (forminput[key] > vmax) or (forminput[key] < vmin):
-                        flash(f"The value for {key} must be in the range {vmin} - {vmax}")
-                    else:
-                        flash(f"A new value for {key} was provided: {forminput[key]}")
-                        updates[key] = forminput[key]
+                    # print(f"{key} form input {forminput[key]} != config {formdata[key]['setting']}")
+                    if 'min' in formdata[key].items():
+                        vmin = formdata[key]['min']
+                        vmax = formdata[key]['max']
+                        if (forminput[key] > vmax) or (forminput[key] < vmin):
+                            flash(f"The value for {key} must be in the range {vmin} - {vmax}")
+                            continue
+                    flash(f"A new value for {key} was provided: {forminput[key]}")
+                    updates[key] = forminput[key]
+
+            switchitems = ['use_export', 'use_downloads']
+            for switch in switchitems:
+                if switch in request.form and formdata[switch]['setting'] is False:
+                    # switch is set and differs from config => update
+                    updates[switch] = True
+                elif (switch not in request.form) and (formdata[switch]['setting'] is True):
+                    # switch is unset differs from config => update
+                    updates[switch] = False
+                else:
+                    # no change
+                    continue
+
             if len(updates) > 0:
+                # write to local-config and update conf dict
                 save_updates_to_local_config(updates)
 
             formdata = collect_settings_formdata()
 
+        print(9)
         return render_template('settings.html', formdata=formdata, common=common)
 
     except Exception as err:
@@ -590,6 +742,7 @@ def settings():
 
 @app.route('/log', methods=['GET', 'POST'])
 def log():
+    selection = 'system'  # by default show the system log
     try:
         if request.method == 'POST':
             common['nrows'] = int(request.form['nrows'])
@@ -600,17 +753,25 @@ def log():
             if common['nrows'] == 0:
                 common['nrows'] =1
 
-        rows = read_log(log_file_location, n=common['nrows'], reverse=True)
+            selection = request.form['logtype']
+
+        if selection == 'system':
+            logfile = log_file_location
+        elif selection == 'web':
+            logfile = web_log_file_location
+
+        rows = read_log(logfile, n=common['nrows'], reverse=True)
         if rows is not None and len(rows) > 0:
             common['nrows'] = len(rows)
-            return render_template('log.html', message=rows, common=common)
+            return render_template('log.html', message=rows, common=common, selection=selection)
         else:
             flash("Log file not found.")
-            return render_template('layout.html', message = '', common=common)
+            return render_template('layout.html', message = '', common=common, selection=selection)
 
     except Exception as err:
         return f"An unexpected error occurred handling your request: {err}"
 
 
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    # run single-threaded (requests do not form new threads) to prevent child process being terminated
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=False)

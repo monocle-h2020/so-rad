@@ -49,11 +49,54 @@
        <td> {{ formdata['solar_elevation_limit']['comment'] }}    </td>
      </tr>
      <tr>
+       <td> {{ formdata['relative_azimuth_target']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="0" max="180" step="1" value = {{ formdata['relative_azimuth_target']['setting'] }} name = "relative_azimuth_target"/>       </td>
+       <td> {{ formdata['relative_azimuth_target']['postlabel'] }}    </td>
+       <td> {{ formdata['relative_azimuth_target']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['minimum_relative_azimuth_deg']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="-1" max="181" step="1" value = {{ formdata['minimum_relative_azimuth_deg']['setting'] }} name = "minimum_relative_azimuth_deg"/>       </td>
+       <td> {{ formdata['minimum_relative_azimuth_deg']['postlabel'] }}    </td>
+       <td> {{ formdata['minimum_relative_azimuth_deg']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['maximum_relative_azimuth_deg']['label'] }}        </td>
+       <td align="right"> <input type = "number" min="-1" max="181" step="1" value = {{ formdata['maximum_relative_azimuth_deg']['setting'] }} name = "maximum_relative_azimuth_deg"/>       </td>
+       <td> {{ formdata['maximum_relative_azimuth_deg']['postlabel'] }}    </td>
+       <td> {{ formdata['maximum_relative_azimuth_deg']['comment'] }}    </td>
+     </tr>
+     <tr>
        <td> {{ formdata['sampling_interval']['label'] }}        </td>
        <td align="right"> <input type = "number" min="10" max="999999" step="1" value = {{ formdata['sampling_interval']['setting'] }} name = "sampling_interval"/>       </td>
        <td> {{ formdata['sampling_interval']['postlabel'] }}    </td>
        <td> {{ formdata['sampling_interval']['comment'] }}    </td>
      </tr>
+     <tr>
+       <td> {{ formdata['operator_contact']['label'] }}        </td>
+       <td align="right"> <input type = "email" value = {{ formdata['operator_contact']['setting'] }} name = "operator_contact"/>       </td>
+       <td> {{ formdata['operator_contact']['postlabel'] }}    </td>
+       <td> {{ formdata['operator_contact']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['owner_contact']['label'] }}        </td>
+       <td align="right"> <input type = "email" value = {{ formdata['owner_contact']['setting'] }} name = "owner_contact"/>       </td>
+       <td> {{ formdata['owner_contact']['postlabel'] }}    </td>
+       <td> {{ formdata['owner_contact']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['use_export']['label'] }}  </td>
+       <td align="right"> <input type="checkbox" id="use_export" name="use_export" value="use_export_selected" {{ formdata['use_export']['checked'] }}> <label for="use_export"> Upload data </label> </td>
+       <td> {{ formdata['use_export']['postlabel'] }}    </td>
+       <td> {{ formdata['use_export']['comment'] }}    </td>
+     </tr>
+     <tr>
+       <td> {{ formdata['use_downloads']['label'] }}  </td>
+       <td align="right"> <input type="checkbox" id="use_downloads" name="use_downloads" value="use_downloads_selected" {{ formdata['use_downloads']['checked'] }}> <label for="use_downloads"> Generate datasets </label> </td>
+       <td> {{ formdata['use_downloads']['postlabel'] }}    </td>
+       <td> {{ formdata['use_downloads']['comment'] }}    </td>
+     </tr>
+
     </table>
        <p>       <input type = "submit" value = "Save"/> </p>
    </form>

@@ -136,9 +136,9 @@ class TPacket(object):
         tchannel = TChannel()
         serlow = self.databytes[0]  # last 2 hex chars of SN
         serhi = self.databytes[1]  # first 2 hex chars of SN
-        vals = [2, 4, 8, 9, 10, 12, 16, 20, 24]
+        vals = [2, 4, 8, 9, 10, 12, 16, 17, 20, 24]
         types = ['MicroFlu', 'IOM', 'COM', 'IPS',
-                 'SAMIP', 'SCM', 'SAM', 'DFM', 'ADM']
+                 'SAMIP', 'SCM', 'SAM', 'SAM', 'DFM', 'ADM']
         tchannel.TInfo.TID = self.TID
         #tchannel.TInfo.serialn = str.upper(hex(serhi)[-2::]+hex(serlow)[-2::])
         tchannel.TInfo.serialn = str.upper(f"{serhi:02x}{serlow:02x}")

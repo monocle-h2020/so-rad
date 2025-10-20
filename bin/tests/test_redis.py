@@ -23,16 +23,16 @@ def main(conf):
               np.int16(999), np.int32(999), np.float16(999.999), np.float32(999.999),
               [1,2,3,'a','b','c'], (1,2,3,'a','b','c'), {1:'a',2:'b',3:'c'}, 1]:
         rf.store(c, 'test', i, expires=2)
-        r, u = rf.retrieve(c, 'test', freshness = 10)
+        r, u, s = rf.retrieve(c, 'test', freshness = 10)
         log.info(f"Stored {i} (dtype {type(i)}), retrieved {r} (dtype {type(r)}), updated: {u}")
 
     log.info("Test object expiration using short freshness (should return None and throw warning that result is ignored)")
     rf.store(c, 'test', i, expires=-1)  # should instantly expire
-    r, u = rf.retrieve(c, 'test', freshness=0)
+    r, u, s = rf.retrieve(c, 'test', freshness=0)
     log.info(f"Stored {i} (dtype {type(i)}), retrieved {r} (dtype {type(r)}), updated: {u}")
 
     log.info("Test object expiration with freshness=None (should only throw warning and return value as normal)")
-    r, u = rf.retrieve(c, 'test', freshness=None)
+    r, u, s = rf.retrieve(c, 'test', freshness=None)
     log.info(f"Stored {i} (dtype {type(i)}), retrieved {r} (dtype {type(r)}), updated: {u}")
 
     print("Finished tests")

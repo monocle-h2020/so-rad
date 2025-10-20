@@ -53,7 +53,9 @@ def solar_az_el(lat, lon, altitude, datetime_):
     return solar_az_deg, solar_el_deg
 
 
-def sun_relative_azimuth(lat, lon, altitude, datetime_, ship_bearing, motor_deg, motor_dict):
+def sun_relative_azimuth(lat, lon, altitude, datetime_,
+                         ship_bearing, motor_deg, motor_dict,
+                         relative_azimuth_target=135.0):
     """
     Return the current azimuth of sensors with respect to the sun
     """
@@ -71,8 +73,8 @@ def sun_relative_azimuth(lat, lon, altitude, datetime_, ship_bearing, motor_deg,
     solar_az_deg, solar_el_deg = solar_az_el(lat, lon, altitude, datetime_)
 
     # Optimal viewing positions relative to compass (range 0 - 359, 0 = North)
-    view_comp_cw = (solar_az_deg + 135.0) % 360.0
-    view_comp_ccw = (solar_az_deg - 135.0) % 360.0
+    view_comp_cw = (solar_az_deg + relative_azimuth_target) % 360.0
+    view_comp_ccw = (solar_az_deg - relative_azimuth_target) % 360.0
 
     # Optimal positions relative to motor home (offset corrected)  position (0 = motor home)
     motor_home_offset = motor_dict['home_pos']
@@ -88,117 +90,9 @@ def sun_relative_azimuth(lat, lon, altitude, datetime_, ship_bearing, motor_deg,
     return motor_to_sun, solar_az_deg
 
 
-def calculate_positions(lat, lon, altitude, datetime_, ship_bearing, motor_dict, motor_pos_steps):
-    """
-    Do solar and motor angle calculations
-    : floats lat, lon, altitude, datetime_ from gps
-    : float ship_bearing from gps heading
-    : motor_dict has limit settings
-    : float motor_pos_steps is current motor position in steps
-    """
-
-    try:
-        assert lat is not None
-        assert lon is not None
-        assert altitude is not None
-        assert datetime_ is not None
-        assert ship_bearing is not None
-        assert motor_dict is not None
-        assert motor_pos_steps is not None
-
-    except AssertionError:
-        return None, None, None
-
-    # Get solar angles
-    solar_az_deg, solar_el_deg = solar_az_el(lat, lon, altitude, datetime_)
-
-    # Viewing positions relative to compass (range 0 - 359, 0 = North)
-    view_comp_cw = (solar_az_deg + 135.0) % 360.0
-    view_comp_ccw = (solar_az_deg - 135.0) % 360.0
-
-    # positions relative to motor home (offset corrected)  position (0 = motor home)
-    motor_home_offset = motor_dict['home_pos']
-    sol_az_motor_deg = (solar_az_deg - ship_bearing) - motor_home_offset
-    view_motor_cw =  (sol_az_motor_deg + 135.0) % 360.0
-    view_motor_ccw = (sol_az_motor_deg - 135.0) % 360.0
-    # wrap angles to [-180,180]
-    sol_az_motor_deg = wrap180(sol_az_motor_deg)
-    view_motor_cw_deg = wrap180(view_motor_cw)
-    view_motor_ccw_deg = wrap180(view_motor_ccw)
-
-    # Check that the positions are -180 -> 180
-    assert 180.0 >= view_motor_cw_deg >= -180.0
-    assert 180.0 >= view_motor_ccw_deg >= -180.0
-
-    # Adjust for motor turning limits, still in degrees
-    cw_limit_deg = motor_dict['cw_limit']
-    ccw_limit_deg = motor_dict['ccw_limit']
-    if view_motor_cw_deg > cw_limit_deg:
-       achieved_view_motor_cw_deg = cw_limit_deg
-    elif view_motor_cw_deg < ccw_limit_deg:
-       achieved_view_motor_cw_deg = ccw_limit_deg
-    else:
-       achieved_view_motor_cw_deg = view_motor_cw_deg
-
-    if view_motor_ccw_deg > cw_limit_deg:
-       achieved_view_motor_ccw_deg = cw_limit_deg
-    elif view_motor_ccw_deg < ccw_limit_deg:
-       achieved_view_motor_ccw_deg = ccw_limit_deg
-    else:
-       achieved_view_motor_ccw_deg = view_motor_ccw_deg
-
-    # the four options are (some of these will be duplicate solutions)
-    angle_options = [achieved_view_motor_cw_deg, achieved_view_motor_ccw_deg, cw_limit_deg, ccw_limit_deg]
-
-    # compare achievable angles to sun (still in motor plane with 0 = home)
-    ach_rel_cw =  abs(achieved_view_motor_cw_deg - sol_az_motor_deg)
-    ach_rel_ccw = abs(achieved_view_motor_ccw_deg - sol_az_motor_deg)
-    ach_at_cw_limit = abs(cw_limit_deg - sol_az_motor_deg)
-    ach_at_ccw_limit = abs(ccw_limit_deg - sol_az_motor_deg)
-
-    # how well do these achievable angles correspond to the optimum positions?
-    angle_options_diff = [abs(achieved_view_motor_cw_deg - view_motor_cw_deg),
-                          abs(achieved_view_motor_ccw_deg - view_motor_ccw_deg)]
-    best_ach_angle_index = argsort(angle_options_diff)[0]
-
-    ach_rel_angles_are_similar = abs(angle_options_diff[0]- angle_options_diff[1]) <= 5.0  # if similar also consider the travel distance
-
-    # compare to current motor position
-    motor_pos_deg = float(motor_pos_steps) / motor_dict['steps_per_degree']
-    travel_distance_cw =  abs(motor_pos_deg - achieved_view_motor_cw_deg)
-    travel_distance_ccw = abs(motor_pos_deg - achieved_view_motor_ccw_deg)
-
-    travel_distances = [travel_distance_cw, travel_distance_ccw]
-
-    if ach_rel_angles_are_similar and (travel_distances[argsort(angle_options_diff)[1]] <= travel_distances[argsort(angle_options_diff)[0]]):
-        # stay with second-best for now
-        target_motor_pos_deg = angle_options[argsort(angle_options_diff)[1]]
-    else:
-        target_motor_pos_deg = angle_options[argsort(angle_options_diff)[0]]  # move to optimal position
-
-    target_motor_pos_step = int(round(target_motor_pos_deg * motor_dict['steps_per_degree']))
-
-    motor_angles = {'view_comp_cw': view_comp_cw,
-                    'view_comp_ccw': view_comp_ccw,
-                    'sol_az_motor_deg': sol_az_motor_deg,
-                    'sol_az_to_motor_deg_abs': abs(sol_az_motor_deg),
-                    'target_motor_pos_deg': target_motor_pos_deg,
-                    'target_motor_pos_step': target_motor_pos_step,
-                    'view_motor_cw_deg': view_motor_cw_deg,
-                    'view_motor_ccw_deg': view_motor_ccw_deg,
-                    'ach_rel_cw': ach_rel_cw,
-                    'ach_rel_ccw': ach_rel_ccw,
-                    'ach_mot_cw': achieved_view_motor_cw_deg,
-                    'ach_mot_ccw': achieved_view_motor_ccw_deg,
-                    'target_motor_pos_rel_az_deg': wrap180(abs(target_motor_pos_deg - sol_az_motor_deg))}
-
-    # 1 - sol_az_to_motor_deg_abs is the current angle (before adjustments are made) between motor home and sun
-    # 2 - target_motor_pos_rel_az_deg is the achievable angle, which will be true after motor has moved (respecting angle limits)
-
-    return solar_az_deg, solar_el_deg, motor_angles
-
-
-def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict, motor_pos_steps):
+def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing,
+                         motor_dict, motor_pos_steps,
+                         relative_azimuth_target=135.0):
     """
     Do solar and motor angle calculations
     : floats lat, lon, altitude, datetime_ from gps
@@ -228,8 +122,8 @@ def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict
     sol_az_to_motor_angle = wrap180(solar_az_deg - motor_home_compass_deg)
 
     # optimal viewing positions relative to motor plane
-    opt1_view_to_motor_angle = wrap180((sol_az_to_motor_angle + 135.0) % 360.0)
-    opt2_view_to_motor_angle = wrap180((sol_az_to_motor_angle - 135.0) % 360.0)
+    opt1_view_to_motor_angle = wrap180((sol_az_to_motor_angle + relative_azimuth_target) % 360.0)
+    opt2_view_to_motor_angle = wrap180((sol_az_to_motor_angle - relative_azimuth_target) % 360.0)
 
     # Case 1: optimal viewing positions inside motor movement range?
     # if one or more of them are, thatś where the motor should be turned.
@@ -272,7 +166,7 @@ def calculate_positions2(lat, lon, altitude, datetime_, ship_bearing, motor_dict
 
     # compare achievable angles to sun (still in motor plane with 0 = home)
     achievable_angles_to_sun = [abs(a - sol_az_to_motor_angle) for a in angle_options]
-    achievable_angles_to_opt = [abs(135.-a) for a in achievable_angles_to_sun]
+    achievable_angles_to_opt = [abs(relative_azimuth_target-a) for a in achievable_angles_to_sun]
     achievable_angles_sort_key = argsort(achievable_angles_to_opt)
     angle_options_sorted = array(angle_options)[achievable_angles_sort_key]  # first is best
     achievable_angles_to_sun_sorted = array(achievable_angles_to_sun)[achievable_angles_sort_key]  # first is best

@@ -11,19 +11,13 @@
 <div>
   <h2>Live status page</h2>
 </div>
-{% if common['so-rad_status']==true %}
+{% if common['so-rad_status'] %}
   <div style="color:#ffffff;background-color:#11cc11;font-weight:medium">So-Rad service is running</div>
 {% else %}
   <div style="color:#000000;background-color:#ee1111;font-weight:bold">So-Rad service is not running</div>
 {% endif %}
 <br>
 
-<div id="redis_live" align="center" margin-left="auto" margin-right="auto">
-  <table width=90%>
-  </table>
-</div>
-
-<br>
 <br>
 
 <div align="center" margin-left="auto" margin-right="auto">
@@ -51,23 +45,39 @@
       <tr>  <th>Longitude</th>             <td><span id="lon0">...</span> deg</td>           <td>    </td>   </tr>
       <tr>  <th>RTK heading</th>           <td><span id="relPosHeading">...</span> deg</td>  <td>    </td>   </tr>
       <tr>  <th>Heading accuracy</th>      <td><span id="accHeading">...</span> deg</td>     <td>    </td>   </tr>
+      <tr>  <th>Corrected heading</th>     <td><span id="ship_bearing_mean">...</span> deg</td><td>  </td>   </tr>
       <tr>  <th>GPS Fix</th>               <td><span id="fix"></span></td>                   <td>    </td>   </tr>
       <tr>  <th>Satellites</th>            <td><span id="nsat0"></span></td>                 <td>    </td>   </tr>
       <tr>  <th>Tilt avg</th>              <td><span id="tilt_avg">...</span> +/- 
                                                <span id="tilt_std">...</span></td>
-                                           <td><span id="tilt_updated">...</span></td>                   </tr>
+                                           <td><span id="tilt_updated">...</span></td>                       </tr>
       <tr>  <th>Pi temp</th>               <td><span id="pi_temp">...</span> C</td>          <td>    </td>   </tr>
       <tr>  <th>Motor temp</th>            <td><span id="motor_temp">...</span> C</td>       <td>    </td>   </tr>
       <tr>  <th>Driver temp</th>           <td><span id="driver_temp">...</span> C</td>      <td>    </td>   </tr>
       <tr>  <th>Control unit temp</th>     <td><span id="inside_temp">...</span> C</td>      <td>    </td>   </tr>
       <tr>  <th>Control unit RH</th>       <td><span id="inside_rh">...</span> %</td>        <td>    </td>   </tr>
+      {% if common['use_camera'] %}
+      <tr>  <th>Last camera image</th>     <td colspan="2"><span id="last_picam_image">...</span>    </td>   </tr>
+      {% endif %}
   </table>
 </div>
 
 
 <br>
 <br>
-<div id="map" style="width: 600px; height: 400px; margin:0 auto;"></div>
+<div align="center" margin-left="auto" margin-right="auto">
+   <table width=90%>
+     <td width=50%>
+       <div id="map" style="width: 90%; height: 300px; margin:0 auto;"></div>
+     </td>
+      {% if common['use_camera'] %}
+     <td width=50% align="center">
+        <img src="{{ url_for('serve_img', quality=70) }}" width="90%" valign="middle"></p>
+     </td>
+      {% endif %}
+
+   </table>
+</div>
 
 
 <script> 
@@ -124,10 +134,14 @@
       lat0.innerText = data.lat0;
       var lon0 = document.getElementById("lon0");
       lon0.innerText = data.lon0;
+
       var relPosHeading = document.getElementById("relPosHeading");
       relPosHeading.innerText = data.relPosHeading.toFixed(2);
       var accHeading = document.getElementById("accHeading");
       accHeading.innerText = data.accHeading.toFixed(4);
+      var ship_bearing_mean = document.getElementById("ship_bearing_mean");
+      ship_bearing_mean.innerText = data.ship_bearing_mean.toFixed(2);
+
       var fix = document.getElementById("fix");
       fix.innerText = data.fix;
       var nsat0 = document.getElementById("nsat0");
@@ -141,20 +155,23 @@
       tilt_updated.innerText = data.tilt_updated;
 
       var pi_temp = document.getElementById("pi_temp");
-      pi_temp.innerText = data.pi_temp.toFixed(1);
+      pi_temp.innerText = data.pi_temp;
       var motor_temp = document.getElementById("motor_temp");
-      motor_temp.innerText = data.motor_temp.toFixed(1);
+      motor_temp.innerText = data.motor_temp;
       var driver_temp = document.getElementById("driver_temp");
-      driver_temp.innerText = data.driver_temp.toFixed(1);
+      driver_temp.innerText = data.driver_temp;
       var inside_temp = document.getElementById("inside_temp");
-      inside_temp.innerText = data.inside_temp.toFixed(1);
+      inside_temp.innerText = data.inside_temp;
       var inside_rh = document.getElementById("inside_rh");
-      inside_rh.innerText = data.inside_rh.toFixed(1);
+      inside_rh.innerText = data.inside_rh;
+
+      var last_picam_image = document.getElementById("last_picam_image");
+      last_picam_image.innerText = data.last_picam_image;
 
   }
 
   window.addEventListener('load', function () {
-    var fetchInterval = 5000; // in milliseconds
+    var fetchInterval = 2000; // in milliseconds
     setInterval(fetchStatus, fetchInterval);
   });
 

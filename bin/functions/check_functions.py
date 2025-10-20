@@ -29,13 +29,12 @@ import logging
 log = logging.getLogger('checks')
 
 
-def check_remote_data_store(conf):
+def check_remote_data_store(export_config_dict):
     "Check for response from remote Parse server. Look for last logged/updated record from this instrument. Return connection status and time of last update"
-    export_config_dict = conf['EXPORT']
-    parse_app_url = export_config_dict.get('parse_url')  # something like https:1.2.3.4:port/parse/classes/sorad
-    parse_app_id = export_config_dict.get('parse_app_id')  # ask the parse server admin for this key and store it in local-config.ini
-    platform_id = export_config_dict.get('platform_id')
-    parse_clientkey = export_config_dict.get('parse_clientkey')
+    parse_app_url = export_config_dict['parse_url']  # something like https:1.2.3.4:port/parse/classes/sorad
+    parse_app_id = export_config_dict['parse_app_id']  # ask the parse server admin for this key and store it in local-config.ini
+    platform_id = export_config_dict['platform_id']
+    parse_clientkey = export_config_dict['parse_clientkey']
     headers = {'content-type': 'application/json',
                'X-Parse-Application-Id': parse_app_id,
                'X-Parse-Client-Key': parse_clientkey}
@@ -166,6 +165,18 @@ def check_sun(sample_dict, solar_azimuth, solar_elevation):
     else:
         return False
 
+def check_rel_az_limits(sample_dict, rel_azimuth):
+    """Check the attainable azimuth solution against the user-configured limits"""
+    if rel_azimuth is None:
+        return False
+    if rel_azimuth is nan:
+        return False
+    minaz = sample_dict['minimum_relative_azimuth_deg']
+    maxaz = sample_dict['maximum_relative_azimuth_deg']
+    if minaz <= abs(rel_azimuth) <= maxaz:
+        return True
+    else:
+        return False
 
 def check_ed_sampling(use_rad, rad, ready, values):
     "Check whether conditions for periodic Ed sampling are met"
