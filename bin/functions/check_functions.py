@@ -123,13 +123,16 @@ def check_speed(sample_dict, gps):
 def check_motor(motor):
     "Verify that Motor has no alarm"
     # read register 128: present alarm code
-    response = motor_func.read_command(motor['serial'], 1, 3, 128, 2)
-    alarm = int.from_bytes(response[3:7], byteorder='big')
-    if alarm > 0:
-        return False, alarm
-    else:
-        return True, alarm
-
+    try:
+        response = motor_func.read_command(motor['serial'], 1, 3, 128, 2)
+        alarm = int.from_bytes(response[3:7], byteorder='big')
+        if alarm > 0:
+            return False, alarm
+        else:
+            return True, alarm
+    except Exception:
+        log.warning("No response from motor")
+        return True, 0
 
 def check_sensors(rad_dict, prev_sample_time, radiometry_manager):
     """Verify that the radiometers fall under the criteria to take a measurement"""
