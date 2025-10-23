@@ -318,9 +318,10 @@ def rht_init(rht_config):
     # Return the configuration dict and initialise relevant manager class
     if rht['interface'] in ['ada_dht22', 'ada_cp_dht']:
         rht['manager'] = rht_manager.Ada_dht22(rht)
-
-    if rht['interface'] in ['amt2301b']:
+    elif rht['interface'] in ['amt2301b']:
         rht['manager'] = rht_manager.Ada_amt2301b(rht)
+    else:
+        log.warning(f"RHT protocol {rht['interface']} is not implemented")
 
     return rht
 

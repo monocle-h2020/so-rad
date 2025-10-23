@@ -180,7 +180,6 @@ class Ada_dht22(object):
         self.stop_monitor = False
         self.sleep_interval = 0.1
         self.sampling_time = rht['sampling_time']  # sampling cycle (for averaging) in seconds
-        self.update_rht_single()   # init with first reading
         self.buffer_time =  [self.updated]
         self.buffer_temp =  [self.temp]
         self.buffer_rh = [self.rh]
@@ -189,6 +188,8 @@ class Ada_dht22(object):
             self.dht_device = adafruit_dht.DHT22(adafruit_dht.Pin(self.pin))
         else:
             self.dht_device = None
+
+        self.update_rht_single()   # init with first reading
 
         log.info("RHT sensor initialised")
 
