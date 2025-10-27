@@ -158,7 +158,8 @@ class DatasetsManager(object):
                     log.info(f"Requesting HDF dataset from {hdf_start_time.isoformat()} to {hdf_end_time.isoformat()}")
                     job = sorad_q.enqueue(df.hdf_from_web_request, self.storage_path, self.database_path,
                                                                    hdf_start_time, hdf_end_time,
-                                                                   self.platform_id, self.platform_uuid)
+                                                                   self.platform_id, self.platform_uuid,
+                                                                   job_timeout=3400)
                     self.last_hdf_requested = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
                     log.info(job)
                 except Exception as err:
