@@ -6,7 +6,7 @@ Dataset download functions for So-Rad web interface
 
 from flask import Flask, render_template, abort, \
                   flash, redirect, url_for, request,\
-                  Markup, jsonify, send_file
+                  jsonify, send_file
 from jinja2 import TemplateNotFound
 import os
 import datetime
