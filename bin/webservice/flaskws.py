@@ -6,7 +6,8 @@ Connect to db to provide latest activity from solar tracking radiometry platform
 
 from flask import Flask, render_template, abort, \
                   flash, redirect, url_for, request,\
-                  Markup, jsonify, send_file
+                  jsonify, send_file
+from markupsafe import Markup
 from jinja2 import TemplateNotFound
 import sqlite3
 import configparser
@@ -15,7 +16,7 @@ import os
 from forms import LoginForm
 from flask_login import LoginManager, current_user, login_user, logout_user, UserMixin, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.urls import url_parse
+from urllib.parse import urlparse as url_parse
 import uuid
 from math import sin, cos, radians
 import datetime
