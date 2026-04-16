@@ -69,7 +69,7 @@ if __name__ == '__main__':
     conf = cf_func.update_config(conf, args.local_config_file, verbosity=False)
 
     db_dict = db_init(conf['DATABASE'])
-    dataset_dict = datasets_init(conf['DOWNLOAD'])
+    dataset_dict = datasets_init(conf)
 
     # connect to redis queue
     sorad_q = Queue('sorad_q', connection=Redis())
@@ -95,4 +95,7 @@ if __name__ == '__main__':
                                                  start_time, end_time,
                                                  format='csv'))
 
-    df.hdf_from_web_request(conf, start_time, end_time, platform_id)
+    df.hdf_from_web_request(storage_path='.', database_path=dataset_dict['database_path'],
+                         start_time=start_time, end_time=end_time,
+                         platform_id='test', platform_uuid='test',
+                         save_if_empty=False)
