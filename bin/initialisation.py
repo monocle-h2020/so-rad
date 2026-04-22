@@ -111,6 +111,7 @@ def datasets_init(conf):
 
     if not datasets['used']:
         log.info(f"No periodic dataset dumps configured")
+        datasets['manager'] = None
         return datasets
 
     if not os.path.exists(datasets['storage_path']):
