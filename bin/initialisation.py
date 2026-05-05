@@ -26,6 +26,7 @@ from thread_managers import gpio_manager
 from thread_managers import camera_manager
 from thread_managers import export_manager
 from thread_managers import datasets_manager
+from thread_managers import wind_manager
 from functions import db_functions
 log = logging.getLogger('init')   # report to root logger
 
@@ -120,6 +121,55 @@ def datasets_init(conf):
     datasets['manager'] = datasets_manager.DatasetsManager(datasets)
 
     return datasets
+def wind_init(wind_config, ports):
+    """
+    Read Anemometer config settings and initialise manager
+    : wind_config is the [WIND] section in the config file
+    : wind is a dictionary containing the configuration and manager
+    """
+    wind = {}
+    # Get all the TPR variables from the config file
+    wind['used'] = wind_config.getboolean('use_wind')
+    wind['interface'] = wind_config.get('interface').lower()
+    wind['manager'] = None
+    wind['baud'] = wind_config.getint('baud')
+    port_autodetect = wind_config.getboolean('port_autodetect')
+    port_autodetect_string = wind_config.get('port_autodetect_string')
+
+
+    if not wind['used']:
+        log.info(f"Anemometer disabled in config")
+        return wind
+
+    assert wind['interface'].lower() in ['gill', ]
+
+    if port_autodetect:
+        for port, desc, hwid in sorted(ports):
+            if port_autodetect_string in port+desc+hwid:
+                wind['port'] = port
+                log.info("Anemometer auto-detected on port: {0}".format(port))
+                break
+    else:
+        assert wind_config.get('port_default') not in [None, 'none', 'None']
+        wind['port'] = wind_config.get('port_default')
+        log.info("Anemometer manually set to port: {0}".format(wind['port']))
+
+    # Create a serial object for the motor port
+    if wind['port'] is not None:
+        wind['serial'] = serial.Serial(port=wind['port'],
+                                       baudrate=wind['baud'],
+                                       timeout=1.2, bytesize=8, parity='N',
+                                       stopbits=1, xonxoff=0)
+        wind['serial'].reset_input_buffer()
+        wind['serial'].reset_output_buffer()
+    else:
+        raise serial.SerialException('Could not open Anemometer port')
+
+    # Return the configuration dict and initialise relevant manager class
+    if wind['interface'] == 'gill':
+        wind['manager'] = wind_manager.Gill(wind)
+
+    return wind
 
 
 def camera_init(camera_config):
@@ -154,6 +204,7 @@ def camera_init(camera_config):
 
     return cam
 
+
 def motor_init(motor_config, ports):
     """read motor configuration. Any other motor initialisation (e.g. test connection, go to home position) should be called here"""
     motor = {}
@@ -180,7 +231,7 @@ def motor_init(motor_config, ports):
     if motor_config.getboolean('port_autodetect'):
         port_autodetect_string = motor_config.get('port_autodetect_string')
         for port, desc, hwid in sorted(ports):
-            log.info("port info: {0} {1} {2}".format(port, desc, hwid))
+            log.debug("port info: {0} {1} {2}".format(port, desc, hwid))
             if port_autodetect_string in port+desc+hwid:
                 motor['port'] = port
                 log.info("Motor auto-detected on port: {0}".format(port))
@@ -368,6 +419,8 @@ def gps_init(gps_config, ports):
        gps['manager'] = gps_manager.NMEA0183()
     elif gps['protocol'] == 'pyubx2':
        gps['manager'] = gps_manager.PYUBX2()
+    elif gps['protocol'] == 'djim350':
+       gps['manager'] = gps_manager.DJIM350()
     else:
        log.exception("GPS protocol '{0}' is not implemented".format(gps['protocol']))
 
@@ -389,6 +442,7 @@ def rad_init(rad_config, ports):
     rad['inttime'] = rad_config.getint('integration_time')
     rad['allow_consecutive_timeouts'] = rad_config.getint('allow_consecutive_timeouts')
     rad['minimum_reboot_interval_sec'] = rad_config.getint('minimum_reboot_interval_sec')
+    rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
 
     rad['use_gpio_control'] = rad_config.getboolean('use_gpio_control')
     if rad['use_gpio_control']:

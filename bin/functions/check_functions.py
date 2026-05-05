@@ -92,8 +92,11 @@ def check_gps(gps):
         return True
 
 
-def check_heading(gps):
+def check_heading(gps, bearing_fixed):
     "Verify that gps derived heading is usable"
+    if bearing_fixed:
+        return True
+
     if gps['manager'] is None:
         return False
 
@@ -111,9 +114,14 @@ def check_heading(gps):
             (gps['manager'].heading is not None):
             return True
 
-    elif gps['protocol'] == 'nmea0183':
-        if gps['manager'].speed >= gps['heading_speed_limit']:
-            return True
+    elif gps['protocol'] in ['nmea0183', 'djim350']:
+        if gps['manager'].speed is None:
+            return False
+        elif gps['manager'].speed >= gps['heading_speed_limit']:
+            if gps['manager'].heading is None:
+                return False
+            else:
+                return True
 
     return False
 

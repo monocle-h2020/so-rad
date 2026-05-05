@@ -220,6 +220,7 @@ def redis_live():
            raise Exception("Redis not initialised")
 
         redisvals = {}
+
         for key in ['system_status',
                     'sampling_status',
                     'counter',

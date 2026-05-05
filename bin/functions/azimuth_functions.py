@@ -67,6 +67,7 @@ def sun_relative_azimuth(lat, lon, altitude, datetime_,
         assert motor_dict is not None
         assert motor_deg is not None
     except AssertionError:
+        log.warning("relative viewing azimuth not calculated due to missing inputs")
         return None, None
 
     # Get solar angles

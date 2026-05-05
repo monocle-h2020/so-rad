@@ -64,6 +64,7 @@ def run_test(conf, repeat=False):
        while repeat:
            try:
                single_test(radiometry_manager, ed=False)
+               time.sleep(1)
            except KeyboardInterrupt:
                repeat = False
     else:
@@ -95,4 +96,4 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
-    run_test(conf, repeat=False)  # select repeat = True to repeat test until interrupted
+    run_test(conf, repeat=True)  # select repeat = True to repeat test until interrupted

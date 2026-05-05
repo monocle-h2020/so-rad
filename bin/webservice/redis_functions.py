@@ -40,8 +40,12 @@ def redis_retrieve(client, key, freshness=30):
                  threshold for this condition may vary between uses.
     """
 
-    dtype = client.get(f"{key}_dtype").decode('utf-8')
+    dtype = client.get(f"{key}_dtype")
+    if dtype is None:
+        return None, None
+    dtype = dtype.decode('utf-8')
     value = client.get(key)
+
 
     updated = client.get(f"{key}_updated").decode('utf-8')
     updated = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S.%f")

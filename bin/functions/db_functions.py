@@ -94,7 +94,9 @@ def create_tables(db_dict):
             tilt_avg float, tilt_std float,
             bearing_accuracy float, sorad_version float,
             batt_v float, inside_temp float, inside_rel_hum float, n_rad_obs integer,
-            export_success bool, export_attempts integer)"""
+            export_success bool, export_attempts integer,
+            wind_speed float,
+            wind_direction integer)"""
 
     cur.execute(sql)
 
@@ -121,33 +123,65 @@ def commit_db(db_dict, verbose, values, trigger_id, spectra_data, software_versi
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
+                           wind_speed, wind_direction,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
                             values['rel_view_az'], values['pi_temp'],
                             values['tilt_avg'], values['tilt_std'], values['accHeading'], software_version,
-                            values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp']))
+                            values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'],
+                            values['wind_speed'], values['wind_direction']))
 
             sample_id = cur.lastrowid
             conn.commit()
             conn.close()
             return sample_id
 
-        elif (trigger_id) is not None and (spectra_data is not None):
+        elif (trigger_id is not None) and (spectra_data is not None):
+
+            log.info(f"id {sample_uuid}")
+            log.info(f"trigger id {trigger_id}")
+            log.info(f"gps time {values['dt']}")
+            log.info(f"fix {values['fix']}")
+            log.info(f"lat {values['lat0']}")
+            log.info(f"batt V {values['batt_voltage']}")
+            log.info(f"inside T {values['inside_temp']}")
+            log.info(f"inside RH {values['inside_rh']}")
+            log.info(f"motor T {values['motor_temp']}")
+            log.info(f"driver T {values['driver_temp']}")
+            log.info(f"tilt avg {values['tilt_avg']}")
+            log.info(f"tilt std {values['tilt_std']}")
+            log.info(f"acc Head {values['accHeading']}")
+            log.info(f"sw v {software_version}")
+            log.info(f"wind speed {values['wind_speed']}")
+            log.info(f"wind dir {values['wind_direction']}")
+            log.info(f"solar az {values['solar_az']}")
+            log.info(f"solar el {values['solar_el']}")
+            log.info(f"ship bearing {values['ship_bearing_mean']}")
+            log.info(f"speed {values['speed']}")
+            log.info(f"lon {values['lon0']}")
+            log.info(f"rel az {values['rel_view_az']}")
+            log.info(f"pi temp {values['pi_temp']}")
+            log.info(f"n spec {len(spectra_data)}")
+
             cur.execute("""INSERT INTO sorad_metadata(sample_uuid, pc_time, gps_time, gps_fix, gps_lat, gps_long, gps_speed,
                            platform_bearing, sun_azimuth, sun_elevation, rel_view_az, pi_cpu_temp,
                            tilt_avg, tilt_std,
                            bearing_accuracy, sorad_version,
                            batt_v, inside_temp, inside_rel_hum, motor_temp, driver_temp,
+                           wind_speed, wind_direction,
                            n_rad_obs, export_success, export_attempts)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""", \
                            (sample_uuid, trigger_id, values['dt'], values['fix'], values['lat0'], values['lon0'], values['speed'],
                             values['ship_bearing_mean'], values['solar_az'], values['solar_el'],
                             values['rel_view_az'], values['pi_temp'],
                             values['tilt_avg'], values['tilt_std'],
                             values['accHeading'], software_version,
-                            values['batt_voltage'], values['inside_temp'], values['inside_rh'], values['motor_temp'], values['driver_temp'], len(spectra_data)))
+                            values['batt_voltage'], values['inside_temp'], values['inside_rh'],
+                            values['motor_temp'], values['driver_temp'],
+                            values['wind_speed'], values['wind_direction'],
+                            len(spectra_data)))
 
             sample_id = cur.lastrowid
 
