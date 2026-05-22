@@ -29,6 +29,7 @@ from thread_managers import datasets_manager
 from thread_managers import wind_manager
 from functions import db_functions
 log = logging.getLogger('init')   # report to root logger
+import subprocess
 
 
 def db_init(db_config):
@@ -190,6 +191,8 @@ def camera_init(camera_config):
     cam['storage_path'] = camera_config.get('storage_path')
     cam['max_storage_gb'] = float(camera_config.get('max_storage_gb'))
     cam['storage_protocol'] = camera_config.get('storage_protocol')
+    cam['autodetect'] = camera_config.getboolean('autodetect')
+    cam['autodetect_string'] = camera_config.get('autodetect_string')
 
     if not cam['used']:
         log.info(f"Camera disabled in config")
@@ -197,6 +200,30 @@ def camera_init(camera_config):
 
     assert cam['interface'].lower() in ['soradcam', ]
     assert os.path.exists(cam['storage_path'])
+
+    if cam['autodetect']:
+        log.info(f"Looking for camera using string {cam['autodetect_string']}")
+        camera_found = False
+        response = subprocess.run("ifconfig eth0 | grep -Eo 'inet (addr:)?([0-9]*\\.){3}[0-9]*' | grep -Eo '([0-9]*\\.){3}[0-9]*' | grep -v '127.0.0.1'",
+                                  shell=True, capture_output=True, text=True)
+        if response.stdout != "" and response.stderr == "":
+            sorad_ip = response.stdout.strip()
+            sorad_ip_domain = ".".join(sorad_ip.split('.')[:-1] + ['0/24'])
+
+            response = subprocess.run(f"nmap -sn {sorad_ip_domain} |grep --after 1 {cam['autodetect_string']}",
+                                      shell=True, capture_output=True, text=True)
+
+            if response.stdout != "":
+                cam['hostname'] = response.stdout.split('Nmap scan report for ')[1].split(' (')[0]
+                cam['ip'] = response.stdout.split('Nmap scan report for ')[1].split(' (')[1].split(')')[0]
+                log.info(f"Camera host {cam['hostname']} found at {cam['ip']}")
+                log.info(response.stdout.split('\n')[1])
+                camera_found = True
+            else:
+                log.info(f"Unexpected response looking for camera: {response}")
+
+        else:
+            log.info(f"Unexpected response looking for host ip: {response}")
 
     # Return the configuration dict and initialise relevant manager class
     if cam['interface'] == 'soradcam':

@@ -14,7 +14,6 @@ from initialisation import camera_init
 from main_app import parse_args
 import functions.config_functions as cf
 import thread_managers.camera_manager as cameras
-
 import functions.redis_functions as rf
 
 # connect to redis
@@ -25,14 +24,13 @@ request_timeout = cameras.TIMEOUT*2.
 
 
 def main(conf):
-    print("Start test, initialising")
+
+    log.info("Start test, initialising")
     cam = camera_init(conf['CAMERA'])
     camera = cam['manager']
 
     camera.start()
     log.info(f"Connected to camera: {camera.connected}")
-
-
 
     try:
         while True:

@@ -231,30 +231,56 @@ class Soradcam(object):
                     self.busy = False
 
             elif self.picture_requested:
-                # fetch new image from remote camera
+                # request new image from remote camera
                 log.info("Picture requested from camera manager")
-                camera_url = f"http://{self.camera_ip}/get{self.res}"
-                log.info(camera_url)
+                #camera_url = f"http://{self.camera_ip}/get{self.res}"
+                # to prevent broken html pipe on delayed responses, make an asynchronous request
+                camera_url = f"http://{self.camera_ip}/get_async{self.res}"
+                #log.info(camera_url)
+                # first send the async request, which should return immediate acknowledgment
                 try:
                     response = requests.get(camera_url, timeout=TIMEOUT)
-                    log.info(f"Camera request response code: {response.status_code}")
+                    log.info(f"Camera capture request response code: {response.status_code}")
                     self.last_received_time = datetime.datetime.now() # when request was answered, irrespective of result
                     if (response.status_code >= 200) and (response.status_code < 300):
                         self.last_request_success = True
-                        self.last_valid_result = response
-                        self.last_received_time = datetime.datetime.now()
-                        with open(os.path.join(self.storage_path, f"{self.request_label}.jpg"), 'wb') as outfile:
-                            outfile.write(response.content)
+                        self.last_valid_result = response  #  this just stores the last response, useful for debugging
+                        breakpoint()  # check response to capture image_uuid
+                        image_uuid = response.result[0]
                     else:
                         self.last_request_success = False
-                        # self.last_valid_result = None
 
                 except requests.exceptions.ReadTimeout:
-                    log.warning("Timeout on camera request")
+                    log.warning("Timeout on camera capture request")
+                    self.connected = self.check_api_port()
+                    self.last_request_success = False
+
+                except Exception as err:
+                    log.warning("Unhandled exception during camera capture request")
+                    log.exception(err)
+                    self.connected = self.check_api_port()
+                    self.last_request_success = False
+
+                # Finally attempt to fetch the image
+                try:
+                    while self.last_request_time + datetime.timedelta(seconds=FORCED_TIMEOUT) > datetime.datetime.now():
+                        camera_url = f"http://{self.camera_ip}/fetch_async{image_uuid}"
+
+                    response = requests.get(camera_url, timeout=TIMEOUT)
+                    log.info(f"Camera image request response code: {response.status_code}")
+                    self.last_received_time = datetime.datetime.now() # when request was answered, irrespective of result
+                    if (response.status_code >= 200) and (response.status_code < 300):
+                        self.last_request_success = True
+
+                        with open(os.path.join(self.storage_path, f"{self.request_label}.jpg"), 'wb') as outfile:
+                            outfile.write(response.content)
+
+                except requests.exceptions.ReadTimeout:
+                    log.warning("Timeout on camera image fetch request")
                     self.connected = self.check_api_port()
 
                 except Exception as err:
-                    log.warning("Unhandled exception during camera request")
+                    log.warning("Unhandled exception during camera image fetch request")
                     log.exception(err)
                     self.connected = self.check_api_port()
 
