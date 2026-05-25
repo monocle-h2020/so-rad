@@ -64,6 +64,8 @@ def redis_retrieve(client, key, freshness=30):
         value = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
     elif dtype == "pickle":
         value = pickle.loads(client.get(key))
+    elif dtype == "bytes":
+        value = value
     else:
         return None, updated
 

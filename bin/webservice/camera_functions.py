@@ -184,6 +184,12 @@ def camera_main(common, conf):
         # camera_vals = get_latest_image(camera_vals)
 
         dest = os.path.join('.','static','latest_image_full.jpg')
+        if os.path.exists(dest):
+            os.remove(dest)
+        try:
+            os.symlink(filelist[-1], dest)
+        except: pass
+
         # download full version of latest image using send_file
         if (request.method == 'POST') and ('download-latest' in request.form.keys()):
             return send_file(dest, as_attachment=True, mimetype='jpg')
@@ -218,14 +224,14 @@ def latest_image(quality):
            raise Exception("Redis not initialised")
         camera_dict, u = redis_retrieve(client, 'camera_dict', freshness=None)
         camera_response, u = redis_retrieve(client, 'camera_last_image', freshness=None)
-        print(camera_response)
         if camera_response is None:
+            print("No redis entry 'camera_last_image'")
             return ''
-        img = camera_response.content
-        img_io = BytesIO()
-        pil_img = Image.open(BytesIO(img))
-        pil_img.save(img_io, 'JPEG', quality=int(quality))
-        img_io.seek(0)
+        print(f"Reading last camera image, {len(camera_response)} bytes")
+        pil_img = Image.open(BytesIO(camera_response))
+        #pil_img.save(img_io, 'JPEG', quality=int(quality))
+        #img_io.seek(0)
     except Exception as err:
         return f"Error serving latest image:\n{err}"
-    return send_file(img_io, mimetype='image/jpeg')
+    #return send_file(img_io, mimetype='image/jpeg')
+    return send_file(BytesIO(camera_response), mimetype='image/jpeg')
