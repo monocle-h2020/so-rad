@@ -24,46 +24,70 @@ img {
 <p>No camera configured for use</p>
 {% endif %}
 
+<p>{{ camera_vals['queue_status_message'] }}</p>
+
+Review, download and delete images and archives,<br>
+or generate a zip archive for a specific timeframe in zip format.<br>
+Requests are added to a processing queue.<br>
+Files that are ready for download will appear here when refreshing this page.<br>
+
 <p>{{ camera_vals['stored_gb'] }} Gb stored out of {{ camera_vals['max_storage_gb'] }} Gb allocated.</p>
 
   <form action="/camera" method = "POST">
+
     <p>Latest image {{ camera_vals['image_list'][0] }} preview:</p>
     <p><img src="{{ url_for('serve_img', quality=50) }}" width="500"></p>
-
     <input type = "submit" value = "Download full size image" name = "download-latest">
-    <p> {{ camera_vals['n_images'] }} Images available. List:
-      <input type = "number" value = {{ camera_vals['n_images_shown'] }} name = "n_images_shown" size="6"/> 
-      <input type = "submit" value = "Confirm"/> or: 
-      <input type = "submit" value = "Show all" name="All"/>
-      <input type = "submit" value = "Show 100 most recent" name="100"/>
-    </p>
-    <p>
-    Prepare zip image archive for download for period starting <br>
-    <input type = "string" value = "FIRST or YYYY-MM-DDTHH:MM:SS" name = "start_dt" size="28"/> 
-    and ending  <input type = "string" value = "LAST or YYYY-MM-DDTHH:MM:SS" name = "end_dt" size="28"/> 
-    <input type = "submit" value = "Confirm" name = "makezip" /><br>
-    Note: for large archives your web session may time out while the request completes.
 
     <p>
-    Available zip archives:
+      <label for="make_zip_start">Generate downloadable archive for timeframe:</label>
+      <input type="datetime-local" id="make_zip_start" name="make_zip_start" value={{camera_vals['make_zip_start_current']}} />
+      <label for="make_zip_end"> to:</label>
+      <input type="datetime-local" id="make_zip_end" name="make_zip_end" value={{camera_vals['make_zip_end_current']}} />
+      <input type = "submit" value = "Generate zip" name="makezip" />
+    </p>
+
+    <p> {{ camera_vals['n_datasets'] }} zip archives available: </p>
+    <p>
+    <input type = "submit" value = "Delete all stored zip archives" name = "clear_zip_storage">
+    <br>
     <table>
-    {% for m, s in zip(camera_vals['zip_list'], camera_vals['zip_sizes']) %}
+      <tr>
+        <th>File</th>
+        <th>Size (Mb)</th>
+        <th>Modified</th>
+        <th colspan=2>Actions</th>
+     </tr>
+    {% for m, s, c in zip(camera_vals['zip_list'], camera_vals['zip_sizes'], camera_vals['zip_dataset_mods']) %}
       <tr>
         <td align="left"> {{ m }} </td>
-        <td align="right"> {{ '%0d' %s }} Mb </td>
-        <td> <input type = "submit" value = "Download zip archive" name = "download_{{ m }}"> </td>
+        <td align="right"> {{ '%0d' %s }} </td>
+        <td align="left"> {{ c }} </td>
+        <td> <input type = "submit" value = "Download archive" name = "download_{{ m }}"> </td>
         <td> <input type = "submit" value = "Delete" name = "delete_{{ m }}"> </td>
       </tr>
     {% endfor %}
     </table>
     </p>
 
+    <p> {{ camera_vals['n_images'] }} Images available. List:
+      <input type = "number" value = {{ camera_vals['n_images_shown'] }} name = "n_images_shown" size="6"/> 
+      <input type = "submit" value = "Confirm"/> or: 
+      <input type = "submit" value = "Show all" name="All"/>
+      <input type = "submit" value = "Show 100 most recent" name="100"/>
+    </p>
+
     <p>
     Individual image files:
     <br>
-    <input type = "submit" value = "Delete all stored images" name = "clear_storage">
+    <input type = "submit" value = "Delete all stored images" name = "clear_img_storage">
     <br>
     <table>
+      <tr>
+        <th>File</th>
+        <th>Size (Mb)</th>
+        <th colspan=2>Actions</th>
+     </tr>
     {% for m, s in zip(camera_vals['image_list'], camera_vals['image_sizes']) %}
       <tr>
         <td align="left"> {{ m }} </td>

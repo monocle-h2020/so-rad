@@ -41,10 +41,13 @@ def camera_zip_from_web_request(storage_path,
         return
 
     try:
-        with zipfile.ZipFile(os.path.join(storage_path, f"{platform_id}_{label}.zip"),
-                             'w', zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(os.path.join(storage_path, f"{platform_id}_{label}.zipping"),
+                             'w', zipfile.ZIP_STORED) as z:
             for file in final_filepaths:
                 z.write(file)
+
+        os.rename(os.path.join(storage_path, f"{platform_id}_{label}.zipping"),
+                  os.path.join(storage_path, f"{platform_id}_{label}.zip"))
 
     except Exception as err:
         log.exception(err)

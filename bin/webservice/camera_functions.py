@@ -30,14 +30,15 @@ from dataset_functions import queue_info
 sorad_q = Queue('sorad_q', connection=Redis())
 
 
-def get_file_lists(conf):
+def get_file_lists(conf, storage_dir, mask='*.jpg'):
     """
-    list image files and zip archives
+    list files by extension
     """
-    filelist = glob.glob(os.path.join(conf['CAMERA']['storage_path'], '*.jpg'))
+    filelist = glob.glob(os.path.join(storage_dir, mask))
     # get image store size
     total_bytes = 0
     filesizes = []
+    filemods = []
     for file in filelist:
         filesizes.append(os.path.getsize(file))
 
@@ -48,23 +49,27 @@ def get_file_lists(conf):
         match = re.match(pat, file)
         if match:
             filetimes.append(datetime.datetime.strptime(match.group(1), '%Y-%m-%dT%H:%M:%S'))
+            filemods.append(datetime.datetime.strftime(
+                                     datetime.datetime.fromtimestamp(os.path.getmtime(file)),
+                                     '%Y%m%dT%H%M%S'))
 
     # sort filelist by observation timestamp
     filelist  = array(filelist)[argsort(filetimes)]
     filesizes = array(filesizes)[argsort(filetimes)]
     filetimes = array(filetimes)[argsort(filetimes)]
+    filemods =  array(filemods)[argsort(filetimes)]
 
-    zip_archives = glob.glob(os.path.join('.', 'static', '*.zip'))
-
-    return filelist, filesizes, filetimes, zip_archives
+    return filelist, filesizes, filetimes, filemods
 
 
 def camera_main(common, conf):
     """
     Show latest camera image if a camera is present/active
     """
+    print(0)
     try:
         storage_path = conf['DOWNLOAD'].get('storage_path')
+        imgdir = conf['CAMERA'].get('storage_path')
 
         client = redis_init()
         if client is None:
@@ -72,13 +77,22 @@ def camera_main(common, conf):
         camera_dict, u = redis_retrieve(client, 'camera_dict', freshness=None)
 
         camera_vals = {'n_images_shown': 100,
+                       'n_datasets_shown': 10,
                        'max_storage_gb': conf['CAMERA']['max_storage_gb'],
-                       'redis_camera_dict': camera_dict}
+                       'redis_camera_dict': camera_dict,
+                       'make_zip_start_current': datetime.datetime.strftime(datetime.datetime.now()-datetime.timedelta(hours=24), '%Y-%m-%dT%H:%M'),
+                       'make_zip_end_current': datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%dT%H:%M'),
+                       'queue_status_message': queue_info(sorad_q)}
 
-        filelist, filesizes, filetimes, zip_archives = get_file_lists(conf)
+        print(1)
+
+        filelist, filesizes, filetimes, filemods = get_file_lists(conf, storage_dir=imgdir, mask='*.jpg')
+        ziplist, zipsizes, ziptimes, zipmods = get_file_lists(conf, storage_path, mask='*.zip')
         camera_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
 
         if request.method == 'POST':
+
+            print(2)
 
             camera_vals['n_images_shown'] = int(request.form['n_images_shown'])
             if 'All' in request.form.keys():
@@ -90,43 +104,37 @@ def camera_main(common, conf):
             elif 'makezip' in request.form.keys():
                  filelist_start = -1
                  filelist_end = -2
+                 print(3)
 
-                 start_dt_str = request.form['start_dt']
-                 end_dt_str = request.form['end_dt']
+                 print(request.form['make_zip_start'])
+                 print(request.form['make_zip_end'])
+                 zip_start = datetime.datetime.strptime(request.form['make_zip_start'], "%Y-%m-%dT%H:%M")
+                 zip_end = datetime.datetime.strptime(request.form['make_zip_end'], "%Y-%m-%dT%H:%M")
+                 print(f"zip archive {zip_start} - {zip_end} requested")
 
-                 if start_dt_str.lower() == 'first':
-                     filelist_start = 0
-                 else:
-                     print(start_dt_str)
-                     try:
-                         start_dt = datetime.datetime.strptime(start_dt_str, '%Y-%m-%dT%H:%M:%S')
-                     except ValueError:
-                         return f"{start_dt_str} is not a valid timeformat for 'YYYY-mm-ddTHH:MM:SS'"
-                     for i, ft in enumerate(filetimes):
-                         if ft >= start_dt:
-                             filelist_start = i
-                             break
-                 if end_dt_str.lower() == 'last':
-                      filelist_end = -1
-                 else:
-                     try:
-                         end_dt = datetime.datetime.strptime(end_dt_str, '%Y-%m-%dT%H:%M:%S')
-                     except ValueError:
-                         return f"{end_dt_str} is not a valid timeformat for 'YYYY-mm-ddTHH:MM:SS'"
+                 camera_vals['make_csv_start_current'] = datetime.datetime.strftime(zip_start, '%Y-%m-%dT%H:%M')
+                 camera_vals['make_csv_end_current']   = datetime.datetime.strftime(zip_end, '%Y-%m-%dT%H:%M')
+                 print(3.1)
 
-                     for i, ft in enumerate(filetimes):
-                         if ft <= end_dt:
-                             filelist_end = i
-                         else:
-                             break
+                 for i, ft in enumerate(filetimes):
+                     if ft >= zip_start:
+                         filelist_start = i
+                         break
+
+                 for i, ft in enumerate(filetimes):
+                     if ft <= zip_end:
+                         filelist_end = i
+                     else:
+                         break
+                 print(3.2)
 
                  if filelist_end < filelist_start:
                      flash("No images found matching that time frame")
-
                  else:
                      try:
+                         print(4)
+
                          label = f"{filetimes[filelist_start].isoformat()}-{filetimes[filelist_end].isoformat()}"
-                         #zipresult = camera_zip(filelist[filelist_start:filelist_end],label)
                          print(f"requested zip file containing files from {filelist[filelist_start]} to {filelist[filelist_end]}")
                          job = sorad_q.enqueue(df.camera_zip_from_web_request,
                                                storage_path,
@@ -140,22 +148,30 @@ def camera_main(common, conf):
                      except Exception as err:
                          print(err)
 
-            elif 'clear_storage' in request.form.keys():
-                print(1)
+            elif 'clear_img_storage' in request.form.keys():
+                print('clear_img_storage')
                 for f in filelist:
                     if os.path.exists(f):
                         os.remove(f)
-                filelist, filesizes, filetimes, zip_archives = get_file_lists(conf)
+                filelist, filesizes, filetimes, filemods = get_file_lists(conf, storage_dir=imgdir, mask='*.jpg')
                 camera_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
+
+            elif 'clear_zip_storage' in request.form.keys():
+                print('clear_zip_storage')
+                for f in ziplist:
+                    if os.path.exists(f):
+                        os.remove(f)
+                ziplist, zipsizes, ziptimes, zipmods = get_file_lists(conf, storage_path, mask='*.zip')
+
 
             else:
                 for key in request.form.keys():
                     if 'download_' in key:
                         fileselected = '_'.join(key.split('_')[1:])
                         if os.path.basename(fileselected)[-3:] == 'jpg':
-                            rootpath = conf['CAMERA']['storage_path']
+                            rootpath = imgdir
                         elif os.path.basename(fileselected)[-3:] == 'zip':
-                            rootpath = './static'
+                            rootpath = storage_path
                         else:
                             print(f"Unknown download request for {fileselected}")
                             break
@@ -169,16 +185,25 @@ def camera_main(common, conf):
                         fileselected = '_'.join(key.split('_')[1:])
                         print(fileselected)
                         if os.path.basename(fileselected)[-3:] == 'jpg':
-                            rootpath = conf['CAMERA']['storage_path']
+                            rootpath = imgdir
                         elif os.path.basename(fileselected)[-3:] == 'zip':
-                            rootpath = './static'
+                            rootpath = storage_path
                         filepath = os.path.join(rootpath, fileselected)
                         if os.path.exists(filepath):
                             os.remove(filepath)
-                            filelist, filesizes, filetimes, zip_archives = get_file_lists(conf)
+                            filelist, filesizes, filetimes, filemods = get_file_lists(conf, storage_dir=imgdir, mask='*.jpg')
+                            ziplist, zipsizes, ziptimes, zipmods = get_file_lists(conf, storage_path, mask='*.zip')
                             camera_vals['stored_gb'] = f"{sum(filesizes) / 1024**3:.2f}"
                         else:
                             break
+
+        print(5)
+
+        camera_vals['n_datasets'] = len(ziplist)
+        if camera_vals['n_datasets'] < camera_vals['n_datasets_shown']:
+            camera_vals['n_datasets_shown'] = camera_vals['n_datasets']
+
+        print(5.1)
 
         camera_vals['n_images'] = len(filelist)
         if len(filelist) < camera_vals['n_images_shown']:
@@ -189,10 +214,12 @@ def camera_main(common, conf):
         filenames_short.reverse()
         camera_vals['image_list'] = filenames_short[0:camera_vals['n_images_shown']]
         camera_vals['image_sizes'] = [os.path.getsize(os.path.join(conf['CAMERA']['storage_path'],file))/1024. for file in filenames_short]
-        camera_vals['zip_list'] = [os.path.basename(z) for z in zip_archives]
-        camera_vals['zip_sizes'] = [os.path.getsize(z)/1024.**2 for z in zip_archives]
 
-        # camera_vals = get_latest_image(camera_vals)
+        camera_vals['zip_list'] = [os.path.basename(z) for z in ziplist]
+        camera_vals['zip_sizes'] = [os.path.getsize(z)/1024.**2 for z in ziplist]
+        camera_vals['zip_dataset_mods'] = list(zipmods)
+
+        print(6)
 
         dest = os.path.join('.','static','latest_image_full.jpg')
         if os.path.exists(dest):
@@ -206,6 +233,8 @@ def camera_main(common, conf):
             return send_file(dest, as_attachment=True, mimetype='jpg')
 
         try:
+            print(7)
+
             return render_template('camera.html',
                                    common=common,
                                    camera_vals=camera_vals,
@@ -215,6 +244,7 @@ def camera_main(common, conf):
             return err
             flash("Unable to load the requested page")
             flash(err)
+            print(err)
             return render_template('layout.html', common=common)
 
     except Exception as msg:
