@@ -14,20 +14,20 @@ import redis
 from PIL import Image
 from io import BytesIO
 import glob
-import zipfile
+from redis import Redis
 from redis_functions import redis_init, redis_retrieve
 from numpy import argsort, array
 import re
+import sys
+import inspect
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))))
+from functions import download_functions as df
+from rq import Queue
+from dataset_functions import queue_info
 
-def camera_zip(filepaths, label):
-    try:
-        with zipfile.ZipFile(os.path.join(".", "static", f"{label}.zip"),
-                             'w', zipfile.ZIP_DEFLATED) as z:
-            for file in filepaths:
-                 z.write(file)
-        return True
-    except:
-        return False
+
+# link to or create redis queue 'sorad_q'
+sorad_q = Queue('sorad_q', connection=Redis())
 
 
 def get_file_lists(conf):
@@ -64,6 +64,8 @@ def camera_main(common, conf):
     Show latest camera image if a camera is present/active
     """
     try:
+        storage_path = conf['DOWNLOAD'].get('storage_path')
+
         client = redis_init()
         if client is None:
            raise Exception("Redis not initialised")
@@ -122,12 +124,21 @@ def camera_main(common, conf):
                      flash("No images found matching that time frame")
 
                  else:
-                     label = f"{filetimes[filelist_start].isoformat()}-{filetimes[filelist_end].isoformat()}"
-                     zipresult = camera_zip(filelist[filelist_start:filelist_end],label)
-                     if zipresult:
-                         flash(f"Created image archive {label}.zip")
-                     else:
-                         flash(f"Error creating image archive.")
+                     try:
+                         label = f"{filetimes[filelist_start].isoformat()}-{filetimes[filelist_end].isoformat()}"
+                         #zipresult = camera_zip(filelist[filelist_start:filelist_end],label)
+                         print(f"requested zip file containing files from {filelist[filelist_start]} to {filelist[filelist_end]}")
+                         job = sorad_q.enqueue(df.camera_zip_from_web_request,
+                                               storage_path,
+                                               filelist[filelist_start:filelist_end],
+                                               label,
+                                               common['platform_id'],
+                                               job_timeout=3400)
+
+                         flash(f"Job {job.id} was added to the processing queue")
+
+                     except Exception as err:
+                         print(err)
 
             elif 'clear_storage' in request.form.keys():
                 print(1)

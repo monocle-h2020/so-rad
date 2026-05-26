@@ -34,7 +34,7 @@ import functions.config_functions as cf_func
 from thread_managers import timed_actions
 from numpy import nan, max
 
-__version__ = 20251015.1
+__version__ = 20260526.1
 
 
 # initiate redis connection
@@ -322,6 +322,8 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         time.sleep(1.0)
 
     log.info(f"There are {threading.active_count()} active threads left.")
+    for t in threading.enumerate()[1:]:
+        log.info(t.ident)
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
