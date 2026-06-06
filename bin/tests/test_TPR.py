@@ -24,10 +24,21 @@ def main(conf):
     print("Show live data for {0} second (0.01s refresh rate)".format(test_duration_single_reads))
     # get protocol from config
     t1 = time.time()
+
+    test_zeroing = True
+    x_sample = []
+    y_sample = []
+    z_sample = []
+
     while time.time() < t1 + test_duration_single_reads:
 
         u, t, p, r, x, y, z = tpr_manager.update_pitch_roll_single()
         print("{0} | Tilt: {1:2.2f} \t Pitch: {2:2.2f} \t Roll: {3:2.2f} \t x/y/z accelleration: {4}/{5}/{6}".format(u, t, p, r, x, y, z))
+
+        if test_zeroing:
+            x_sample.append(x)
+            y_sample.append(y)
+            z_sample.append(z)
 
         time.sleep(0.01)
 
