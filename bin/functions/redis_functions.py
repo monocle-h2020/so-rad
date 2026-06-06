@@ -30,7 +30,7 @@ def nptobase(x):
     try:
        x = x.item()
     except Exception as msg:
-        log.debug(msg)
+        # log.debug(msg)
         pass
     return x
 
