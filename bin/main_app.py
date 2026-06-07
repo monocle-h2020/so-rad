@@ -605,6 +605,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                            0.0, values['dt'],
                                                                            values['ship_bearing_mean'], motor,
                                                                            values['motor_pos'])
+
             except:
                 log.warning(f"No pointing solution found. Is GPS info available?")
                 ready['motor'] = False
