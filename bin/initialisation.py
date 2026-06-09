@@ -358,6 +358,9 @@ def tpr_init(tpr_config):
     tpr['xindex'] = tpr_config.getint('xindex')
     tpr['yindex'] = tpr_config.getint('yindex')
     tpr['zindex'] = tpr_config.getint('zindex')
+    tpr['x_offset'] = tpr_config.getfloat('x_offset')
+    tpr['y_offset'] = tpr_config.getfloat('y_offset')
+    tpr['z_offset'] = tpr_config.getfloat('z_offset')
     tpr['manager'] = None
 
     if not tpr['used']:

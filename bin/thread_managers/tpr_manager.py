@@ -63,6 +63,9 @@ class Ada_adxl345(object):
         self.yindex = tpr['yindex']  # 2
         self.zindex = tpr['zindex']  # 0
         self.xindex = tpr['xindex']  # 1
+        self.xoffset = tpr['x_offset']
+        self.yoffset = tpr['y_offset']
+        self.zoffset = tpr['z_offset']
         self.sampling_time = tpr['sampling_time']  # sampling cycle in seconds, default 10 seconds
         self.errorcount = 0
         try:
@@ -81,9 +84,9 @@ class Ada_adxl345(object):
 
     def update_pitch_roll_single(self):
         '''Pitch and Roll from rotation around X and Y axes'''
-        x = float(self.accelerometer.acceleration[self.xindex])
-        y = float(self.accelerometer.acceleration[self.yindex])
-        z = float(self.accelerometer.acceleration[self.zindex])
+        x = float(self.accelerometer.acceleration[self.xindex]) - self.xoffset
+        y = float(self.accelerometer.acceleration[self.yindex]) - self.yoffset
+        z = float(self.accelerometer.acceleration[self.zindex]) - self.zoffset
         self.x_acc = x
         self.y_acc = y
         self.z_acc = z

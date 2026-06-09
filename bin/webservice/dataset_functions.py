@@ -201,14 +201,14 @@ def download_main(common, conf):
         csv_filenames_short.reverse()
         dataset_vals['csv_dataset_list'] = csv_filenames_short[0:dataset_vals['n_datasets_shown']]
         dataset_vals['csv_dataset_sizes'] = [os.path.getsize(os.path.join(conf['DOWNLOAD']['storage_path'],file))/1024. for file in csv_filenames_short]
-        dataset_vals['csv_dataset_mods'] = list(csv_filemods)
+        dataset_vals['csv_dataset_mods'] = list(csv_filemods)   # fixme: this will not follow the same sort order as filenames_short
 
         hdf_filenames_short = [os.path.basename(f) for f in hdf_filelist]
         hdf_filenames_short.sort()
         hdf_filenames_short.reverse()
         dataset_vals['hdf_dataset_list'] = hdf_filenames_short[0:dataset_vals['n_datasets_shown']]
         dataset_vals['hdf_dataset_sizes'] = [os.path.getsize(os.path.join(conf['DOWNLOAD']['storage_path'],file))/1024. for file in hdf_filenames_short]
-        dataset_vals['hdf_dataset_mods'] = list(hdf_filemods)
+        dataset_vals['hdf_dataset_mods'] = list(hdf_filemods)  # fixme: this will not follow the same sort order as filenames_short
 
         print(dataset_vals)
 

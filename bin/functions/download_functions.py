@@ -16,11 +16,44 @@ import sqlite3
 import datetime
 import functions.db_functions as db_func
 import h5py
+import zipfile
 from numpy import unique, nanmean, argmin, argmax, nan
 from collections import OrderedDict
 
 log = logging.getLogger('download')
 #log.setLevel('DEBUG')
+
+
+def camera_zip_from_web_request(storage_path,
+                                filepaths,
+                                label,
+                                platform_id):
+
+    logfilename = os.path.join(storage_path, 'zip_log.txt')
+    log = init_job_logger(logfilename)
+    final_filepaths = []
+    for f in filepaths:
+        if os.path.isfile(f):
+            final_filepaths.append(f)
+
+    if len(final_filepaths) == 0:
+        log.info(f"No files matching request")
+        return
+
+    try:
+        with zipfile.ZipFile(os.path.join(storage_path, f"{platform_id}_{label}.zipping"),
+                             'w', zipfile.ZIP_STORED) as z:
+            for file in final_filepaths:
+                z.write(file)
+
+        os.rename(os.path.join(storage_path, f"{platform_id}_{label}.zipping"),
+                  os.path.join(storage_path, f"{platform_id}_{label}.zip"))
+
+    except Exception as err:
+        log.exception(err)
+
+    log.info(f"Saved {destination_file}")
+
 
 
 def hdf_from_web_request(storage_path, database_path,
@@ -31,7 +64,7 @@ def hdf_from_web_request(storage_path, database_path,
     Handle an hdf generation request from the web service (via redis queue).
     conf is the config read by configparser containing 'DATABASE' and 'DOWNLOAD' sections
     """
-    logfilename = os.path.join(storage_path, 'csv_log.txt')
+    logfilename = os.path.join(storage_path, 'hdf_log.txt')
     # make a dummy db_dict just to get db cursor
     db_dict = {'file': database_path}
 

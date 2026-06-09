@@ -44,16 +44,18 @@ def main(conf):
 
             if camera.last_request_success:
                 time_elapsed = (camera.last_received_time - camera.last_request_time).total_seconds()
-                print(f"Image taken at {camera.last_request_time.isoformat()}: {len(camera.last_valid_result.content)} bytes [{time_elapsed} s]")
-            else:
-                print(f"No image received, last response at {camera.last_received_time.isoformat()}")
+                log.info(f"Image taken at {camera.last_request_time.isoformat()}: {len(camera.last_image)} bytes [{time_elapsed} s]")
 
-            outpath = os.path.join(cam['storage_path'], label+'.jpg')
-            if os.path.exists(outpath):
-                print(f"Image stored at {outpath}")
-                rf.store(redis_client, 'last_picam_image', outpath)
+                outpath = os.path.join(cam['storage_path'], label+'.jpg')
+                if os.path.exists(outpath):
+                    log.info(f"Image stored at {outpath}")
+                    rf.store(redis_client, 'last_picam_image_path', outpath)
+                else:
+                    log.error(f"Error: Image not found at {outpath}")
+
             else:
-                print(f"Error: Image not found at {outpath}")
+                log.warning(f"No image received, last response at {camera.last_received_time.isoformat()}")
+
 
             time.sleep(1)
 

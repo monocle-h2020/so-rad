@@ -34,7 +34,7 @@ import functions.config_functions as cf_func
 from thread_managers import timed_actions
 from numpy import nan, max
 
-__version__ = 20251015.1
+__version__ = 20260526.1
 
 
 # initiate redis connection
@@ -322,6 +322,8 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         time.sleep(1.0)
 
     log.info(f"There are {threading.active_count()} active threads left.")
+    for t in threading.enumerate()[1:]:
+        log.info(t.ident)
 
     # Exit the program
     log.info("Idling {0} s before shutdown".format(idle_time))
@@ -345,7 +347,7 @@ def update_system_values(gps, values, tpr=None, rht=None, wind=None, motor=None,
     values['nsat0'] = gps['manager'].satellite_number
     values['heading'] = gps['manager'].heading
 
-    if gps['protocol'] in ['pybux2', 'rtk']:
+    if gps['protocol'] in ['pyubx2', 'rtk']:
         values['headMot'] = gps['manager'].headMot
         values['relPosHeading'] = gps['manager'].relPosHeading
         values['accHeading'] = gps['manager'].accHeading
@@ -395,7 +397,8 @@ def update_system_values(gps, values, tpr=None, rht=None, wind=None, motor=None,
             rf.store(redis_client, 'tilt_avg', tpr['manager'].tilt_avg, expires=30)
             rf.store(redis_client, 'tilt_std', tpr['manager'].tilt_std, expires=30)
             rf.store(redis_client, 'tilt_updated', tpr['manager'].avg_updated, expires=30)
-        except:
+        except Exception as err:
+            log.debug(f"Failed to update redis: {err}")
             pass
     return values
 
@@ -602,6 +605,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                                                                            0.0, values['dt'],
                                                                            values['ship_bearing_mean'], motor,
                                                                            values['motor_pos'])
+
             except:
                 log.warning(f"No pointing solution found. Is GPS info available?")
                 ready['motor'] = False
@@ -658,9 +662,6 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # check whether the interval for separate Ed sampling has passed
     ready['ed_sampling'] = check_ed_sampling(use_rad, rad, ready, values)
 
-    # collect latest GPS and TPR data now that a measurement may be triggered
-    values = update_system_values(gps, values, tpr, rht, wind, motor, redis=True)
-
     # update viewing azimuth details
     try:
         values['motor_deg'] = values['motor_pos'] / motor['steps_per_degree']
@@ -669,6 +670,9 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     values['rel_view_az'], values['solar_az'] = azi_func.sun_relative_azimuth(values['lat0'], values['lon0'], 0.0, values['dt'],
                                                                               values['ship_bearing_mean'], values['motor_deg'], motor,
                                                                               relative_azimuth_target=sample['relative_azimuth_target'])
+
+    # collect latest GPS and TPR data now that a measurement may be triggered
+    values = update_system_values(gps, values, tpr, rht, wind, motor, redis=True)
 
     # check achieved angle against configured limits
     ready['rel_az_limits'] = check_rel_az_limits(sample, values['rel_view_az'])
