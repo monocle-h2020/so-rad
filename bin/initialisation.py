@@ -409,8 +409,9 @@ def gps_init(gps_config, ports):
         log.info("Defaulting to GPS port settings in config file")
         gps['port1'] = gps_config.get('port1_default')
 
-    # Create serial objects for the GPS sensor port using variables from the config file
-    gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
+    if gps['protocol'] not in ['djim350']:
+        # Create serial objects for the GPS sensor port using variables from the config file
+        gps['serial1'] = serial.Serial(port=gps['port1'], baudrate=gps['baud1'], timeout=0.5, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False)
 
     # assign the relevant gps manager class
     if gps['protocol'] == 'rtk':
@@ -420,7 +421,9 @@ def gps_init(gps_config, ports):
     elif gps['protocol'] == 'pyubx2':
        gps['manager'] = gps_manager.PYUBX2()
     elif gps['protocol'] == 'djim350':
-       gps['manager'] = gps_manager.DJIM350()
+       gps['exe'] = gps_config.get('exe')
+       assert os.path.isfile(gps['exe'])
+       gps['manager'] = gps_manager.DJIM350(gps['exe'])
     else:
        log.exception("GPS protocol '{0}' is not implemented".format(gps['protocol']))
 
@@ -481,9 +484,13 @@ def rad_init(rad_config, ports):
                 log.warning(f"Radiometer identifier {autodetect_string} not found on any port")
     else:
         log.info("Port autodetect disabled, using manual configuration")
-        rad['ports'] = [rad_config.get('port1')]
-        rad['ports'].append(rad_config.get('port2'))
-        rad['ports'].append(rad_config.get('port3'))
+        if rad_config.get('port1').lower() != 'none':
+            rad['ports'] = [rad_config.get('port1')]
+        if rad_config.get('port2').lower() != 'none':
+            rad['ports'].append(rad_config.get('port2'))
+        if rad_config.get('port3').lower() != 'none':
+            rad['ports'].append(rad_config.get('port3'))
+
 
     if len(rad['ports']) < rad['n_sensors']:
         log.critical(f"{len(rad['ports'])} identified out of {rad['n_sensors']} expected.")
@@ -539,6 +546,8 @@ def sample_init(sample_conf):
     sample['relative_azimuth_target'] = float(sample_conf.get('relative_azimuth_target'))
     sample['minimum_relative_azimuth_deg'] = sample_conf.getint('minimum_relative_azimuth_deg')
     sample['maximum_relative_azimuth_deg'] = sample_conf.getint('maximum_relative_azimuth_deg')
+    sample['do_radiometry'] = sample_conf.getboolean('do_radiometry')
+    sample['radiometry_trigger_source'] = sample_conf.get('radiometry_trigger_source')
 
     # Return the sample dict
     return sample

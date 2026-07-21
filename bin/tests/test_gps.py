@@ -18,19 +18,64 @@ from functions.config_functions import read_config, update_config
 import logging
 
 
+
 def run_test(conf, terse=False):
     """Show GPS output stream"""
     # collect messages to return to web service
-    test_duration = 999  # seconds
-
     ports = list_ports.comports()
     for port, desc, hwid in sorted(ports):
         log.info("port info: {0} {1} {2}".format(port, desc, hwid))
 
-    log.info("Connecting to gps ports")
     gps = initialisation.gps_init(conf['GPS'], ports)
+
+    if gps['protocol'] == 'djim350':
+        test_dji(gps, terse)
+    else:
+        test_serial_protocols(gps, terse)
+
+
+def test_dji(gps, terse=False):
+    if gps['manager'] is not None:
+        gps['manager'].start()
+    else:
+        log.info("No GPS manager identified")
+    time.sleep(0.1)
+
+    if terse:
+        test_duration = 10
+    else:
+        test_duration = 999
+    if not terse:
+        log.info("Showing gps manager data for {0}s, CTRL-C to stop".format(test_duration))
+
+    t0 = time.perf_counter()
+
+    while (time.perf_counter() - t0) < test_duration:
+        msg = f"Updated\t\t {gps['manager'].last_update}\n"
+        msg+= f"Gps time\t\t {gps['manager'].datetime}\n"
+        msg+= f"Lat\t\t {gps['manager'].lat}\n"
+        msg+= f"Lon\t\t {gps['manager'].lon}\n"
+        msg+= f"Heading\t\t {gps['manager'].heading}\n"
+        msg+= f"Speed\t\t {gps['manager'].speed}\n"
+        msg+= f"Fix\t\t {gps['manager'].fix}\n"
+        msg+= f"pos_mode\t\t {gps['manager'].pos_mode}\n"
+        msg+= f"check: {check_gps(gps)}\n"
+        log.info(msg)
+        time.sleep(1.0)
+
+    log.info("Test complete")
+
+
+
+def test_serial_protocols(gps, terse=False):
+    log.info("Connecting to gps ports")
     log.info(gps['serial1'])
     log.info(f"GPS protocol: {gps['protocol']}")
+
+    if terse:
+        test_duration = 10
+    else:
+        test_duration = 999
 
     if not terse:
         log.info("Showing a few blocks of gps data, if available")
@@ -40,7 +85,9 @@ def run_test(conf, terse=False):
 
     log.info("starting gps managers")
     if gps['manager'] is not None:
-        gps['manager'].add_serial_port(gps['serial1'])
+        try:
+            gps['manager'].add_serial_port(gps['serial1'])
+        except: pass
         gps['manager'].start()
     else:
         log.info("No GPS manager identified")
