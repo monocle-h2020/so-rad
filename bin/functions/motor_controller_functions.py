@@ -347,7 +347,7 @@ def get_motor_pos(motor_serial_port):
         try:
             motor_pos = int(motor_pos, 16)
         except ValueError:
-            log.info("No response from motor")
+            log.info(f"No valid response from motor: {motor_pos}")
             motor_pos = None
     return motor_pos
 

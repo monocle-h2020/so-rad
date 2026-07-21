@@ -108,7 +108,7 @@ def test_serial_protocols(gps, terse=False):
                 header = """\nTime \t\t {0} \nLat \t\t {1} \t Lon \t {2} \nSpeed \t\t {3} \nFix \t\t {4} \t nSat {7} \t Checks: {8} \nheading \t {5} (Check: {6})""".\
                       format(gps['manager'].last_update, gps['manager'].lat, gps['manager'].lon,
                       gps['manager'].speed, gps['manager'].fix,
-                      gps['manager'].heading, check_heading(gps), gps['manager'].satellite_number, check_gps(gps))
+                      gps['manager'].heading, check_heading(gps, bearing_fixed=False), gps['manager'].satellite_number, check_gps(gps))
                 vals = """headMot \t {0} \nrelPosHead \t {1} \nAcc \t\t {2} \nVehH valid \t {3} \nRelPosH valid\t {4} \nDiff Soln\t {5}\n GNSS fix\t {6}""".\
                       format(gps['manager'].headMot, gps['manager'].relPosHeading, gps['manager'].accHeading,
                       gps['manager'].flags_headVehValid, gps['manager'].flag_relPosHeadingValid, gps['manager'].flags_diffSolN, gps['manager'].flags_gnssFixOK)

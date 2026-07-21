@@ -48,6 +48,7 @@ class Soradcam(object):
         self.last_request_time = None
         # last image received
         self.last_valid_result = None
+        self.last_image = None
         # last request success
         self.last_request_success = False
         # last time a request to the camera was answered
@@ -101,7 +102,6 @@ class Soradcam(object):
                   }
 
         rf.store(redis_client, 'camera_dict', camdict, expires=30)
-        rf.store(redis_client, 'camera_last_image', self.last_valid_result, expires=30)
 
     def check_storage(self):
         '''
@@ -190,7 +190,10 @@ class Soradcam(object):
         self.stop_monitor = True
         time.sleep(1*self.sleep_interval)
         log.info(self.thread)
-        self.thread.join(2*self.sleep_interval)
+        try:
+            self.thread.join(2*self.sleep_interval)
+        except:
+            pass
         log.info("Camera manager running = {0}".format(self.thread.is_alive()))
         self.started = False
 
@@ -207,7 +210,7 @@ class Soradcam(object):
             self.busy = True
             self.picture_requested = True
             self.request_label = label
-            log.info(f"Image requested at {self.last_request_time}")
+            log.info(f"Setting image request at {self.last_request_time}")
             self.update_redis()
         return
 
@@ -217,6 +220,7 @@ class Soradcam(object):
         This will run and read new data and pass it back
         """
         log.info("Starting camera monitor thread")
+
         while not self.stop_monitor:
             if not self.connected:
                 self.connected = self.check_api_port()
@@ -230,33 +234,92 @@ class Soradcam(object):
                     self.last_request_success = False
                     self.busy = False
 
-            elif self.picture_requested:
-                # fetch new image from remote camera
+            if self.picture_requested:
+                # request new image from remote camera
+                image_uuid = None
                 log.info("Picture requested from camera manager")
-                camera_url = f"http://{self.camera_ip}/get{self.res}"
-                log.info(camera_url)
+                #camera_url = f"http://{self.camera_ip}/get{self.res}"
+                # to prevent broken html pipe on delayed responses, make an asynchronous request
+                camera_url = f"http://{self.camera_ip}/get{self.res}_async"
+                # first send the async request, which should return immediate acknowledgment
                 try:
                     response = requests.get(camera_url, timeout=TIMEOUT)
-                    log.info(f"Camera request response code: {response.status_code}")
+                    log.info(f"Camera capture request response code: {response.status_code}")
                     self.last_received_time = datetime.datetime.now() # when request was answered, irrespective of result
-                    if (response.status_code >= 200) and (response.status_code < 300):
+                    if response.ok:
+                        log.info(f"Camera request id {response.text}")
                         self.last_request_success = True
-                        self.last_valid_result = response
-                        self.last_received_time = datetime.datetime.now()
-                        with open(os.path.join(self.storage_path, f"{self.request_label}.jpg"), 'wb') as outfile:
-                            outfile.write(response.content)
+                        self.last_valid_result = response  #  this just stores the last response, useful for debugging
+                        image_uuid = response.text
                     else:
                         self.last_request_success = False
-                        # self.last_valid_result = None
+                        log.warning("Camera image request not acknowledged by camera")
 
-                except requests.exceptions.ReadTimeout:
-                    log.warning("Timeout on camera request")
+                except (requests.exceptions.ReadTimeout, NewConnectionError, ConnectTimeoutError, RemoteDisconnected) as err:
+                    log.warning(f"Timeout on camera capture request: {err}")
                     self.connected = self.check_api_port()
+                    self.last_request_success = False
+                    self.busy = False
+                    self.picture_requested = False
+                    self.update_redis()
 
                 except Exception as err:
-                    log.warning("Unhandled exception during camera request")
+                    log.warning("Unhandled exception during camera capture request")
                     log.exception(err)
                     self.connected = self.check_api_port()
+                    self.last_request_success = False
+                    self.busy = False
+                    self.picture_requested = False
+                    self.update_redis()
+
+                except KeyboardInterrupt:
+                    self.stop()
+
+
+                # Attempt to fetch the image
+                if image_uuid is not None:
+                    try:
+                        while self.last_request_time + datetime.timedelta(seconds=TIMEOUT) > datetime.datetime.now():
+                            log.info(f"Request image id {image_uuid}")
+                            camera_url = f"http://{self.camera_ip}/fetch_async/{image_uuid}"
+
+                            response = requests.get(camera_url, timeout=TIMEOUT)
+                            log.info(f"Camera image request response code: {response.status_code}")
+                            self.last_received_time = datetime.datetime.now() # when request was answered, irrespective of result
+                            if response.ok:
+                                self.last_request_success = True
+                                self.last_valid_result = response  #  this just stores the last response, useful for debugging
+                                self.last_image = response.content #  bytes object, a jpeg image
+
+                                if len(response.content) > 0:
+
+                                    with open(os.path.join(self.storage_path, f"{self.request_label}.jpg"), 'wb') as outfile:
+                                        outfile.write(response.content)
+
+                                    rf.store(redis_client, 'camera_last_image', self.last_image, expires=30)
+                                    log.info(f"Stored last image on redis, {len(self.last_image)} bytes")
+
+                                    break
+
+                                elif  response.text == '':
+                                    # sleep for a short standard period
+                                    time.sleep(0.3)
+                            else:
+                                # sleep for a short standard period
+                                time.sleep(0.1)
+
+
+                    except (requests.exceptions.ReadTimeout, NewConnectionError, ConnectTimeoutError, RemoteDisconnected) as err:
+                        log.warning(f"Timeout on camera capture request: {err}")
+                        self.connected = self.check_api_port()
+
+                    except Exception as err:
+                        log.warning("Unhandled exception during camera image fetch request")
+                        log.exception(err)
+                        self.connected = self.check_api_port()
+
+                    except KeyboardInterrupt:
+                        self.stop()
 
                 # return to normal state
                 self.busy = False
@@ -280,3 +343,4 @@ class Soradcam(object):
 
     def __del__(self):
         self.stop()
+

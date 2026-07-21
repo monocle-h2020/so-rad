@@ -30,7 +30,7 @@ def nptobase(x):
     try:
        x = x.item()
     except Exception as msg:
-        log.debug(msg)
+        # log.debug(msg)
         pass
     return x
 
@@ -71,6 +71,7 @@ def retrieve(client, key, freshness=30):
     if dtype is None:
         log.warning(f"Key {key} not registered in redis")
         return None, None, None
+
     dtype = dtype.decode('utf-8')
     value = client.get(key)
 
@@ -83,17 +84,20 @@ def retrieve(client, key, freshness=30):
 
     if dtype in ['float', 'int', 'str', 'datetime']:
         value = value.decode('utf-8')
+        if dtype == "float":
+            value = float(value)
+        elif dtype == "int":
+            value = int(value)
+        elif dtype == "str":
+            value = str(value)
+        elif dtype == "datetime":
+            value = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
 
-    if dtype == "float":
-        value = float(value)
-    elif dtype == "int":
-        value = int(value)
-    elif dtype == "str":
-        value = str(value)
-    elif dtype == "datetime":
-        value = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
     elif dtype == "pickle":
         value = pickle.loads(client.get(key))
+    elif dtype == "bytes":
+        value = value
+
     else:
         log.warning(f"reading dtype {dtype} not implemented")
         return None, updated, None
@@ -136,13 +140,19 @@ def store(client, key, value, expires=30):
          (isinstance(value, dict)) or (isinstance(value, np.ndarray)):
         client.set(f"{key}_dtype", "pickle")
         pickleit=True
+    elif isinstance(value, bytes):
+        client.set(f"{key}_dtype", "pickle")
+        pickleit=True
     elif value is None:
         client.set(f"{key}_dtype", "pickle")
         pickleit=True
     else:
         log.warning(f"Setting dtype {type(value)} not implemented, using pickle")
         try:
-            log.info(f"record was {key} : {value}")
+            if len(value)>500:
+                log.info(f"record was {key} : {value[0:500]}")
+            else:
+                log.info(f"record was {key} : {value}")
         except:
             pass
         client.set(f"{key}_dtype", "pickle")

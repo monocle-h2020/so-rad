@@ -58,6 +58,12 @@ def check_remote_data_store(export_config_dict):
     except requests.exceptions.ReadTimeout:
         log.warning("Timeout connecting to remote data store")
         return False, None
+    except requests.exceptions.ConnectTimeout:
+        log.warning("Timeout connecting to remote data store")
+        return False, None
+    except urllib3.exceptions.MaxRetryError:
+        log.warning("Timeout connecting to remote data store")
+        return False, None
     except requests.urllib3.exceptions.NewConnectionError:
         log.warning("No connection with remote data store")
         return False, None

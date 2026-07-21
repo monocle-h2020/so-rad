@@ -11,13 +11,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfi
 from main_app import parse_args
 from functions.check_functions import check_internet, check_remote_data_store
 import functions.config_functions as cf
+from initialisation import export_init, db_init
 
 def run_test(conf):
     """Test connectivity to internet and remote stores"""
     result = check_internet()
     print(f"Internet connection: {result}")
 
-    result = check_remote_data_store(conf)
+    db = db_init(conf['DATABASE'])
+
+    export_dict = export_init(conf, db)
+    if not export_dict['used']:
+        log.info("No data export configured")
+
+    result = check_remote_data_store(export_dict)
     print(f"Remote store connection: {result}")
 
 
