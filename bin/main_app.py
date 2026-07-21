@@ -165,7 +165,10 @@ def init_all(conf):
         time.sleep(0.1)
 
     if gps['manager'] is not None:
-        gps['manager'].add_serial_port(gps['serial1'])
+        if gps['protocol'] in ['djim350']:
+            log.info("Skip GPS serial port assignment, it is handled elsewhere")
+        else:
+            gps['manager'].add_serial_port(gps['serial1'])
         gps['manager'].start()
 
     if tpr['manager'] is not None:
@@ -237,6 +240,16 @@ def init_all(conf):
 
     else:
         radiometry_manager = None
+
+    # set up radiometry sampling switch, if any
+    if sample['radiometry_trigger_source'] not in [None, 'none', 'None']:
+        if (sample['trigger_source'] == 'djim350') and (gps['protocol'] == 'djim350'):
+            # override the default switch state with link new switch
+            log.info(f"Radiometry on/off is controlled via {sample['trigger_source']}")
+            sample['do_radiometry'] = gps['manager'].do_radiometry
+            # to get the state of the switch at any time call the linked function: sample['do_radiometry']()
+        else:
+            log.error(f"Radiometry switch source {sample['trigger_source']} is not matched and will be ignored")
 
     # Return all the dicts and manager objects
     return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, wind, power_schedule, export, datasets, maintenance
@@ -499,6 +512,8 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage
 
+    log.info(f"Radiometry switch is {sample['do_radiometry']()}")
+
     # Check positioning
     ready['gps']  = check_gps(gps)
     ready['heading'] = check_heading(gps, bearing_fixed)
@@ -676,7 +691,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     # If all checks are good, take radiometry measurements
     if all([use_rad, ready['gps'], ready['rad'], ready['sun'],
                      ready['speed'], ready['heading'], ready['motor'],
-                     ready['rel_az_limits']]):
+                     ready['rel_az_limits'], sample['do_radiometry']()]):
 
         # Get the current time of the computer as a unique trigger id
         rf.store(redis_client, 'sampling_status', 'sampling', expires=30)
@@ -716,7 +731,7 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # alternatively trigger just the Ed sampling, if corresponding conditions are met
     elif (abs(trigger_id['ed_sensor'].timestamp() - datetime.datetime.now().timestamp()) > rad['ed_sampling_interval'])\
-        and (ready['ed_sampling']):
+        and (ready['ed_sampling']) and (sample['do_radiometry']()):
         rf.store(redis_client, 'sampling_status', 'sampling_ed', expires=30)
         trigger_id['ed_sensor'] = datetime.datetime.now()
 
