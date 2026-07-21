@@ -18,67 +18,8 @@ import struct
 import datetime
 import logging
 
+log = logging.getLogger('pt2')
 
-def test():
-    """
-    Reads config file to set up environment then
-    - check sensor lan state (switch off to save power)
-    - record one sample with the sensor
-    - plot the spectrum (optional)
-    """
-    ports = list_ports.comports()
-    for port, desc, hwid in ports:
-        log.info(f"port: {port} | description: {desc} | hwid: {hwid}")
-
-    mod = find_modbus(ports, autodetect_string="SER=FT5UMZYB")  # edit the autodetect_string to test a specific interface.
-
-    open_modbus(mod)
-    time.sleep(0.5)
-
-    log.info("Checking for trios sensor")
-    tries = 0
-    result = None
-    while result is None and tries < 3:
-        tries +=1
-        result = report_slave_id(mod, slave_id=1, timeout=3)
-    if result is None:
-        mod['serial'].close()
-        return
-
-    log.info("Reading system registers")
-    result = read_all_system_registers(mod)
-
-    log.info("reading serial number")
-    devserial = read_one_register(mod, 'device_serial_number')
-    log.info(f"Serial number: {devserial}")
-
-    log.info("checking lan state")
-    lanstate = get_lan_state(mod)
-    log.info(f"Lan state: {lanstate}")
-
-    if lanstate:
-        log.info("setting land state OFF")
-        set_lan_state(mod, False)
-        log.info("checking lan state (2)")
-        lanstate = get_lan_state(mod)
-
-    log.info("Sampling one spectrum")
-    result = sample_one(mod)
-    log.info(f"Integration time: {result.integration_time['value']} ({type(result.integration_time['value'])})")
-    log.info(f"Inclination (pre/post): {result.pre_inclination['value']} ({type(result.pre_inclination['value'])})/ {result.post_inclination['value']} ({type(result.post_inclination['value'])})")
-    log.info(f"Uncalibrated spectrum ({type(result.spectrum)}): {result.spectrum}")
-
-    log.info("checking inttime state")
-    inttime = read_one_register(mod, 'integration_time_cfg')
-    log.info(f"Integration time: {inttime}")
-
-    if inttime > 0:
-        log.info("Setting integration time to auto (0)")
-        set_integration_time(mod, inttime=0)
-        inttime = read_one_register(mod, 'integration_time_cfg')
-        log.info(f"Integration time: {inttime}")
-
-    mod['serial'].close()
 
 class G2registers():
     """All G2 registers and how to read them"""
@@ -445,7 +386,7 @@ class CrcEmptyMessage(Exception):
     pass
 
 
-def report_slave_id(mod, slave_id=1, timeout=3.0):
+def report_slave_id(mod, slave_id=1, timeout=3.0, retries=3):
     """
     Special function reporting back sensor informationin ascii coding: sensor name, serial number and firmware version.
     """
@@ -467,31 +408,37 @@ def report_slave_id(mod, slave_id=1, timeout=3.0):
 
     command = "".join([id, fun_code, reg_address, n_regs, crc16_check])
 
-    # Send the command to the controller
-    mod['serial'].flushInput()
-    mod['serial'].flushOutput()
-    mod['serial'].write(codecs.decode(command, 'hex'))
+    success = False
 
-    # Read the response
-    a = mod['serial'].in_waiting
-    t0 = time.perf_counter()
-    while a<1 and (time.perf_counter() - t0 < timeout):
-        time.sleep(0.2)
+    for r in range(retries):
+        # Send the command to the controller
+        mod['serial'].flushInput()
+        mod['serial'].flushOutput()
+        mod['serial'].write(codecs.decode(command, 'hex'))
+
+        # Read the response
         a = mod['serial'].in_waiting
+        t0 = time.perf_counter()
+        while a<1 and (time.perf_counter() - t0 < timeout):
+            time.sleep(0.1)
+            a = mod['serial'].in_waiting
 
-    # read response of location
-    response = mod['serial'].read(size=a)
-    try:
-        make = response[3:-2].split(b'\x00')[0].decode('ascii')
-        model = response[3:-2].split(b'\x00')[1].decode('ascii')
-        serialn = response[3:-2].split(b'\x00')[2].decode('ascii')
-        version = response[3:-2].split(b'\x00')[3].decode('ascii')
-        log.info(f"{mod['serial'].port}: {make} | {model} | {serialn} | {version}")
+        # read response of location
+        response = mod['serial'].read(size=a)
+        try:
+            make = response[3:-2].split(b'\x00')[0].decode('ascii')
+            model = response[3:-2].split(b'\x00')[1].decode('ascii')
+            serialn = response[3:-2].split(b'\x00')[2].decode('ascii')
+            version = response[3:-2].split(b'\x00')[3].decode('ascii')
+            log.info(f"{mod['serial'].port}: {make} | {model} | {serialn} | {version}")
+            success = True
+        except:
+            log.info(f"No TriOS G2 response on {mod['serial'].port} (tries={r+1}): {response}")
+
+    if success:
         return serialn
-    except:
-        log.info(f"No TriOS G2 response on {mod['serial'].port}: {response}")
+    else:
         return None
-
 
 def init_logger():
     """Initialises the root logger for the program
@@ -603,11 +550,3 @@ def calc_crc16(inputcommand):
     converted_crc16_modbus = ''.join([crc16_modbus[2:4], crc16_modbus[0:2]])
 
     return converted_crc16_modbus
-
-
-if __name__ == '__main__':
-    # start logging here
-    log = init_logger()
-    test()
-else:
-    log = logging.getLogger('pt2')
