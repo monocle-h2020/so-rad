@@ -23,6 +23,7 @@ import time
 import re
 import json
 from math import pi, sqrt, cos, sin, atan2, degrees
+from numpy import deg2rad, rad2deg, arccos
 import threading
 import datetime
 import logging
@@ -84,13 +85,13 @@ class DJI_PSDK():
         self.rtk_hfsl = None
         self.rtk_lat = None
         self.rtk_lon = None
-        self.rtk_connection = None  # this appears to be hard-coded '1' in the SDK
         self.compass_x = None
         self.compass_y = None
         self.compass_z = None
         self.fused_lat = None
         self.fused_lon = None
         self.fused_alt = None
+        self.altitude_barometer = None
 
         # interpreted fields
         # self.gps_time
@@ -133,7 +134,8 @@ class DJI_PSDK():
         self.last_update = datetime.datetime.now()
 
         # threading
-        self.sleep_interval = 0.5
+        self.read_interval = 0.05
+        self.sleep_interval = 0.1
         self.started = False
         self.stop_monitor = False
         self.thread = None
@@ -146,14 +148,10 @@ class DJI_PSDK():
             tds = td.total_seconds()
             msg =  f"DJI-GPS {self.last_update.isoformat()} Aircraft time: {self.datetime.isoformat()} Diff = {tds}\n"
 
-        msg += f"\t\t\t\t\t\tGPS   lat: {self.lat_gps:.6f} lon: {self.lon_gps:.6f} speed: {self.speed} Alt: {self.alt_gps} nsat: {self.satellite_number} fix: {self.fix}\n"
-        msg += f"\t\t\t\t\t\tRTK   lat: {self.lat_rtk:.6f} lon: {self.lon_rtk:.6f} Alt: {self.alt_rtk} | Connected: {self.rtk_connection} | Solution: {self.rtk_solution_code}\n"
-        if None not in [self.fused_lat, self.fused_lon, self.fused_alt, self.nsat]:
-            msg += f"\t\t\t\t\t\tFused lat: {self.fused_lat:.6f} lon: {self.fused_lon:.6f} Alt: {self.fused_alt} nsat: {self.nsat}\n"
-        msg += f"\t\t\t\t\t\tBatteries {self.battery1_capacity}%|{self.battery2_capacity}%\n"
-        msg += f"\t\t\t\t\t\tBatteries {self.battery1_capacity}%|{self.battery2_capacity}%\n"
-        msg += f"\t\t\t\t\t\tAltitude from home {self.alt_from_home} m\n"
-        msg += f"\t\t\t\t\t\tHome alt {self.home_altitude} m\n"
+        msg += f"\t\t\t\t\t\tGPS   lat: {self.lat_gps} lon: {self.lon_gps} speed: {self.speed} Alt: {self.alt_gps} nsat: {self.satellite_number} fix: {self.fix}\n"
+        msg += f"\t\t\t\t\t\tRTK   lat: {self.lat_rtk} lon: {self.lon_rtk} Alt: {self.alt_rtk} | Solution: {self.rtk_solution_code}\n"
+        msg += f"\t\t\t\t\t\tTilt     : {self.tilt}  pitch: {self.pitch}  roll: {self.roll} yaw: {self.yaw}\n"
+        msg += f"\t\t\t\t\t\tAltitude {self.alt}, {self.alt_from_home} m from home altitude\n"
         msg += f"\t\t\t\t\t\tHeading {self.heading} \n"
 
         return msg
@@ -208,25 +206,18 @@ class DJI_PSDK():
         try:
             step = 0
             while (popen.poll() is None) and (not self.stop_monitor):
-                events = sel.select(timeout=self.sleep_interval) # Blocks until data is ready or timeout passes
+                events = sel.select(timeout=self.read_interval) # Blocks until data is ready or timeout passes
                 for key, _ in events:
                     line = key.fileobj.readline()
                     log.debug(line)
                     self.parse_line(line)
-                    if self.appstarted and self.gpssuccess and self.policyok and self.positionupdateevent:
-                        # update values at every positionupdate-event
-                        try:
-                            self.update_all()
-                            self.positionupdateevent = False
-                        except Exception as msg:
-                            log.exception(msg)
 
-                        # control the frequency of console logging
-                        if (self.display) and step == 0:
-                            log.info(self)
-                            step += 1
-                        elif step == self.display_step:
-                            step = 0
+                    # control the frequency of console logging
+                    if (self.display) and step == 0:
+                        log.info(self)
+                        step += 1
+                    elif step == self.display_step:
+                        step = 0
                     else:
                         log.debug(f"Waiting for data: app started {self.appstarted}, gps subscription {self.gpssuccess}, policy updated {self.policyok}")
 
@@ -279,8 +270,21 @@ class DJI_PSDK():
             value = d['widgetValue']
             self.widgets[index] = value
             self.do_widget_action(index, value)
+            return
 
-        elif 'rtk_solution' in d.keys():
+        # if the symbol is a part of this class we'll update its value
+        positionupdate = False
+        for key, value in d.items():
+            if key in self.__dict__.keys() and not callable(getattr(self, key)):
+                setattr(self, key, value)
+                log.debug(f"{key} was updated to {getattr(self,key)} by {func}")
+                if key in ['gps_x', 'rtk_lon']:
+                    log.debug("Received gps/rtk position data")
+                    positionupdate = True
+            else:
+                log.warning(f"received {key} from {func} but this attribute is not known")
+
+        if 'rtk_solution' in d.keys():
             self.rtk_solution_code = d['rtk_solution']
             self.rtk_solution = {
                               0: "DJI_FC_SUBSCRIPTION_POSITION_SOLUTION_PROPERTY_NOT_AVAILABLE",
@@ -299,19 +303,13 @@ class DJI_PSDK():
                              49: "DJI_FC_SUBSCRIPTION_POSITION_SOLUTION_PROPERTY_WIDE_LANE_AMBIGUITY_INT (Integer wide-lane ambiguity solution)",
                              50: "DJI_FC_SUBSCRIPTION_POSITION_SOLUTION_PROPERTY_NARROW_INT (Narrow fixed point position solution)"
                          }[int(self.rtk_solution_code)]
-        else:
-            # if the symbol is a part of this class we'll update its value
-            positionupdate = False
-            for key, value in d.items():
-                if key in self.__dict__.keys() and not callable(getattr(self, key)):
-                    setattr(self, key, value)
-                    log.debug(f"{key} was updated to {getattr(self,key)} by {func}")
-                    if key in ['gpx_x', 'rtk_lon']:
-                        positionupdate = True
-                else:
-                    log.warning(f"received {key} from {func} but this attribute is not known")
-            if positionupdate:
-                self.positionupdateevent = True
+
+        if positionupdate:
+            if self.appstarted and self.gpssuccess and self.policyok:
+                try:
+                    self.update_all()
+                except Exception as msg:
+                    log.exception(msg)
 
 
     def widgetdonothing(self):
@@ -321,7 +319,7 @@ class DJI_PSDK():
     def set_do_radiometry(self):
         # switch state of startradiometry attribute. A parent function may look at this to determine action.
         self._do_radiometry = not self._do_radiometry
-        log.info(f"A widget changed the state of do_radiometry to {self.do_radiometry}")
+        log.info(f"A widget changed the state of do_radiometry to {self.do_radiometry()}")
 
     def do_radiometry(self):
         "Report state of self._do_radiometry"
@@ -411,18 +409,24 @@ class DJI_PSDK():
     def update_compass(self):
         """
         """
-        if None in [self.pitch, self.roll, self.compass_x, self.compass_y, self.compass_z]:
+        if None in [self.pitch, self.roll, self.yaw, self.compass_x, self.compass_y, self.compass_z]:
             self.heading = None
+            self.tilt = None
             return
 
         pitch = self.pitch
         roll = self.roll
+
+        # tilt from pitch/roll
+        tilt = arccos(cos(deg2rad(roll)) * cos(deg2rad(pitch)))
+        self.tilt = rad2deg(tilt)
+
         mx = self.compass_x
         my = self.compass_y
         mz = self.compass_z
         declination_deg = 0  # not currently used
 
-        # mag\netometer readings -> horizontal plane
+        # magnetometer readings -> horizontal plane
         xh = (mx * cos(pitch) + my * sin(roll) * sin(pitch) + mz * cos(roll) * sin(pitch))
 
         yh = (my * cos(roll) - mz * sin(roll))
@@ -439,9 +443,14 @@ class DJI_PSDK():
             return
 
         if self.timestamp_us > 0:
-            ts_us = f"{int(str(self.timestamp_us)[0:6]):06d}"
-            self.datetime = datetime.datetime.strptime(f"{self.gps_date}{self.gps_time}.{ts_us}",
-                                                               "%Y%m%d%H%M%S.%f")
+            try:
+                ts_us = f"{int(str(self.timestamp_us)[0:6]):06d}"
+                self.datetime = datetime.datetime.strptime(f"{self.gps_date}{self.gps_time}.{ts_us}",
+                                                                   "%Y%m%d%H%M%S.%f")
+            except ValueError:
+                self.datetime = None
+            except Exception:
+                raise
 
     def update_position_gps(self):
         """
@@ -450,12 +459,13 @@ class DJI_PSDK():
         Latitude in Decimal Degrees = x/10^7  * 180/pi
         Longitude in Decimal Degrees = y/10^7  * 180/pi
         """
+        if self.gps_fix is not None:
+            self.fix = int(self.gps_fix)
+
         if None in [self.gps_x, self.gps_y, self.gps_z, self.gps_fix, self.nsat]:
             self.lat_gps, self.lon_gps, self.alt_gps = None, None, None
-            if self.gps_fix is not None:
-                self.fix = int(self.gps_fix)
             return
-        self.fix = int(self.gps_fix)
+
         self.satellite_number = int(self.nsat)
         self.lat_gps = float(self.gps_x)/10**7
         self.lon_gps = float(self.gps_y)/10**7
@@ -482,20 +492,23 @@ class DJI_PSDK():
         """
         Decide which positioning info to use
         """
+        if self.altitude_barometer is not None:
+            self.alt = float(self.altitude_barometer)
+            self.alt_from_home = self.alt - float(self.home_altitude)
+        else:
+            self.alt = None
+            self.alt_from_home = None
+
         if (self.rtk_solution_code is not None) and (self.rtk_solution_code >= 16):
             self.lat = self.lat_rtk
             self.lon = self.lon_rtk
-            self.alt = self.alt_rtk
             self.pos_mode = 'rtk'
-            self.alt_from_home = self.alt - float(self.home_altitude)
         elif (self.fix is not None) and (self.fix >= 3):
             self.lat = self.lat_gps
             self.lon = self.lon_gps
-            self.alt = self.alt_gps
             self.pos_mode = 'gps'
-            self.alt_from_home = self.alt - float(self.home_altitude)
         else:
-            self.lat, self.lon, self.alt = None, None, None
+            self.lat, self.lon = None, None
             self.pos_mode = None
 
     def update_speed(self):
