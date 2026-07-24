@@ -52,14 +52,14 @@ def test_dji(gps, terse=False):
 
     while (time.perf_counter() - t0) < test_duration:
         msg = f"Updated\t\t {gps['manager'].last_update}\n"
-        msg+= f"Gps time\t\t {gps['manager'].datetime}\n"
+        msg+= f"Gps time\t {gps['manager'].datetime}\n"
         msg+= f"Lat\t\t {gps['manager'].lat}\n"
         msg+= f"Lon\t\t {gps['manager'].lon}\n"
         msg+= f"Heading\t\t {gps['manager'].heading}\n"
         msg+= f"Speed\t\t {gps['manager'].speed}\n"
         msg+= f"Fix\t\t {gps['manager'].fix}\n"
-        msg+= f"pos_mode\t\t {gps['manager'].pos_mode}\n"
-        msg+= f"check: {check_gps(gps)}\n"
+        msg+= f"pos_mode\t {gps['manager'].pos_mode}\n"
+        msg+= f"check:\t {check_gps(gps)}\n"
         log.info(msg)
         time.sleep(1.0)
 
