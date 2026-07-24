@@ -243,13 +243,13 @@ def init_all(conf):
 
     # set up radiometry sampling switch, if any
     if sample['radiometry_trigger_source'] not in [None, 'none', 'None']:
-        if (sample['trigger_source'] == 'djim350') and (gps['protocol'] == 'djim350'):
+        if (sample['radiometry_trigger_source'] == 'djim350') and (gps['protocol'] == 'djim350'):
             # override the default switch state with link new switch
-            log.info(f"Radiometry on/off is controlled via {sample['trigger_source']}")
+            log.info(f"Radiometry on/off is controlled via {sample['radiometry_trigger_source']}")
             sample['do_radiometry'] = gps['manager'].do_radiometry
             # to get the state of the switch at any time call the linked function: sample['do_radiometry']()
         else:
-            log.error(f"Radiometry switch source {sample['trigger_source']} is not matched and will be ignored")
+            log.error(f"Radiometry switch source {sample['radiometry_trigger_source']} is not matched and will be ignored")
 
     # Return all the dicts and manager objects
     return db, rad, sample, gps, radiometry_manager, motor, battery, bat_manager, gpios, tpr, rht, cam, wind, power_schedule, export, datasets, maintenance
@@ -514,8 +514,6 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
                      rht, cam, wind, power_schedule, export, datasets, maintenance, conf, idle_time=1800)
             sys.exit(1)
         values['batt_voltage'] = bat_manager.batt_voltage
-
-    log.info(f"Radiometry switch is {sample['do_radiometry']()}")
 
     # Check positioning
     ready['gps']  = check_gps(gps)
