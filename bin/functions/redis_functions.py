@@ -69,7 +69,7 @@ def retrieve(client, key, freshness=30):
 
     dtype = client.get(f"{key}_dtype")
     if dtype is None:
-        log.warning(f"Key {key} not registered in redis")
+        log.debug(f"Key {key} not registered in redis")
         return None, None, None
 
     dtype = dtype.decode('utf-8')
