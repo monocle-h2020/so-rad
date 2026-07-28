@@ -467,8 +467,8 @@ class DJI_PSDK():
             return
 
         self.satellite_number = int(self.nsat)
-        self.lat_gps = float(self.gps_x)/10**7
-        self.lon_gps = float(self.gps_y)/10**7
+        self.lat_gps = float(self.gps_y)/10**7
+        self.lon_gps = float(self.gps_x)/10**7
         self.alt_gps = float(self.gps_z)/10**3
         self.last_update = datetime.datetime.now()
 
@@ -480,6 +480,9 @@ class DJI_PSDK():
         Longitude in Decimal Degrees = y/10^7  * 180/pi
         """
         if None in [self.rtk_lat, self.rtk_lon, self.rtk_hfsl]:
+            self.lat_rtk, self.lon_rtk, self.alt_rtk = None, None, None
+            return
+        if (float(self.rtk_lat) == 0.0) or (float(self.rtk_lon) == 0.0):
             self.lat_rtk, self.lon_rtk, self.alt_rtk = None, None, None
             return
 
@@ -499,7 +502,10 @@ class DJI_PSDK():
             self.alt = None
             self.alt_from_home = None
 
-        if (self.rtk_solution_code is not None) and (self.rtk_solution_code >= 16):
+        if (self.rtk_solution_code is not None) and \
+           (self.rtk_solution_code >= 16) and \
+           (self.lat_rtk is not None) and \
+           (self.lon_rtk is not None):
             self.lat = self.lat_rtk
             self.lon = self.lon_rtk
             self.pos_mode = 'rtk'
