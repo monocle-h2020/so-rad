@@ -120,7 +120,7 @@ def check_heading(gps, bearing_fixed):
             (gps['manager'].heading is not None):
             return True
 
-    elif gps['protocol'] in ['nmea0183', 'djim350']:
+    elif gps['protocol'] in ['nmea0183']:
         if gps['manager'].speed is None:
             return False
         elif gps['manager'].speed >= gps['heading_speed_limit']:
@@ -128,6 +128,13 @@ def check_heading(gps, bearing_fixed):
                 return False
             else:
                 return True
+
+    elif gps['protocol'] in ['djim350']:
+        if gps['manager'].heading is None:
+            return False
+        else:
+            return True
+
 
     return False
 
