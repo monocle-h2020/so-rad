@@ -24,11 +24,11 @@ log = logging.getLogger('pt2')
 class G2registers():
     """All G2 registers and how to read them"""
     def __init__(self):
-        self.slave_address =          {'name': 'slave_address',           'start': 0,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
+        self.slave_address =          {'name': 'slave_address',           'start': 0,   'len': 1,  'datatype': '>H',  'timeout':0.5, 'value': None}
         self.measurement_timeout =    {'name': 'measurement_timeout',     'start': 1,   'len': 1,  'datatype': '>H',  'timeout':0.5, 'value': None}
         self.deep_sleep_timeout  =    {'name': 'deep_sleep_timeout',      'start': 2,   'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.device_serial_number =   {'name': 'device_serial_number',    'start': 10,  'len': 5,  'datatype': 'str', 'timeout':0.25, 'value': None}
-        self.firmware_version =       {'name': 'firmware_version',        'start': 15,  'len': 5,  'datatype': 'str', 'timeout':0.15, 'value': None}
+        self.device_serial_number =   {'name': 'device_serial_number',    'start': 10,  'len': 5,  'datatype': 'str', 'timeout':0.5, 'value': None}
+        self.firmware_version =       {'name': 'firmware_version',        'start': 15,  'len': 5,  'datatype': 'str', 'timeout':0.5, 'value': None}
         self.self_trigger_activated = {'name': 'self_trigger_activated',  'start': 102, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
         self.self_trigger_interval =  {'name': 'self_trigger_interval',   'start': 103, 'len': 2,  'datatype': '>L',  'timeout':0.15, 'value': None}
         self.integration_time_cfg =   {'name': 'integration_time_cfg',    'start': 107, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
@@ -39,32 +39,32 @@ class G2registers():
         self.system_date_and_time =   {'name': 'system_date_and_time',    'start': 237, 'len': 2,  'datatype': 'seconds',  'timeout':0.15, 'value': None}
         self.device_description =     {'name': 'device_description',      'start': 239, 'len': 32, 'datatype': 'str', 'timeout':0.15, 'value': None}
         self.lan_enable_state =       {'name': 'lan_enable_state',        'start': 273, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.dark_pixel_start =       {'name': 'dark_pixel_start',        'start': 274, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.dark_pixel_stop =        {'name': 'dark_pixel_stop',         'start': 275, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.light_pixel_start =      {'name': 'light_pixel_start',       'start': 276, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
-        self.light_pixel_stop =       {'name': 'light_pixel_stop',        'start': 277, 'len': 1,  'datatype': '>H',  'timeout':0.15, 'value': None}
+        self.dark_pixel_start =       {'name': 'dark_pixel_start',        'start': 274, 'len': 1,  'datatype': '>H',  'timeout':0.25, 'value': None}
+        self.dark_pixel_stop =        {'name': 'dark_pixel_stop',         'start': 275, 'len': 1,  'datatype': '>H',  'timeout':0.25, 'value': None}
+        self.light_pixel_start =      {'name': 'light_pixel_start',       'start': 276, 'len': 1,  'datatype': '>H',  'timeout':0.25, 'value': None}
+        self.light_pixel_stop =       {'name': 'light_pixel_stop',        'start': 277, 'len': 1,  'datatype': '>H',  'timeout':0.25, 'value': None}
 
         # on unused sensors, many of these registers are not yet initiated and won't be read correctly.
         # After the first measurement has been triggered this should work
-        self.par =                    {'name': 'par',                     'start':1000, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.spectrum_type =          {'name': 'spectrum_type',           'start':2000, 'len': 1,  'datatype': '>H', 'timeout':0.15, 'value': None}
-        self.integration_time =       {'name': 'integration_time',        'start':2005, 'len': 1,  'datatype': '>H', 'timeout':0.15, 'value': None}
-        self.temperature =            {'name': 'temperature',             'start':2007, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.length =                 {'name': 'length',                  'start':2009, 'len': 1,  'datatype': '>H', 'timeout':0.15, 'value': None}
-        self.pressure =               {'name': 'pressure',                'start':2011, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.pre_inclination =        {'name': 'pre_inclination',         'start':2013, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.post_inclination =       {'name': 'post_inclination',        'start':2015, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.temp_inclination_sensor= {'name': 'temp_inclination_sensor', 'start':2030, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.temp_pressure_sensor =   {'name': 'temp_pressure_sensor',    'start':2032, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.pre_inclination_X =      {'name': 'pre_inclination_X',       'start':2034, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.pre_inclination_Y =      {'name': 'pre_inclination_Y',       'start':2036, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.pre_inclination_Z =      {'name': 'pre_inclination_Z',       'start':2038, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.post_inclination_X =     {'name': 'post_inclination_X',      'start':2040, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.post_inclination_Y =     {'name': 'post_inclination_Y',      'start':2042, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.post_inclination_Z =     {'name': 'post_inclination_Z',      'start':2044, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.pre_pressure =           {'name': 'pre_pressure',            'start':2046, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.post_pressure =          {'name': 'post_pressure',           'start':2048, 'len': 2,  'datatype': '>f', 'timeout':0.15, 'value': None}
-        self.dark_pixel_avg =         {'name': 'dark_pixel_avg',          'start':2050, 'len': 1,  'datatype': '>H', 'timeout':0.15, 'value': None}
+        self.par =                    {'name': 'par',                     'start':1000, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.spectrum_type =          {'name': 'spectrum_type',           'start':2000, 'len': 1,  'datatype': '>H', 'timeout':0.25, 'value': None}
+        self.integration_time =       {'name': 'integration_time',        'start':2005, 'len': 1,  'datatype': '>H', 'timeout':0.25, 'value': None}
+        self.temperature =            {'name': 'temperature',             'start':2007, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.length =                 {'name': 'length',                  'start':2009, 'len': 1,  'datatype': '>H', 'timeout':0.25, 'value': None}
+        self.pressure =               {'name': 'pressure',                'start':2011, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.pre_inclination =        {'name': 'pre_inclination',         'start':2013, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.post_inclination =       {'name': 'post_inclination',        'start':2015, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.temp_inclination_sensor= {'name': 'temp_inclination_sensor', 'start':2030, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.temp_pressure_sensor =   {'name': 'temp_pressure_sensor',    'start':2032, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.pre_inclination_X =      {'name': 'pre_inclination_X',       'start':2034, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.pre_inclination_Y =      {'name': 'pre_inclination_Y',       'start':2036, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.pre_inclination_Z =      {'name': 'pre_inclination_Z',       'start':2038, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.post_inclination_X =     {'name': 'post_inclination_X',      'start':2040, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.post_inclination_Y =     {'name': 'post_inclination_Y',      'start':2042, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.post_inclination_Z =     {'name': 'post_inclination_Z',      'start':2044, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.pre_pressure =           {'name': 'pre_pressure',            'start':2046, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.post_pressure =          {'name': 'post_pressure',           'start':2048, 'len': 2,  'datatype': '>f', 'timeout':0.25, 'value': None}
+        self.dark_pixel_avg =         {'name': 'dark_pixel_avg',          'start':2050, 'len': 1,  'datatype': '>H', 'timeout':0.25, 'value': None}
 
         # RAMSES G2 has the 'Raw Light' method. The other registers (for calibrated wavelength and intensity) are commented out here because they are not tested.
         # Note that the data is stored in blocks of 125 coils, so two requests are needed to receive the complete length.
@@ -81,15 +81,12 @@ def sample_one(mod):
     result.spectrum = None
 
     meastimer = read_one_register(mod, register_name='measurement_timeout')
-    if meastimer is None or meastimer > 0:
-        log.info(f"Sensor busy or no response on {mod['serial'].port}. Retrying.")
-        time.sleep(0.1)
-        meastimer = read_one_register(mod, register_name='measurement_timeout')
-        if meastimer is None:
-            log.info(f"No response on {mod['serial'].port}")
-        elif meastimer > 0:
-            log.info(f"Sensor busy on {mod['serial'].port}. Measurement timeout register returned {meastimer}")
-            return result
+    if meastimer is None:
+        log.info(f"No response on {mod['serial'].port}")
+        return result
+    elif meastimer > 0:
+        log.info(f"Sensor busy on {mod['serial'].port}. Measurement timeout register returned {meastimer}")
+        return result
 
     # trigger measurement
     trigger_measurement(mod)
@@ -120,18 +117,36 @@ def set_lan_state(mod, state=False):
     """Enable or Disable the LAN interface. Saved across restarts. After enabling the device should be power cycled."""
     lanreg = G2registers().lan_enable_state
     response = write_single_command(mod['serial'], 1, 6, lanreg['start'], {True:65535, False:0}[state], timeout=1.0)
-    log.debug(crc_check_incoming(response))
+    try:
+        log.debug(crc_check_incoming(response))
+    except Exception as err:
+        log.warning(err)
+
+def set_self_trigger_state(mod, state=False):
+    """Enable or Disable the self-trigger."""
+    trigreg = G2registers().self_trigger_activated
+    response = write_single_command(mod['serial'], 1, 6, trigreg['start'], {True:65535, False:0}[state], timeout=1.0)
+    try:
+        log.debug(crc_check_incoming(response))
+    except Exception as err:
+        log.warning(err)
 
 def set_integration_time(mod, inttime=0):
     """Enable or Disable the LAN interface. Saved across restarts. After enabling the device should be power cycled."""
     lanreg = G2registers().integration_time_cfg
     response = write_single_command(mod['serial'], 1, 6, lanreg['start'], inttime, timeout=1.0)
-    log.debug(crc_check_incoming(response))
+    try:
+        log.debug(crc_check_incoming(response))
+    except Exception as err:
+        log.warning(err)
 
 def trigger_measurement(mod):
     """Write register 0x06 with value 0x0400 (1024) to trigger a single measurement"""
-    response = write_single_command(mod['serial'], 1, 6, 1, 1024, timeout=1)
-    log.debug(response)
+    response = write_single_command(mod['serial'], 1, 6, 1, 1024, timeout=1.0)
+    try:
+        log.debug(response)
+    except Exception as err:
+        log.warning(err)
 
 
 def get_lan_state(mod):
@@ -160,7 +175,7 @@ def get_lan_state(mod):
     return lanstate
 
 
-def read_last_meas(mod):
+def read_last_meas(mod, retries=3):
     """
     Populate a dictionary with all instrument data from all trios G2 registers. The length attribute can then be used to read spectral data.
     """
@@ -172,18 +187,27 @@ def read_last_meas(mod):
                   g2.temp_inclination_sensor,
                   g2.raw_ordinate0, g2.raw_ordinate1]:
 
-        response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=g2var['timeout'])
-        datatype = g2var['datatype']
-        try:
-            #crc_check_incoming(response)
-            g2var['value'] = unpack_response(response, datatype)
-            log.debug(f"{g2var['name']}: {g2var['value']}")
-        except CrcError as err:
-            #log.exception(err)
-            log.warning(f"{g2var['name']} Checksum failed: {response}")
-        except CrcEmptyMessage as err:
-            #log.exception(err)
-            log.debug(f"{g2var['name']} Checksum failed: Empty response")
+        attempt = 0
+        for attempt in range(retries):
+           if attempt > 0:
+               time.sleep(attempt*g2var['timeout'])
+           try:
+               response = read_command(mod['serial'], 1, 3, g2var['start'], g2var['len'], timeout=(attempt+1)*g2var['timeout'])
+               datatype = g2var['datatype']
+               #crc_check_incoming(response)
+               g2var['value'] = unpack_response(response, datatype)
+               log.debug(f"{g2var['name']}: {g2var['value']}")
+               break
+           except CrcError as err:
+               #log.exception(err)
+               log.warning(f"{g2var['name']} Checksum failed: {response}. Retrying (attempt {attempt+1})")
+           except CrcEmptyMessage as err:
+               #log.exception(err)
+               log.warning(f"{g2var['name']} Checksum failed: Empty response. Retrying (attempt {attempt+1})")
+           except ValueError as err:
+               log.warning(f"{g2var['name']} Invalid package. Retrying (attempt {attempt+1})")
+           except IndexError as err:
+               log.warning(f"{g2var['name']} Invalid package. Retrying (attempt {attempt+1})")
 
     try:
         g2.spectrum = list(g2.raw_ordinate0['value'] + g2.raw_ordinate1['value'])
@@ -229,36 +253,42 @@ def write_single_command(mod_serial, slave_id, function_code, register_address, 
     mod_serial.write(codecs.decode(command, 'hex'))
 
     # Read the response
-    time.sleep(timeout)
-    a = mod_serial.in_waiting
-    # read response of location
-    response = mod_serial.read(size=a)
+    response = read_modbus(mod_serial, inter_byte_timeout=0.1, timeout=timeout)
 
     return response
 
 
-def read_one_register(mod, register_name='system_date_and_time', slave_address=1):
+def read_one_register(mod, register_name='system_date_and_time', slave_address=1, retries=3):
     """perform request and read operation by register name"""
-
+    result = None
     g2 = G2registers()
     reg = g2.__dict__[register_name]
-    response = read_command(mod['serial'], slave_address, 3, reg['start'], reg['len'], timeout=reg['timeout'])
 
-    if response == b'':  # nothing received, try once more but slower.
-        log.debug("No response, trying again.. ")
-        response = read_command(mod['serial'], slave_address, 3, reg['start'], reg['len'], timeout=reg['timeout']*2)
+    for r in range(retries):
+        if r > 0:
+            time.sleep(r*0.1)
 
-    datatype = reg['datatype']
-    try:
-        crc_check_incoming(response)
-    except CrcError as err:
-        log.warning(f"CRC check failed on register {register_name}: {response}")
-        return None
-    except CrcEmptyMessage as err:
-        log.debug(f"CRC check: empty response on register {register_name}")
-        return None
+        response = read_command(mod['serial'], slave_address, 3, reg['start'], reg['len'], timeout=(r+1)*reg['timeout'])
 
-    result = unpack_response(response, datatype)
+        if response == b'':  # nothing received, try once more but slower.
+            log.info(f"No data received for {register_name}, trying again {r}")
+            continue
+
+        datatype = reg['datatype']
+        try:
+            crc_check_incoming(response)
+        except CrcError as err:
+            log.warning(f"CRC check failed on register {register_name}: {response} (tries: {r+1})")
+            continue
+        except CrcEmptyMessage as err:
+            log.debug(f"CRC check: empty response on register {register_name} (tries: {r+1})")
+            continue
+
+        try:
+            result = unpack_response(response, datatype)
+        except Exception as err:
+            log.warning(f"Could not unpack response: {response} (tries: {r+1})")
+            time.sleep(0.1)
 
     return result
 
@@ -337,15 +367,15 @@ def parse_data_types(datablock, datatype):
             if len(data) == 1:
                 data = data[0]
     except:
-        log.warning(f"Could not parse {datablock}, {data_hex}, {len(datablock)} as {datatype}")
+        msg = f"Could not parse block {datablock}, hex {data_hex}, of length {len(datablock)} as {datatype}"
+        log.warning(msg)
         data = None
-        pass
+        raise ValueError(msg)
 
-    log.debug(f"data hex/int: {data_hex} / {data}")
     return data
 
 
-def unpack_response(response, datatype='int', ):
+def unpack_response(response, datatype='int'):
     """unpack the hex response"""
     slave_id = int(response[0])  # 1 register
     function_code = int(response[1])  # 1 register
@@ -361,7 +391,7 @@ def unpack_response(response, datatype='int', ):
 def crc_check_incoming(response):
     """crc check on incoming packet"""
     if len(response) == 0:
-        raise CrcEmptyMessage("Empty repsonse")
+        raise CrcEmptyMessage("Empty response")
 
     crc_message = response[0:-2]
     crc_hex = response[-2:].hex() # string representation of bytes object code in hex
@@ -386,7 +416,7 @@ class CrcEmptyMessage(Exception):
     pass
 
 
-def report_slave_id(mod, slave_id=1, timeout=3.0, retries=3):
+def report_slave_id(mod, slave_id=1, timeout=1.0, retries=3):
     """
     Special function reporting back sensor informationin ascii coding: sensor name, serial number and firmware version.
     """
@@ -414,26 +444,25 @@ def report_slave_id(mod, slave_id=1, timeout=3.0, retries=3):
         # Send the command to the controller
         mod['serial'].flushInput()
         mod['serial'].flushOutput()
+        log.info(f"Sending sensor info request on {mod['serial'].port} (tries={r+1})")
         mod['serial'].write(codecs.decode(command, 'hex'))
 
         # Read the response
-        a = mod['serial'].in_waiting
-        t0 = time.perf_counter()
-        while a<1 and (time.perf_counter() - t0 < timeout):
-            time.sleep(0.1)
-            a = mod['serial'].in_waiting
-
-        # read response of location
-        response = mod['serial'].read(size=a)
         try:
+            log.info(f"Reading sensor info registers on {mod['serial'].port}")
+            response = read_modbus(mod['serial'], inter_byte_timeout=0.25, timeout=timeout)
+            log.debug(len(response))
+            log.debug(response)
             make = response[3:-2].split(b'\x00')[0].decode('ascii')
             model = response[3:-2].split(b'\x00')[1].decode('ascii')
             serialn = response[3:-2].split(b'\x00')[2].decode('ascii')
             version = response[3:-2].split(b'\x00')[3].decode('ascii')
             log.info(f"{mod['serial'].port}: {make} | {model} | {serialn} | {version}")
             success = True
+            break
         except:
-            log.info(f"No TriOS G2 response on {mod['serial'].port} (tries={r+1}): {response}")
+            log.info(f"No (valid) TriOS G2 response on {mod['serial'].port} (tries={r+1}): {response}")
+            time.sleep(0.25)
 
     if success:
         return serialn
@@ -489,7 +518,7 @@ def open_modbus(mod, baud=9600, db=8, sb=1, parity=serial.PARITY_NONE):
         try:
             mod['serial'] = serial.Serial(port=mod['port'],
                                       baudrate=baud,
-                                      timeout=1.0, bytesize=db, parity=parity,
+                                      timeout=5.0, bytesize=db, parity=parity,
                                       stopbits=sb, xonxoff=0)
             mod['serial'].reset_input_buffer()
             mod['serial'].reset_output_buffer()
@@ -526,12 +555,26 @@ def read_command(mod_serial, slave_id, function_code, register_address, no_of_re
     mod_serial.flushInput()
     mod_serial.flushOutput()
     mod_serial.write(codecs.decode(command, 'hex'))
-    # Read the response
-    time.sleep(timeout)
-    a = mod_serial.in_waiting
-    # read response of location
-    response = mod_serial.read(size=a)
+    # now read the response
+    response = read_modbus(mod_serial, inter_byte_timeout=0.25, timeout=timeout)
     return response
+
+def read_modbus(mod_serial, inter_byte_timeout=0.25, timeout=1.0):
+    """Actively listen instead of waiting to start.
+    The response still needs to start before timeout elapses.
+    Will continue to listen as long as data continue to arrive
+    """
+    inter_byte_timeout=0.1
+    response = bytearray()
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if mod_serial.in_waiting:
+            response.extend(mod_serial.read(mod_serial.in_waiting))
+            start_time = time.time()
+        else:
+            time.sleep(inter_byte_timeout)
+
+    return bytes(response)
 
 
 def calc_crc16(inputcommand):

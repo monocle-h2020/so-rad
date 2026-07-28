@@ -62,7 +62,7 @@ class TriosG2Manager(object):
         # thread properties
         self.started = False
 
-    def connect_sensors(self, timeout=2):
+    def connect_sensors(self, timeout=10):
         """connect to each port, start threads and collect sensor information"""
         if len(self.instruments) > 0:
              log.warning(f"There are already {len(self.instruments)} Ramses G2 instruments connected. Operation aborted.")
@@ -70,6 +70,7 @@ class TriosG2Manager(object):
 
         self.instruments_defined = []
         for port in self.ports:
+            log.info(port)
             self.instruments_defined.append(TriosG2Ramses(port))
 
         for instrument in self.instruments_defined:
@@ -346,8 +347,12 @@ class TriosG2Ramses(object):
         autotrig = pt2.read_one_register(self.mod, 'self_trigger_activated')
         if autotrig is None:
             log.warning(f"{self.mod['port']}: failed to detect auto-trigger setting.")
+        elif autotrig:
+            log.info(f"{self.mod['port']}: disable self-trigger state.")
+            pt2.set_self_trigger_state(self.mod, False)
         else:
             log.info(f"{self.mod['port']}: auto-trigger mode: {autotrig}.")
+
 
         log.info(f"{self.mod['port']}: checking integration time setting")
         inttime = pt2.read_one_register(self.mod, 'integration_time_cfg')
@@ -393,6 +398,7 @@ class TriosG2Ramses(object):
             self.ready = False
             log.critical(f"No Ramses G2 sensor found on {self.mod['port']}")
         else:
+            log.info(f"Ramses G2 sensor found on {self.mod['port']}")
             self.ready = True
             self.busy = False
 
