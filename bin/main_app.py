@@ -21,6 +21,7 @@ import logging
 import logging.handlers
 import functions.motor_controller_functions as motor_func
 import functions.db_functions as db_func
+from functions.rgb_indicator import set_colour
 # import functions.gps_functions as gps_func  deprecated
 import functions.azimuth_functions as azi_func
 from functions.check_functions import check_gps, check_motor, check_sensors, \
@@ -34,7 +35,7 @@ import functions.config_functions as cf_func
 from thread_managers import timed_actions
 from numpy import nan, max
 
-__version__ = 20260526.1
+__version__ = 20260729.1
 
 
 # initiate redis connection
@@ -236,7 +237,8 @@ def init_all(conf):
         except Exception as msg:
             log.critical(msg)
             # call sys.exit after pausing for idle_time to prevent immediate restart
-            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, wind, power_schedule, export, datasets, maintenance, conf, idle_time=600)
+            # TODO: make this configurable
+            stop_all(db, None, gps, battery, bat_manager, rad, tpr, rht, cam, wind, power_schedule, export, datasets, maintenance, conf, idle_time=30)
 
     else:
         radiometry_manager = None
@@ -261,6 +263,11 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
     log.info("Stopping system modules")
     print("stopping")
     rf.store(redis_client, 'system_status', 'stopping', expires=30)
+
+    # set RGB to red = system exiting
+    try:
+        set_colour(conf, 'red')
+    except: pass
 
     if export['manager'] is not None:
         log.info("Stopping export manager thread")
@@ -339,6 +346,10 @@ def stop_all(db, radiometry_manager, gps, battery, bat_manager, rad, tpr, rht, c
         log.info(t.ident)
 
     # Exit the program
+    # set RGB to red = system exiting
+    try:
+        set_colour(conf, 'red')
+    except: pass
     log.info("Idling {0} s before shutdown".format(idle_time))
     logging.shutdown()
     rf.store(redis_client, 'system_status', 'wait_exit', expires=30)
@@ -474,6 +485,11 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
     """
 
     log = logging.getLogger('main')
+
+    # set RGB to white = system primed
+    try:
+        set_colour(conf, 'white')
+    except: pass
 
     # init dicts for all environment checks and latest sensor values
     ready = {'speed': False, 'motor': False, 'sun': False, 'rad': False, 'heading': False, 'gps': False}
@@ -697,6 +713,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
         # Get the current time of the computer as a unique trigger id
         rf.store(redis_client, 'sampling_status', 'sampling', expires=30)
+
+        # attempt to set RGB to White = system ready
+        try:
+            set_colour(conf, 'green')
+        except: pass
+
         trigger_id['all_sensors'] = datetime.datetime.now()
 
         # trigger a camera image if sufficient time has passed since the last one.
@@ -725,6 +747,10 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
             log.info("{2} | New record (all sensors): {0} [{1}]".format(trigger_id['all_sensors'], db_id, counter))
 
         try:
+            set_colour(conf, 'white')
+        except: pass
+
+        try:
             for sid, spec in zip(sids, spec_data):
                 if None in spec:
                     log.warning(f"{counter} | None value encountered in spectrum from {sid}")
@@ -751,6 +777,12 @@ def run_one_cycle(counter, conf, db_dict, rad, sample, gps, radiometry_manager,
 
     # Alternatively check to see if just the gps location / metadata should be written
     else:
+
+        # set RGB to blue, alternating with white = system lacking essential data
+        try:
+            set_colour(conf, 'blue')
+        except: pass
+
         # trigger = False
         last_any_commit = max([trigger_id['all_sensors'], trigger_id['ed_sensor'], trigger_id['gps_location']])
         log.debug("last commit of any kind: {0}".format(last_any_commit))
@@ -782,6 +814,12 @@ def run():
 
     log = logging.getLogger('main')
     log.info('\n===Started logging===\n')
+
+    # attempt to set RGB to Pink
+    try:
+        # colours = ['blue', 'green', 'red', 'cyan', 'white', 'yellow', 'pink']
+        set_colour(conf, 'pink')
+    except: pass
 
     try:
         # Initialise everything
@@ -816,6 +854,11 @@ def run():
     slow_cycle_timer = time.perf_counter() - slow_cycle_sec - 10  # armed
 
     log.info("===Initialisation complete===")
+
+    # attempt to set RGB to White = system ready
+    try:
+        set_colour(conf, 'white')
+    except: pass
 
     trigger_id = {'all_sensors': datetime.datetime.now(),
                   'ed_sensor': datetime.datetime.now(),
